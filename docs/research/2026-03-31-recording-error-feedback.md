@@ -1,11 +1,3 @@
-# Дослідження: Зворотний зв'язок при неможливості почати запис
-
-**Дата:** 2026-03-31  
-**Автор:** AI Research  
-**Статус:** Завершене дослідження
-
----
-
 ## 1. Проблема
 
 Коли користувач натискає кнопку «Start» або глобальну гарячу клавішу для початку запису, а запис з тих чи інших причин неможливий (наприклад, не обрано мікрофон), програма реагує **після спроби**: бекенд повертає помилку, яка відображається у вікні як текстове повідомлення `role="alert"`.
@@ -472,13 +464,3 @@ RecordingState::Idle => {
 | `hotkey.rs` | Проактивна перевірка + warning звук | Високий |
 | `lib.rs` | Допоміжна функція `play_warning_sound` | Середній |
 | Існуючий `role="alert"` | Зберегти як fallback для runtime помилок | — (не змінювати) |
-
----
-
-## 8. Джерела
-
-- [WAI-ARIA APG: Button Pattern](https://www.w3.org/WAI/ARIA/apg/patterns/button/) — "When the action associated with a button is unavailable, the button has `aria-disabled` set to `true`."
-- [WAI-ARIA APG: Providing Accessible Names and Descriptions](https://www.w3.org/WAI/ARIA/apg/practices/names-and-descriptions/) — використання `aria-describedby` для пояснення.
-- [W3C WAI: User Notification](https://www.w3.org/WAI/tutorials/forms/notifications/) — патерни для зворотного зв'язку.
-- [Tauri v2: Notification Plugin](https://v2.tauri.app/plugin/notification/) — обмеження на Windows.
-- Аналіз коду AudioCaptor: `src-tauri/src/lib.rs`, `hotkey.rs`, `sounds.rs`, `RecordControls.svelte`, `App.svelte`.

@@ -34,8 +34,9 @@
       type="button"
       onclick={canRecord ? onstart : undefined}
       aria-disabled={!canRecord || undefined}
-      aria-describedby={!canRecord ? "start-hint" : undefined}
-      aria-label="Start recording (Alt+S)"
+      aria-label={canRecord
+        ? "Start recording (Alt+S)"
+        : `Start recording (Alt+S). ${readinessHint}`}
       class="btn btn-start"
       class:disabled={!canRecord}
     >

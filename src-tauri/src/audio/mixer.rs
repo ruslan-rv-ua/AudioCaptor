@@ -1,0 +1,436 @@
+use crate::audio::types::{AudioCommand, OutputMode};
+use crate::audio::writer::AudioWriter;
+use crossbeam_channel::Receiver;
+use ringbuf::traits::{Consumer, Observer};
+use rubato::{FftFixedIn, Resampler};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+
+pub struct MixerConfig {
+    pub mic_consumer: Option<ringbuf::HeapCons<f32>>,
+    pub loopback_consumer: Option<ringbuf::HeapCons<f32>>,
+    pub mic_sample_rate: u32,
+    pub loopback_sample_rate: u32,
+    pub mic_channels: u16,
+    pub loopback_channels: u16,
+    pub target_sample_rate: u32,
+    pub target_channels: u16,
+    pub output_mode: OutputMode,
+    pub mic_volume: f32,
+    pub loopback_volume: f32,
+    pub writer: AudioWriter,
+    pub command_rx: Receiver<AudioCommand>,
+    /// Discard this many milliseconds of audio at startup to avoid capturing
+    /// residual notification sound from the WASAPI render pipeline.
+    pub warmup_discard_ms: u64,
+}
+
+pub struct MixerHandle {
+    pub running: Arc<AtomicBool>,
+    pub thread: Option<std::thread::JoinHandle<()>>,
+}
+
+impl MixerHandle {
+    pub fn stop(&mut self) {
+        self.running.store(false, Ordering::Relaxed);
+        if let Some(handle) = self.thread.take() {
+            let _ = handle.join();
+        }
+    }
+}
+
+impl Drop for MixerHandle {
+    fn drop(&mut self) {
+        self.stop();
+    }
+}
+
+/// Start the mixer thread. Returns a handle to control it.
+pub fn start_mixer(config: MixerConfig) -> anyhow::Result<MixerHandle> {
+    let running = Arc::new(AtomicBool::new(true));
+    let running_clone = running.clone();
+
+    let thread = std::thread::Builder::new()
+        .name("mixer".into())
+        .spawn(move || {
+            mixer_loop(config, running_clone);
+        })?;
+
+    Ok(MixerHandle {
+        running,
+        thread: Some(thread),
+    })
+}
+
+/// Create a rubato resampler if source rate differs from target rate.
+/// `chunk_frames` is the number of frames per channel (not total interleaved samples).
+fn maybe_resampler(
+    source_rate: u32,
+    target_rate: u32,
+    channels: usize,
+    chunk_frames: usize,
+) -> Option<FftFixedIn<f32>> {
+    if source_rate == target_rate {
+        return None;
+    }
+    FftFixedIn::new(source_rate as usize, target_rate as usize, chunk_frames, 1, channels).ok()
+}
+
+/// Convert mono samples to stereo by duplicating each sample.
+fn mono_to_stereo(mono: &[f32]) -> Vec<f32> {
+    let mut stereo = Vec::with_capacity(mono.len() * 2);
+    for &s in mono {
+        stereo.push(s);
+        stereo.push(s);
+    }
+    stereo
+}
+
+/// Convert stereo samples to mono by averaging each pair.
+fn stereo_to_mono(stereo: &[f32]) -> Vec<f32> {
+    stereo.chunks(2).map(|c| (c[0] + c[1]) * 0.5).collect()
+}
+
+/// Deinterleave interleaved samples into per-channel vectors (for rubato).
+fn deinterleave(interleaved: &[f32], channels: usize) -> Vec<Vec<f32>> {
+    let mut result: Vec<Vec<f32>> = (0..channels).map(|_| Vec::new()).collect();
+    for (i, &sample) in interleaved.iter().enumerate() {
+        result[i % channels].push(sample);
+    }
+    result
+}
+
+/// Interleave per-channel vectors back into a single buffer.
+fn interleave(channels: &[Vec<f32>]) -> Vec<f32> {
+    if channels.is_empty() {
+        return vec![];
+    }
+    let frames = channels[0].len();
+    let num_ch = channels.len();
+    let mut result = Vec::with_capacity(frames * num_ch);
+    for frame in 0..frames {
+        for ch in channels {
+            result.push(ch[frame]);
+        }
+    }
+    result
+}
+
+/// Resample exactly `chunk_frames` frames from the front of `buf` (interleaved).
+/// Returns the resampled interleaved output.
+fn resample_chunk(
+    buf: &[f32],
+    channels: usize,
+    resampler: &mut FftFixedIn<f32>,
+) -> Vec<f32> {
+    let deint = deinterleave(buf, channels);
+    match resampler.process(&deint, None) {
+        Ok(resampled) => interleave(&resampled),
+        Err(e) => {
+            log::error!("Resample error: {}", e);
+            buf.to_vec()
+        }
+    }
+}
+
+fn mixer_loop(mut config: MixerConfig, running: Arc<AtomicBool>) {
+    let mut paused = false;
+
+    // After Resume, keep discarding until the loopback ring buffer has been quiet
+    // for 20 ms (pipeline drained) or until a 500 ms safety deadline is reached.
+    let mut pending_resume = false;
+    let mut resume_quiet_since: Option<std::time::Instant> = None;
+    let mut resume_deadline: Option<std::time::Instant> = None;
+
+    // Discard the first warmup_discard_ms of audio at startup so that any
+    // residual notification sound left in the WASAPI render pipeline is flushed
+    // before we write to the WAV file.
+    let warmup_end = std::time::Instant::now()
+        + std::time::Duration::from_millis(config.warmup_discard_ms);
+
+    let mut mic_volume = config.mic_volume;
+    let mut loopback_volume = config.loopback_volume;
+    let target_channels = config.target_channels as usize;
+    let mic_channels = config.mic_channels as usize;
+    let loopback_channels = config.loopback_channels as usize;
+
+    // Read buffer — sized for ~10ms at max source sample rate
+    let max_sr = config.mic_sample_rate.max(config.loopback_sample_rate);
+    let chunk_frames = (max_sr as usize) / 100; // 10ms worth of frames
+
+    // Fix #3: use actual channel counts for buffer sizing
+    let mic_chunk_size = chunk_frames * mic_channels;
+    let loopback_chunk_size = chunk_frames * loopback_channels;
+    let mut mic_buf = vec![0.0f32; mic_chunk_size];
+    let mut loopback_buf = vec![0.0f32; loopback_chunk_size];
+
+    // Fix #1: pass chunk_frames (frames per channel) to maybe_resampler
+    let mut mic_resampler = maybe_resampler(
+        config.mic_sample_rate,
+        config.target_sample_rate,
+        mic_channels,
+        chunk_frames,
+    );
+    let mut loopback_resampler = maybe_resampler(
+        config.loopback_sample_rate,
+        config.target_sample_rate,
+        loopback_channels,
+        chunk_frames,
+    );
+
+    // Fix #2: per-source staging buffers to accumulate samples before resampling
+    let mut mic_staging: Vec<f32> = Vec::new();
+    let mut loopback_staging: Vec<f32> = Vec::new();
+
+    log::info!(
+        "Mixer thread started, mode={:?}, target={}Hz/{}ch, mic={}Hz/{}ch, loop={}Hz/{}ch",
+        config.output_mode,
+        config.target_sample_rate, target_channels,
+        config.mic_sample_rate, config.mic_channels,
+        config.loopback_sample_rate, config.loopback_channels,
+    );
+
+    while running.load(Ordering::Relaxed) {
+        // Check for commands (non-blocking)
+        while let Ok(cmd) = config.command_rx.try_recv() {
+            match cmd {
+                AudioCommand::Pause => {
+                    paused = true;
+                    log::info!("Mixer paused");
+                }
+                AudioCommand::Resume => {
+                    // Don't write immediately — wait for the loopback ring buffer
+                    // to drain so residual notification-sound data is discarded.
+                    pending_resume = true;
+                    resume_quiet_since = None;
+                    resume_deadline = Some(
+                        std::time::Instant::now()
+                            + std::time::Duration::from_millis(500),
+                    );
+                    log::info!("Mixer: pending resume, waiting for pipeline drain");
+                }
+                AudioCommand::Stop => {
+                    log::info!("Mixer received Stop");
+                    running.store(false, Ordering::Relaxed);
+                    break;
+                }
+                AudioCommand::SetMicVolume(v) => mic_volume = v,
+                AudioCommand::SetLoopbackVolume(v) => loopback_volume = v,
+            }
+        }
+
+        if !running.load(Ordering::Relaxed) {
+            break;
+        }
+
+        // Read available samples from ring buffers into staging
+        let mic_read = if let Some(ref mut consumer) = config.mic_consumer {
+            let n = consumer.pop_slice(&mut mic_buf);
+            if n > 0 {
+                mic_staging.extend_from_slice(&mic_buf[..n]);
+            }
+            n
+        } else {
+            0
+        };
+
+        let loopback_read = if let Some(ref mut consumer) = config.loopback_consumer {
+            let n = consumer.pop_slice(&mut loopback_buf);
+            if n > 0 {
+                loopback_staging.extend_from_slice(&loopback_buf[..n]);
+            }
+            n
+        } else {
+            0
+        };
+
+        // Advance pending-resume drain detection using the loopback read count.
+        // We track how long the loopback ring buffer has been continuously empty;
+        // once it stays empty for 20 ms we know the notification sound has been
+        // fully captured and discarded, and it is safe to start writing.
+        if pending_resume {
+            let loopback_empty = config
+                .loopback_consumer
+                .as_ref()
+                .map(|c| c.occupied_len() == 0 && loopback_read == 0)
+                .unwrap_or(true); // no loopback source → consider it drained
+
+            if loopback_empty {
+                resume_quiet_since.get_or_insert_with(std::time::Instant::now);
+            } else {
+                resume_quiet_since = None;
+            }
+
+            let drained = resume_quiet_since
+                .map(|t| t.elapsed().as_millis() >= 20)
+                .unwrap_or(false);
+            let timed_out = resume_deadline
+                .map(|d| std::time::Instant::now() >= d)
+                .unwrap_or(false);
+
+            if drained || timed_out {
+                pending_resume = false;
+                paused = false;
+                resume_quiet_since = None;
+                resume_deadline = None;
+                mic_staging.clear();
+                loopback_staging.clear();
+                log::info!(
+                    "Mixer resumed ({})",
+                    if drained { "pipeline drained" } else { "timeout" }
+                );
+            }
+        }
+
+        // If no data available from either source, sleep briefly to avoid busy-waiting
+        if mic_read == 0 && loopback_read == 0 {
+            std::thread::sleep(std::time::Duration::from_millis(1));
+            continue;
+        }
+
+        let in_warmup = std::time::Instant::now() < warmup_end;
+        if paused || in_warmup || pending_resume {
+            // Drain staging buffers but don't write — prevents desync
+            mic_staging.clear();
+            loopback_staging.clear();
+            continue;
+        }
+
+        // In Mix mode: only process when both sources have staged data.
+        // Without this, single-source batches alternate and double the output duration.
+        if matches!(config.output_mode, OutputMode::Mix) {
+            let mic_min = if mic_resampler.is_some() { chunk_frames * mic_channels } else { mic_channels };
+            let loop_min = if loopback_resampler.is_some() { chunk_frames * loopback_channels } else { loopback_channels };
+            if mic_staging.len() < mic_min || loopback_staging.len() < loop_min {
+                continue;
+            }
+        }
+
+        // In Mix mode: drain equal frame counts from both sources to keep them in sync.
+        // In single-source modes: drain all available (usize::MAX as sentinel).
+        let (mic_drain_frames, loop_drain_frames) = if matches!(config.output_mode, OutputMode::Mix) {
+            let mic_avail = mic_staging.len() / mic_channels;
+            let loop_avail = loopback_staging.len() / loopback_channels;
+            let min_avail = mic_avail.min(loop_avail);
+            (
+                if mic_resampler.is_some() { (min_avail / chunk_frames) * chunk_frames } else { min_avail },
+                if loopback_resampler.is_some() { (min_avail / chunk_frames) * chunk_frames } else { min_avail },
+            )
+        } else {
+            (usize::MAX, usize::MAX)
+        };
+
+        // Process mic — only resample when we have a full chunk; otherwise pass through directly
+        let mic_processed = if mic_resampler.is_some() {
+            let required = chunk_frames * mic_channels;
+            let max_drain = mic_drain_frames.saturating_mul(mic_channels);
+            let mut output = Vec::new();
+            let mut drained = 0;
+            while mic_staging.len() >= required && drained + required <= max_drain {
+                let chunk: Vec<f32> = mic_staging.drain(..required).collect();
+                let resampled = resample_chunk(&chunk, mic_channels, mic_resampler.as_mut().unwrap());
+                output.extend(resampled);
+                drained += required;
+            }
+            // Fix #4: channel conversion after resampling
+            if mic_channels == 1 && target_channels == 2 {
+                mono_to_stereo(&output)
+            } else if mic_channels == 2 && target_channels == 1 {
+                stereo_to_mono(&output)
+            } else {
+                output
+            }
+        } else if !mic_staging.is_empty() {
+            // No resampler — drain up to mic_drain_frames frames
+            let frames = mic_drain_frames.min(mic_staging.len() / mic_channels);
+            let available: Vec<f32> = mic_staging.drain(..frames * mic_channels).collect();
+            // Fix #4: channel conversion
+            if mic_channels == 1 && target_channels == 2 {
+                mono_to_stereo(&available)
+            } else if mic_channels == 2 && target_channels == 1 {
+                stereo_to_mono(&available)
+            } else {
+                available
+            }
+        } else {
+            vec![]
+        };
+
+        // Process loopback — same pattern
+        let loop_processed = if loopback_resampler.is_some() {
+            let required = chunk_frames * loopback_channels;
+            let max_drain = loop_drain_frames.saturating_mul(loopback_channels);
+            let mut output = Vec::new();
+            let mut drained = 0;
+            while loopback_staging.len() >= required && drained + required <= max_drain {
+                let chunk: Vec<f32> = loopback_staging.drain(..required).collect();
+                let resampled = resample_chunk(&chunk, loopback_channels, loopback_resampler.as_mut().unwrap());
+                output.extend(resampled);
+                drained += required;
+            }
+            // Fix #4: channel conversion after resampling
+            if loopback_channels == 1 && target_channels == 2 {
+                mono_to_stereo(&output)
+            } else if loopback_channels == 2 && target_channels == 1 {
+                stereo_to_mono(&output)
+            } else {
+                output
+            }
+        } else if !loopback_staging.is_empty() {
+            // No resampler — drain up to loop_drain_frames frames
+            let frames = loop_drain_frames.min(loopback_staging.len() / loopback_channels);
+            let available: Vec<f32> = loopback_staging.drain(..frames * loopback_channels).collect();
+            // Fix #4: channel conversion
+            if loopback_channels == 1 && target_channels == 2 {
+                mono_to_stereo(&available)
+            } else if loopback_channels == 2 && target_channels == 1 {
+                stereo_to_mono(&available)
+            } else {
+                available
+            }
+        } else {
+            vec![]
+        };
+
+        // Apply volume, mix, clip, and write based on mode
+        let output = match config.output_mode {
+            OutputMode::Microphone => {
+                mic_processed.iter().map(|&s| (s * mic_volume).clamp(-1.0, 1.0)).collect::<Vec<_>>()
+            }
+            OutputMode::Loopback => {
+                loop_processed.iter().map(|&s| (s * loopback_volume).clamp(-1.0, 1.0)).collect::<Vec<_>>()
+            }
+            // Fix #5: frame-aligned mix loop
+            OutputMode::Mix => {
+                let mic_frames = mic_processed.len() / target_channels;
+                let loop_frames = loop_processed.len() / target_channels;
+                let len_frames = mic_frames.max(loop_frames);
+                let mut out = Vec::with_capacity(len_frames * target_channels);
+                for frame in 0..len_frames {
+                    for ch in 0..target_channels {
+                        let idx = frame * target_channels + ch;
+                        let mic_s = mic_processed.get(idx).copied().unwrap_or(0.0) * mic_volume;
+                        let loop_s = loop_processed.get(idx).copied().unwrap_or(0.0) * loopback_volume;
+                        out.push((mic_s + loop_s).clamp(-1.0, 1.0));
+                    }
+                }
+                out
+            }
+        };
+
+        if !output.is_empty() {
+            if let Err(e) = config.writer.write_samples(&output) {
+                log::error!("WAV write error: {}", e);
+                break;
+            }
+        }
+    }
+
+    // Finalize WAV file
+    match config.writer.finalize() {
+        Ok(path) => log::info!("Recording saved: {}", path.display()),
+        Err(e) => log::error!("Failed to finalize WAV: {}", e),
+    }
+
+    log::info!("Mixer thread stopped");
+}

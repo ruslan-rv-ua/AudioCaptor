@@ -29,10 +29,9 @@
 
   **Гаряча клавіша:**
   - Відображення поточної комбінації
-  - Кнопка "Захопити нову" → режим захоплення: фронтенд слухає натискання, передає в Rust
+  - Кнопка "Захопити нову" → режим захоплення: спочатку зняти глобальний шоткат (`unregister_hotkey`), фронтенд слухає натискання, потім реєструє новий шоткат (`set_hotkey`)
   - Кнопка "Скинути до Pause/Break" (FR6.2)
-  - IPC-команди: `capture_hotkey_start`, `capture_hotkey_stop`, `update_hotkey`
-  - IPC-подія: `hotkey-captured`
+  - IPC-команди: `set_hotkey` (вже існує), `unregister_hotkey` (тимчасове зняття під час захоплення, щоб глобальний шоткат не спрацьовував)
 
   **Звук:**
   - Перемикач увімкнення/вимкнення звукових сповіщень (FR6.3)
@@ -50,8 +49,10 @@
 - Структура `settings.json`:
   ```json
   {
-    "hotkey": { "key": "Pause", "modifiers": [] },
-    "sound_notifications": true,
+    "selected_mic": null,
+    "selected_loopback": null,
+    "hotkey": "Pause",
+    "sound_enabled": true,
     "confirm_exit_during_recording": true,
     "language": "en",
     "profiles": [...],
@@ -61,7 +62,7 @@
 
 ### 3. aria-live регіони (FR8.6)
 
-- Додати `<div role="status" aria-live="assertive" aria-atomic="true">` для анонсів стану запису
+- Додати `<div role="status" aria-atomic="true">` для анонсів стану запису (`role="status"` має неявне `aria-live="polite"`)
 - При зміні стану оновлювати текст: "Recording started" / "Recording paused" / "Recording stopped"
 - Текст локалізований через Paraglide
 - Скрін-рідер автоматично озвучує зміни без взаємодії користувача
@@ -79,7 +80,7 @@
     "url": "https://github.com/.../releases/download/v$version/AudioCaptor.exe",
     "hash": "",
     "bin": "AudioCaptor.exe",
-    "persist": ["settings.json", "logs", "recordings"],
+    "persist": ["settings.json", "logs", "Recordings"],
     "checkver": { "github": "https://github.com/..." }
   }
   ```
@@ -106,7 +107,7 @@
 - [ ] UI відображається українською при виборі мови "Українська"
 - [ ] Усі рядки UI локалізовані (жодного хардкодованого тексту)
 - [ ] При першому запуску мова визначається автоматично за системою
-- [ ] Якщо системна мова `ru` — fallback на англійську
+- [ ] Якщо системна мова `ru` — fallback на українську (FR7.7)
 - [ ] Зміна мови зберігається в `settings.json` та діє після перезапуску
 - [ ] Сторінка налаштувань містить усі розділи: гаряча клавіша, звук, підтвердження виходу, мова
 - [ ] Захоплення нової гарячої клавіші працює через UI
@@ -117,6 +118,6 @@
 - [ ] aria-live регіон озвучує зміну стану запису скрін-рідером
 - [ ] Текст aria-live регіону локалізований
 - [ ] Scoop-маніфест створений та валідний
-- [ ] `scoop install` + `scoop update` зберігає `settings.json`, `logs/`, `recordings/`
+- [ ] `scoop install` + `scoop update` зберігає `settings.json`, `logs/`, `Recordings/`
 - [ ] Програма коректно працює з директорії Scoop
 - [ ] Сторінка налаштувань повністю доступна через клавіатуру та скрін-рідер

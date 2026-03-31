@@ -17,8 +17,8 @@
       id: String,
       name: String,           // унікальне, валідоване
       description: String,
-      output_folder: PathBuf, // за замовчуванням {exe_dir}/recordings/
-      output_mode: OutputMode,// Mic | Loopback | Mix | MixPlusMic | MixPlusLoopback
+      output_folder: PathBuf, // за замовчуванням {exe_dir}/Recordings/
+      output_mode: OutputMode,// Microphone | Loopback | Mix | MixPlusMicrophone | MixPlusLoopback
       sample_rate: u32,       // 8000 | 16000 | 44100 | 48000
       mic_volume: f32,        // 0.0–4.0
       loopback_volume: f32,   // 0.0–4.0
@@ -39,8 +39,8 @@
 ### 2. Розширені режими виводу (FR5.4, FR5.5, FR5.7, FR5.9)
 
 - Два нових режими:
-  - **Мікс + Мікрофон** — паралельний запис у два WAV-файли: `{mix_name}_{ts}.wav` + `{mic_name}_{ts}.wav`
-  - **Мікс + Loopback** — паралельний запис у два WAV-файли: `{mix_name}_{ts}.wav` + `{loopback_name}_{ts}.wav`
+  - **Мікс + Мікрофон** (`MixPlusMicrophone`) — паралельний запис у два WAV-файли: `{mix_name}_{ts}.wav` + `{mic_name}_{ts}.wav`
+  - **Мікс + Loopback** (`MixPlusLoopback`) — паралельний запис у два WAV-файли: `{mix_name}_{ts}.wav` + `{loopback_name}_{ts}.wav`
 - Mixer Thread маршрутизує оброблені дані в 1–2 `WavWriter` залежно від режиму
 - Кастомні базові імена файлів для кожного типу (мікрофон, loopback, мікс) — зберігаються в профілі
 - Автоматичне іменування: `{custom_name}_{YYYY-MM-DD_HH-MM-SS}.wav`
@@ -69,8 +69,37 @@
 |--------|--------|
 | Паралельний запис | Режими Mix+Mic та Mix+Loopback потребують двох одночасних `WavWriter` — перевірити відсутність блокувань |
 | Файлова система | Валідація шляху `output_folder` — перевірити існування, дозволи на запис |
-| Міграція | Існуючі `settings.json` без профілів → автоматично створити "Default" профіль з поточними параметрами |
+| Міграція | Існуючі `settings.json` без профілів → автоматично створити "Default" профіль з поточними параметрами (`mic_volume`, `loopback_volume`, `output_mode`, `sample_rate` переходять з верхнього рівня в профіль) |
 | Пам'ять | `IMMNotificationClient` — COM-об'єкт, потребує правильного часу життя (`Arc<Mutex<>>` або інший механізм) |
+
+### Проміжна структура `settings.json` після Етапу 3
+
+Поля `mic_volume`, `loopback_volume`, `output_mode`, `sample_rate` переходять з верхнього рівня в профілі. `selected_mic`, `selected_loopback`, `hotkey`, `sound_enabled` залишаються на верхньому рівні (пристрої не є частиною профілю за PRD FR4.2).
+
+```json
+{
+  "selected_mic": null,
+  "selected_loopback": null,
+  "hotkey": "Pause",
+  "sound_enabled": true,
+  "profiles": [
+    {
+      "id": "default",
+      "name": "Default",
+      "description": "",
+      "output_folder": "Recordings",
+      "output_mode": "Mix",
+      "sample_rate": 48000,
+      "mic_volume": 1.0,
+      "loopback_volume": 0.5,
+      "mic_filename": "mic",
+      "loopback_filename": "loopback",
+      "mix_filename": "mix"
+    }
+  ],
+  "active_profile_id": "default"
+}
+```
 
 ---
 

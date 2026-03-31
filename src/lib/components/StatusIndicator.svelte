@@ -26,15 +26,16 @@
   let stateClass = $derived(state.toLowerCase());
 </script>
 
-<div
-  class="status-indicator"
-  role="status"
-  aria-live="polite"
-  aria-label={state !== "Idle" ? `Recording status: ${stateLabel}, duration ${formattedDuration}` : `Recording status: ${stateLabel}`}
->
+<div class="status-indicator" aria-label="Recording status">
   <span class="state-badge {stateClass}">{stateLabel}</span>
   {#if state !== "Idle"}
-    <span class="duration" aria-label="Recording duration">{formattedDuration}</span>
+    <span
+      class="duration"
+      role="timer"
+      aria-label="Recording duration: {formattedDuration}"
+    >
+      {formattedDuration}
+    </span>
   {/if}
 </div>
 

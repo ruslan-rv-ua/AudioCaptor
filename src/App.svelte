@@ -62,6 +62,15 @@
     else if (state === "Idle") liveRegionText = "Recording stopped";
   });
 
+  function formatDuration(ms: number): string {
+    const totalSeconds = Math.floor(ms / 1000);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    const pad = (n: number) => n.toString().padStart(2, "0");
+    return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+  }
+
   function handleMnemonic(e: KeyboardEvent) {
     if (!e.altKey) return;
 
@@ -78,6 +87,14 @@
         break;
       case "t":
         if (recording.state !== "Idle") { e.preventDefault(); stopRecording(); }
+        break;
+      case "i":
+        e.preventDefault();
+        if (recording.state !== "Idle") {
+          liveRegionText = `${recording.state === "Paused" ? "Paused" : "Recording"}, ${formatDuration(recording.durationMs)}`;
+        } else {
+          liveRegionText = "Ready";
+        }
         break;
     }
   }

@@ -140,11 +140,13 @@
   function handleOutputModeChange(e: Event) {
     const target = e.target as HTMLSelectElement;
     recording.outputMode = target.value as OutputMode;
+    scheduleSave();
   }
 
   function handleSampleRateChange(e: Event) {
     const target = e.target as HTMLSelectElement;
     recording.sampleRate = parseInt(target.value);
+    scheduleSave();
   }
 </script>
 
@@ -158,7 +160,7 @@
       label="Microphone"
       devices={devices.microphones}
       value={recording.selectedMic}
-      onchange={(id) => (recording.selectedMic = id)}
+      onchange={(id) => { recording.selectedMic = id; scheduleSave(); }}
       disabled={isRecording}
     />
 
@@ -166,7 +168,7 @@
       label="Loopback Device"
       devices={devices.loopbacks}
       value={recording.selectedLoopback}
-      onchange={(id) => (recording.selectedLoopback = id)}
+      onchange={(id) => { recording.selectedLoopback = id; scheduleSave(); }}
       disabled={isRecording}
     />
   </section>
@@ -209,13 +211,13 @@
     <VolumeSlider
       label="Microphone Volume"
       value={recording.micVolume}
-      onchange={updateMicVolume}
+      onchange={(v) => { updateMicVolume(v); scheduleSave(); }}
     />
 
     <VolumeSlider
       label="Loopback Volume"
       value={recording.loopbackVolume}
-      onchange={updateLoopbackVolume}
+      onchange={(v) => { updateLoopbackVolume(v); scheduleSave(); }}
     />
   </section>
 

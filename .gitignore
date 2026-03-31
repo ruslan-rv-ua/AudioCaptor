@@ -1,0 +1,59 @@
+# ─── Rust / Cargo ────────────────────────────────────────────────────────────
+target/
+# Cargo.lock має зберігатися для виконуваних (бінарних) крейтів
+# Cargo.lock
+
+# ─── Node.js / npm ───────────────────────────────────────────────────────────
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-store/
+package-lock.json.bak
+
+# ─── Vite / Svelte ───────────────────────────────────────────────────────────
+dist/
+.vite/
+.svelte-kit/
+
+# ─── Tauri ───────────────────────────────────────────────────────────────────
+src-tauri/target/
+src-tauri/gen/
+src-tauri/WixTools/
+src-tauri/binaries/
+*.exe
+*.msi
+*.nsis
+
+# ─── Дані додатку (портативний режим — поряд з exe) ─────────────────────────
+recordings/
+logs/
+settings.json
+
+# ─── Змінні середовища ───────────────────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# ─── IDE / Редактори ─────────────────────────────────────────────────────────
+.vscode/settings.json
+.vscode/launch.json
+.vscode/*.code-workspace
+.idea/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# ─── Git worktrees ───────────────────────────────────────────────────────────
+.worktrees/
+
+# ─── OS ──────────────────────────────────────────────────────────────────────
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store

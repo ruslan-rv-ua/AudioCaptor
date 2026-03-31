@@ -35,6 +35,23 @@ export function getRecording() {
     set soundEnabled(v: boolean) { soundEnabled = v; },
     get hotkey() { return hotkey; },
     set hotkey(v: string) { hotkey = v; },
+    get canRecord() {
+      const mode = outputMode;
+      const needsMic = mode === "Microphone" || mode === "Mix";
+      const needsLoopback = mode === "Loopback" || mode === "Mix";
+      if (needsMic && !selectedMic) return false;
+      if (needsLoopback && !selectedLoopback) return false;
+      return true;
+    },
+    get readinessHint() {
+      const mode = outputMode;
+      const needsMic = (mode === "Microphone" || mode === "Mix") && !selectedMic;
+      const needsLoopback = (mode === "Loopback" || mode === "Mix") && !selectedLoopback;
+      if (needsMic && needsLoopback) return "Select microphone and system audio device";
+      if (needsMic) return "Select a microphone";
+      if (needsLoopback) return "Select a system audio device";
+      return "";
+    },
   };
 }
 

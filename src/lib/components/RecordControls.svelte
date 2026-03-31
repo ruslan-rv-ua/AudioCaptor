@@ -4,13 +4,15 @@
 
   interface Props {
     recordingState: RecordingState;
+    canRecord: boolean;
+    readinessHint: string;
     onstart: () => void;
     onpause: () => void;
     onresume: () => void;
     onstop: () => void;
   }
 
-  let { recordingState, onstart, onpause, onresume, onstop }: Props = $props();
+  let { recordingState, canRecord, readinessHint, onstart, onpause, onresume, onstop }: Props = $props();
 
   let altPressed = $state(false);
 
@@ -30,12 +32,18 @@
   {#if recordingState === "Idle"}
     <button
       type="button"
-      onclick={onstart}
+      onclick={canRecord ? onstart : undefined}
+      aria-disabled={!canRecord || undefined}
+      aria-describedby={!canRecord ? "start-hint" : undefined}
       aria-label="Start recording (Alt+S)"
       class="btn btn-start"
+      class:disabled={!canRecord}
     >
       {#if altPressed}<u>S</u>tart{:else}Start{/if}
     </button>
+    {#if !canRecord}
+      <p id="start-hint" class="hint" role="note">{readinessHint}</p>
+    {/if}
   {:else if recordingState === "Recording"}
     <button
       type="button"
@@ -78,6 +86,7 @@
     display: flex;
     gap: 8px;
     justify-content: center;
+    flex-wrap: wrap;
     padding: 16px 0;
   }
   .btn {
@@ -94,7 +103,19 @@
     outline-offset: 2px;
   }
   .btn-start { background: #22c55e; color: white; }
-  .btn-start:hover { background: #16a34a; }
+  .btn-start:hover:not(.disabled) { background: #16a34a; }
+  .btn-start.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: #86efac;
+  }
+  .hint {
+    width: 100%;
+    text-align: center;
+    font-size: 0.8rem;
+    color: #6b7280;
+    margin: 4px 0 0;
+  }
   .btn-pause { background: #f59e0b; color: white; }
   .btn-pause:hover { background: #d97706; }
   .btn-resume { background: #3b82f6; color: white; }

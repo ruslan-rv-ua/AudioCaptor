@@ -77,7 +77,7 @@
     const key = e.key.toLowerCase();
     switch (key) {
       case "s":
-        if (recording.state === "Idle") { e.preventDefault(); startRecording(); }
+        if (recording.state === "Idle" && recording.canRecord) { e.preventDefault(); startRecording(); }
         break;
       case "p":
         if (recording.state === "Recording") { e.preventDefault(); pauseRecording(); }
@@ -262,6 +262,8 @@
 
   <RecordControls
     recordingState={recording.state}
+    canRecord={recording.canRecord}
+    readinessHint={recording.readinessHint}
     onstart={startRecording}
     onpause={pauseRecording}
     onresume={resumeRecording}

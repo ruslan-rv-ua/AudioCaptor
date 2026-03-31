@@ -1,6 +1,7 @@
 use crate::audio::types::RecordingState;
 use crate::state::SharedState;
 use crate::{do_pause_recording, do_resume_recording, do_start_recording, do_stop_recording};
+use crate::{play_sound, settings, sounds};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager};
@@ -105,8 +106,26 @@ fn handle_shortcut_event(app: &AppHandle, event: ShortcutEvent) {
 
             match current {
                 RecordingState::Idle => {
+                    // Proactive check: verify required devices before attempting
+                    let settings = settings::read_settings();
+                    let mode = settings.output_mode.as_str();
+                    let needs_mic = matches!(mode, "Microphone" | "microphone" | "Mix" | "mix");
+                    let needs_loopback = matches!(mode, "Loopback" | "loopback" | "Mix" | "mix");
+                    let mic_missing = needs_mic && settings.selected_mic.is_none();
+                    let loopback_missing = needs_loopback && settings.selected_loopback.is_none();
+
+                    if mic_missing || loopback_missing {
+                        if let Ok(s) = state.lock() {
+                            play_sound(&s, sounds::SoundKind::Warning);
+                        }
+                        return;
+                    }
+
                     if let Err(e) = do_start_recording(app) {
                         log::error!("Hotkey start failed: {e}");
+                        if let Ok(s) = state.lock() {
+                            play_sound(&s, sounds::SoundKind::Warning);
+                        }
                         let _ = app.emit("recording-error", e);
                     }
                 }

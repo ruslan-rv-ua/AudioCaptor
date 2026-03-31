@@ -5,12 +5,14 @@ use std::io::Cursor;
 const START_SOUND: &[u8] = include_bytes!("../sounds/start.ogg");
 const PAUSE_SOUND: &[u8] = include_bytes!("../sounds/pause.ogg");
 const STOP_SOUND: &[u8] = include_bytes!("../sounds/stop.ogg");
+const WARNING_SOUND: &[u8] = include_bytes!("../sounds/warning.ogg");
 
 #[derive(Debug, Clone, Copy)]
 pub enum SoundKind {
     Start,
     Pause,
     Stop,
+    Warning,
 }
 
 type SoundMsg = (SoundKind, Option<Sender<()>>);
@@ -41,6 +43,7 @@ impl SoundEngine {
                         SoundKind::Start => START_SOUND,
                         SoundKind::Pause => PAUSE_SOUND,
                         SoundKind::Stop => STOP_SOUND,
+                        SoundKind::Warning => WARNING_SOUND,
                     };
 
                     let cursor = Cursor::new(data);

@@ -369,7 +369,7 @@ fn set_hotkey(app: tauri::AppHandle, shortcut: String) -> Result<(), String> {
     hotkey::register(&app, &shortcut)
 }
 
-fn play_sound(state: &state::AppState, kind: sounds::SoundKind) {
+pub fn play_sound(state: &state::AppState, kind: sounds::SoundKind) {
     if state.sounds_enabled {
         if let Some(ref engine) = state.sound_engine {
             engine.play(kind);

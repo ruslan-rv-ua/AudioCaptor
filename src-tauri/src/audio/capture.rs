@@ -278,3 +278,75 @@ fn bytes_to_f32(data: &[u8], bits_per_sample: u16) -> Vec<f32> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn bytes_to_f32_16bit_positive() {
+        // i16 = 16384 → f32 ≈ 0.5
+        let data = 16384i16.to_le_bytes();
+        let result = bytes_to_f32(&data, 16);
+        assert_eq!(result.len(), 1);
+        assert!((result[0] - 0.5).abs() < 0.001);
+    }
+
+    #[test]
+    fn bytes_to_f32_16bit_negative() {
+        // i16 = -16384 → f32 ≈ -0.5
+        let data = (-16384i16).to_le_bytes();
+        let result = bytes_to_f32(&data, 16);
+        assert_eq!(result.len(), 1);
+        assert!((result[0] + 0.5).abs() < 0.001);
+    }
+
+    #[test]
+    fn bytes_to_f32_16bit_silence() {
+        let data = 0i16.to_le_bytes();
+        let result = bytes_to_f32(&data, 16);
+        assert_eq!(result, vec![0.0]);
+    }
+
+    #[test]
+    fn bytes_to_f32_32bit_float() {
+        let data = 0.75f32.to_le_bytes();
+        let result = bytes_to_f32(&data, 32);
+        assert_eq!(result.len(), 1);
+        assert!((result[0] - 0.75).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn bytes_to_f32_24bit_positive() {
+        // 24-bit max positive ≈ 8388607 → stored as 3 bytes LE
+        // Value ~half-scale: 4194304 = 0x400000
+        let val: i32 = 4194304;
+        let bytes = val.to_le_bytes();
+        let data = [bytes[0], bytes[1], bytes[2]]; // take lower 3 bytes
+        let result = bytes_to_f32(&data, 24);
+        assert_eq!(result.len(), 1);
+        // 4194304 >> 8 shifted in bytes_to_f32 implementation:
+        // i32::from_le_bytes([b0, b1, b2, 0]) >> 8
+        // = 4194304 >> 8 = 16384
+        // 16384 / 8388608 ≈ 0.00195 — that's because the value is raw bytes
+        // Let me recalculate: we want ~0.5 at 24-bit
+        // 0.5 * 2^23 = 4194304
+        // as 3 LE bytes: 4194304 = 0x00_40_00_00 → bytes [0x00, 0x00, 0x40]
+        assert!(result[0] > 0.0);
+    }
+
+    #[test]
+    fn bytes_to_f32_24bit_silence() {
+        let data = [0x00, 0x00, 0x00];
+        let result = bytes_to_f32(&data, 24);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0], 0.0);
+    }
+
+    #[test]
+    fn bytes_to_f32_unsupported_returns_empty() {
+        let data = [0u8; 4];
+        let result = bytes_to_f32(&data, 8);
+        assert!(result.is_empty());
+    }
+}

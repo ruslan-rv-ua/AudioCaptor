@@ -9,6 +9,7 @@ export type RecordingState = "Idle" | "Recording" | "Paused";
 export type OutputMode = "Microphone" | "Loopback" | "Mix";
 
 export interface Settings {
+  version: number;
   selectedMic: string | null;
   selectedLoopback: string | null;
   micVolume: number;

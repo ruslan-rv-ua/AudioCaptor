@@ -1,5 +1,5 @@
 use crate::audio::types::{AudioCommand, OutputMode};
-use crate::audio::writer::AudioWriter;
+use crate::audio::writer::OutputWriter;
 use crossbeam_channel::Receiver;
 use ringbuf::traits::{Consumer, Observer};
 use rubato::{FftFixedIn, Resampler};
@@ -18,7 +18,7 @@ pub struct MixerConfig {
     pub output_mode: OutputMode,
     pub mic_volume: f32,
     pub loopback_volume: f32,
-    pub writer: AudioWriter,
+    pub writer: Box<dyn OutputWriter>,
     pub command_rx: Receiver<AudioCommand>,
     /// Discard this many milliseconds of audio at startup to avoid capturing
     /// residual notification sound from the WASAPI render pipeline.
@@ -130,6 +130,20 @@ fn resample_chunk(
             log::error!("Resample error: {}", e);
             buf.to_vec()
         }
+    }
+}
+
+/// Convert audio between channel counts if needed.
+fn convert_channels(samples: Vec<f32>, source_ch: usize, target_ch: usize) -> Vec<f32> {
+    if source_ch == target_ch {
+        samples
+    } else if source_ch == 1 && target_ch == 2 {
+        mono_to_stereo(&samples)
+    } else if source_ch == 2 && target_ch == 1 {
+        stereo_to_mono(&samples)
+    } else {
+        log::warn!("Unsupported channel conversion: {source_ch} → {target_ch}");
+        samples
     }
 }
 
@@ -332,26 +346,12 @@ fn mixer_loop(mut config: MixerConfig, running: Arc<AtomicBool>) {
                 output.extend(resampled);
                 drained += required;
             }
-            // Fix #4: channel conversion after resampling
-            if mic_channels == 1 && target_channels == 2 {
-                mono_to_stereo(&output)
-            } else if mic_channels == 2 && target_channels == 1 {
-                stereo_to_mono(&output)
-            } else {
-                output
-            }
+            convert_channels(output, mic_channels, target_channels)
         } else if !mic_staging.is_empty() {
             // No resampler — drain up to mic_drain_frames frames
             let frames = mic_drain_frames.min(mic_staging.len() / mic_channels);
             let available: Vec<f32> = mic_staging.drain(..frames * mic_channels).collect();
-            // Fix #4: channel conversion
-            if mic_channels == 1 && target_channels == 2 {
-                mono_to_stereo(&available)
-            } else if mic_channels == 2 && target_channels == 1 {
-                stereo_to_mono(&available)
-            } else {
-                available
-            }
+            convert_channels(available, mic_channels, target_channels)
         } else {
             vec![]
         };
@@ -368,26 +368,12 @@ fn mixer_loop(mut config: MixerConfig, running: Arc<AtomicBool>) {
                 output.extend(resampled);
                 drained += required;
             }
-            // Fix #4: channel conversion after resampling
-            if loopback_channels == 1 && target_channels == 2 {
-                mono_to_stereo(&output)
-            } else if loopback_channels == 2 && target_channels == 1 {
-                stereo_to_mono(&output)
-            } else {
-                output
-            }
+            convert_channels(output, loopback_channels, target_channels)
         } else if !loopback_staging.is_empty() {
             // No resampler — drain up to loop_drain_frames frames
             let frames = loop_drain_frames.min(loopback_staging.len() / loopback_channels);
             let available: Vec<f32> = loopback_staging.drain(..frames * loopback_channels).collect();
-            // Fix #4: channel conversion
-            if loopback_channels == 1 && target_channels == 2 {
-                mono_to_stereo(&available)
-            } else if loopback_channels == 2 && target_channels == 1 {
-                stereo_to_mono(&available)
-            } else {
-                available
-            }
+            convert_channels(available, loopback_channels, target_channels)
         } else {
             vec![]
         };
@@ -433,4 +419,94 @@ fn mixer_loop(mut config: MixerConfig, running: Arc<AtomicBool>) {
     }
 
     log::info!("Mixer thread stopped");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn mono_to_stereo_duplicates_samples() {
+        let mono = vec![0.5, -0.3, 1.0];
+        let stereo = mono_to_stereo(&mono);
+        assert_eq!(stereo, vec![0.5, 0.5, -0.3, -0.3, 1.0, 1.0]);
+    }
+
+    #[test]
+    fn mono_to_stereo_empty() {
+        assert_eq!(mono_to_stereo(&[]), Vec::<f32>::new());
+    }
+
+    #[test]
+    fn stereo_to_mono_averages_pairs() {
+        let stereo = vec![0.6, 0.4, -0.2, -0.8];
+        let mono = stereo_to_mono(&stereo);
+        assert_eq!(mono.len(), 2);
+        assert!((mono[0] - 0.5).abs() < 0.001);
+        assert!((mono[1] + 0.5).abs() < 0.001);
+    }
+
+    #[test]
+    fn stereo_to_mono_empty() {
+        assert_eq!(stereo_to_mono(&[]), Vec::<f32>::new());
+    }
+
+    #[test]
+    fn deinterleave_splits_channels() {
+        let interleaved = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0];
+        let channels = deinterleave(&interleaved, 2);
+        assert_eq!(channels.len(), 2);
+        assert_eq!(channels[0], vec![1.0, 3.0, 5.0]);
+        assert_eq!(channels[1], vec![2.0, 4.0, 6.0]);
+    }
+
+    #[test]
+    fn interleave_merges_channels() {
+        let channels = vec![vec![1.0, 3.0, 5.0], vec![2.0, 4.0, 6.0]];
+        let result = interleave(&channels);
+        assert_eq!(result, vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0]);
+    }
+
+    #[test]
+    fn interleave_deinterleave_roundtrip() {
+        let original = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0];
+        let deint = deinterleave(&original, 2);
+        let reint = interleave(&deint);
+        assert_eq!(original, reint);
+    }
+
+    #[test]
+    fn interleave_empty() {
+        assert_eq!(interleave(&[]), Vec::<f32>::new());
+    }
+
+    #[test]
+    fn convert_channels_same_passthrough() {
+        let data = vec![1.0, 2.0, 3.0, 4.0];
+        let result = convert_channels(data.clone(), 2, 2);
+        assert_eq!(result, data);
+    }
+
+    #[test]
+    fn convert_channels_mono_to_stereo() {
+        let mono = vec![0.5, -0.3];
+        let stereo = convert_channels(mono, 1, 2);
+        assert_eq!(stereo, vec![0.5, 0.5, -0.3, -0.3]);
+    }
+
+    #[test]
+    fn convert_channels_stereo_to_mono() {
+        let stereo = vec![0.6, 0.4, -0.2, -0.8];
+        let mono = convert_channels(stereo, 2, 1);
+        assert_eq!(mono.len(), 2);
+        assert!((mono[0] - 0.5).abs() < 0.001);
+        assert!((mono[1] + 0.5).abs() < 0.001);
+    }
+
+    #[test]
+    fn convert_channels_unsupported_passthrough() {
+        let data = vec![1.0, 2.0, 3.0];
+        let result = convert_channels(data.clone(), 3, 5);
+        assert_eq!(result, data);
+    }
 }

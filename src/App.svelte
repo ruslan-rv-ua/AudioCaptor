@@ -43,6 +43,7 @@
     clearTimeout(saveTimeout);
     saveTimeout = setTimeout(async () => {
       await saveSettings({
+        version: 1,
         selectedMic: recording.selectedMic,
         selectedLoopback: recording.selectedLoopback,
         micVolume: recording.micVolume,

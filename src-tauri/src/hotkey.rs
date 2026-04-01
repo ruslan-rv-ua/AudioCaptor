@@ -1,4 +1,4 @@
-use crate::audio::types::RecordingState;
+use crate::audio::types::{OutputMode, RecordingState};
 use crate::state::SharedState;
 use crate::{do_pause_recording, do_resume_recording, do_start_recording, do_stop_recording};
 use crate::{play_sound, settings, sounds};
@@ -108,9 +108,8 @@ fn handle_shortcut_event(app: &AppHandle, event: ShortcutEvent) {
                 RecordingState::Idle => {
                     // Proactive check: verify required devices before attempting
                     let settings = settings::read_settings();
-                    let mode = settings.output_mode.as_str();
-                    let needs_mic = matches!(mode, "Microphone" | "microphone" | "Mix" | "mix");
-                    let needs_loopback = matches!(mode, "Loopback" | "loopback" | "Mix" | "mix");
+                    let needs_mic = matches!(settings.output_mode, OutputMode::Microphone | OutputMode::Mix);
+                    let needs_loopback = matches!(settings.output_mode, OutputMode::Loopback | OutputMode::Mix);
                     let mic_missing = needs_mic && settings.selected_mic.is_none();
                     let loopback_missing = needs_loopback && settings.selected_loopback.is_none();
 

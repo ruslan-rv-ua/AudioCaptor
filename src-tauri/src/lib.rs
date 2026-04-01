@@ -8,7 +8,7 @@ pub mod state;
 use audio::capture;
 use audio::mixer::{self, MixerConfig};
 use audio::types::{AudioCommand, AudioDevice, OutputMode, RecordingState};
-use audio::writer::AudioWriter;
+use audio::writer::WavOutputWriter;
 use state::SharedState;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -123,8 +123,8 @@ fn start_recording_inner(
     let channels = 2u16;
 
     // Create WAV writer
-    let writer =
-        AudioWriter::new(output_path, sample_rate, channels).map_err(|e| e.to_string())?;
+    let writer: Box<dyn audio::writer::OutputWriter> =
+        Box::new(WavOutputWriter::new(output_path, sample_rate, channels).map_err(|e| e.to_string())?);
 
     // Create command channel
     let (tx, rx) = crossbeam_channel::bounded::<AudioCommand>(32);
@@ -309,11 +309,7 @@ pub fn do_start_recording(app: &tauri::AppHandle) -> Result<(), String> {
     let settings = settings::read_settings();
     let mic_id = settings.selected_mic;
     let loopback_id = settings.selected_loopback;
-    let mode: OutputMode = match settings.output_mode.as_str() {
-        "Microphone" | "microphone" => OutputMode::Microphone,
-        "Loopback" | "loopback" => OutputMode::Loopback,
-        _ => OutputMode::Mix,
-    };
+    let mode = settings.output_mode;
     let sample_rate = settings.sample_rate;
     start_recording_inner(app, &state, mic_id, loopback_id, mode, sample_rate)
 }
@@ -476,6 +472,21 @@ pub fn run() {
             set_sound_enabled,
             set_hotkey,
         ])
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { .. } = event {
+                let app = window.app_handle();
+                if let Some(state) = app.try_state::<SharedState>() {
+                    let is_recording = state
+                        .lock()
+                        .map(|s| s.recording_state != RecordingState::Idle)
+                        .unwrap_or(false);
+                    if is_recording {
+                        log::info!("Window closing during recording — stopping recording");
+                        let _ = stop_recording_inner(&state);
+                    }
+                }
+            }
+        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

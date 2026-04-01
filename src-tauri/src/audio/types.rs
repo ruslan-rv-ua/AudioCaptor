@@ -1,4 +1,5 @@
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
+#[serde(rename_all = "PascalCase")]
 pub enum OutputMode {
     Microphone,
     Loopback,

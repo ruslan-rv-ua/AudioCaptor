@@ -55,6 +55,45 @@ pub fn validate_profile_name(name: &str) -> Result<(), String> {
     Ok(())
 }
 
+pub fn save_profile(
+    profiles: &mut Vec<RecordingProfile>,
+    profile: RecordingProfile,
+) -> Result<(), String> {
+    validate_profile_name(&profile.name)?;
+    validate_filename(&profile.mic_filename)?;
+    validate_filename(&profile.loopback_filename)?;
+    validate_filename(&profile.mix_filename)?;
+
+    // Check for duplicate name (different id)
+    let has_dup = profiles
+        .iter()
+        .any(|p| p.id != profile.id && p.name == profile.name);
+    if has_dup {
+        return Err(format!("Profile name '{}' is a duplicate", profile.name));
+    }
+
+    // Update existing or insert new
+    if let Some(existing) = profiles.iter_mut().find(|p| p.id == profile.id) {
+        *existing = profile;
+    } else {
+        profiles.push(profile);
+    }
+
+    Ok(())
+}
+
+pub fn delete_profile(profiles: &mut Vec<RecordingProfile>, id: &str) -> Result<(), String> {
+    if profiles.len() <= 1 {
+        return Err("Cannot delete the last profile".into());
+    }
+    let idx = profiles
+        .iter()
+        .position(|p| p.id == id)
+        .ok_or_else(|| format!("Profile not found: {id}"))?;
+    profiles.remove(idx);
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -111,5 +150,89 @@ mod tests {
     fn validate_profile_name_accepts_valid() {
         assert!(validate_profile_name("My Profile").is_ok());
         assert!(validate_profile_name("Podcast Recording").is_ok());
+    }
+
+    #[test]
+    fn save_profile_new_adds_to_list() {
+        let mut profiles = vec![RecordingProfile::default()];
+        let new_profile = RecordingProfile {
+            id: "new-id".into(),
+            name: "Podcast".into(),
+            ..RecordingProfile::default()
+        };
+        let result = save_profile(&mut profiles, new_profile);
+        assert!(result.is_ok());
+        assert_eq!(profiles.len(), 2);
+        assert_eq!(profiles[1].name, "Podcast");
+    }
+
+    #[test]
+    fn save_profile_existing_updates_in_place() {
+        let mut profiles = vec![RecordingProfile::default()];
+        let mut updated = profiles[0].clone();
+        updated.name = "Updated Default".into();
+        updated.mic_volume = 2.0;
+        let result = save_profile(&mut profiles, updated);
+        assert!(result.is_ok());
+        assert_eq!(profiles.len(), 1);
+        assert_eq!(profiles[0].name, "Updated Default");
+        assert_eq!(profiles[0].mic_volume, 2.0);
+    }
+
+    #[test]
+    fn save_profile_rejects_duplicate_name() {
+        let mut profiles = vec![RecordingProfile::default()];
+        let dup = RecordingProfile {
+            id: "other-id".into(),
+            name: "Default".into(),
+            ..RecordingProfile::default()
+        };
+        let result = save_profile(&mut profiles, dup);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("duplicate"));
+    }
+
+    #[test]
+    fn save_profile_validates_filenames() {
+        let mut profiles = vec![RecordingProfile::default()];
+        let bad = RecordingProfile {
+            id: "bad".into(),
+            name: "Bad Profile".into(),
+            mic_filename: "bad<file".into(),
+            ..RecordingProfile::default()
+        };
+        let result = save_profile(&mut profiles, bad);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("forbidden"));
+    }
+
+    #[test]
+    fn delete_profile_removes_by_id() {
+        let mut profiles = vec![
+            RecordingProfile::default(),
+            RecordingProfile {
+                id: "second".into(),
+                name: "Second".into(),
+                ..RecordingProfile::default()
+            },
+        ];
+        let result = delete_profile(&mut profiles, "second");
+        assert!(result.is_ok());
+        assert_eq!(profiles.len(), 1);
+    }
+
+    #[test]
+    fn delete_profile_rejects_last_profile() {
+        let mut profiles = vec![RecordingProfile::default()];
+        let result = delete_profile(&mut profiles, "default");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("last"));
+    }
+
+    #[test]
+    fn delete_profile_rejects_nonexistent() {
+        let mut profiles = vec![RecordingProfile::default()];
+        let result = delete_profile(&mut profiles, "nonexistent");
+        assert!(result.is_err());
     }
 }

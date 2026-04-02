@@ -1,6 +1,7 @@
 pub mod audio;
 pub mod hotkey;
 pub mod portable;
+pub mod profiles;
 pub mod settings;
 pub mod sounds;
 pub mod state;

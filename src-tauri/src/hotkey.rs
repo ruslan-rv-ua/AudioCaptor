@@ -108,8 +108,26 @@ fn handle_shortcut_event(app: &AppHandle, event: ShortcutEvent) {
                 RecordingState::Idle => {
                     // Proactive check: verify required devices before attempting
                     let settings = settings::read_settings();
-                    let needs_mic = matches!(settings.output_mode, OutputMode::Microphone | OutputMode::Mix);
-                    let needs_loopback = matches!(settings.output_mode, OutputMode::Loopback | OutputMode::Mix);
+                    let profile = settings
+                        .profiles
+                        .iter()
+                        .find(|p| p.id == settings.active_profile_id)
+                        .cloned()
+                        .unwrap_or_default();
+                    let needs_mic = matches!(
+                        profile.output_mode,
+                        OutputMode::Microphone
+                            | OutputMode::Mix
+                            | OutputMode::MixPlusMicrophone
+                            | OutputMode::MixPlusLoopback
+                    );
+                    let needs_loopback = matches!(
+                        profile.output_mode,
+                        OutputMode::Loopback
+                            | OutputMode::Mix
+                            | OutputMode::MixPlusMicrophone
+                            | OutputMode::MixPlusLoopback
+                    );
                     let mic_missing = needs_mic && settings.selected_mic.is_none();
                     let loopback_missing = needs_loopback && settings.selected_loopback.is_none();
 

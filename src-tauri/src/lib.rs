@@ -310,13 +310,26 @@ fn stop_recording_inner(state: &SharedState) -> Result<(), String> {
 
 pub fn do_start_recording(app: &tauri::AppHandle) -> Result<(), String> {
     let state = app.state::<SharedState>();
-    // Read device params from settings.json (frontend persists selections there)
     let settings = settings::read_settings();
     let mic_id = settings.selected_mic;
     let loopback_id = settings.selected_loopback;
-    let mode = settings.output_mode;
-    let sample_rate = settings.sample_rate;
-    start_recording_inner(app, &state, mic_id, loopback_id, mode, sample_rate)
+
+    // Get params from active profile
+    let profile = settings
+        .profiles
+        .iter()
+        .find(|p| p.id == settings.active_profile_id)
+        .cloned()
+        .unwrap_or_default();
+
+    start_recording_inner(
+        app,
+        &state,
+        mic_id,
+        loopback_id,
+        profile.output_mode,
+        profile.sample_rate,
+    )
 }
 
 pub fn do_pause_recording(app: &tauri::AppHandle) -> Result<(), String> {

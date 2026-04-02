@@ -82,13 +82,20 @@ fn start_recording_inner(
         _ => {}
     }
 
-    // Generate output path
+    // Get active profile for output path and filenames
+    let settings = settings::read_settings();
+    let profile = settings.profiles.iter()
+        .find(|p| p.id == settings.active_profile_id)
+        .cloned()
+        .unwrap_or_default();
+
     let timestamp = chrono::Local::now().format("%Y-%m-%d_%H-%M-%S");
-    let filename = format!("recording_{}.wav", timestamp);
-    let output_path = portable::exe_dir()
-        .map_err(|e| e.to_string())?
-        .join("Recordings")
-        .join(&filename);
+    let base_dir = portable::exe_dir().map_err(|e| e.to_string())?;
+    let output_dir = base_dir.join(&profile.output_folder);
+    std::fs::create_dir_all(&output_dir).map_err(|e| e.to_string())?;
+
+    let filename = format!("{}_{}.wav", profile.mix_filename, timestamp);
+    let output_path = output_dir.join(&filename);
 
     // Play notification sound BEFORE starting capture so it isn't recorded.
     // The mixer's warmup_discard_ms handles any residual audio that the WASAPI
@@ -173,6 +180,8 @@ fn start_recording_inner(
     s.paused_duration = std::time::Duration::ZERO;
     s.pause_start_time = None;
     s.output_mode = mode;
+    s.recording_mic_id = mic_id.clone();
+    s.recording_loopback_id = loopback_id.clone();
     s.mic_capture = mic_handle;
     s.loopback_capture = loopback_handle;
     s.mixer = Some(mixer_handle);
@@ -276,6 +285,8 @@ fn stop_recording_inner(state: &SharedState) -> Result<(), String> {
         s.paused_duration = std::time::Duration::ZERO;
         s.pause_start_time = None;
         s.emitter_running.store(false, Ordering::SeqCst);
+        s.recording_mic_id = None;
+        s.recording_loopback_id = None;
 
         // Extract handles
         (
@@ -383,6 +394,61 @@ fn set_hotkey(app: tauri::AppHandle, shortcut: String) -> Result<(), String> {
     hotkey::register(&app, &shortcut)
 }
 
+#[tauri::command]
+fn cmd_list_profiles() -> Vec<profiles::RecordingProfile> {
+    let settings = settings::read_settings();
+    settings.profiles
+}
+
+#[tauri::command]
+fn cmd_save_profile(profile: profiles::RecordingProfile) -> Result<(), String> {
+    let mut settings = settings::read_settings();
+    profiles::save_profile(&mut settings.profiles, profile)?;
+    settings::write_settings(&settings).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+fn cmd_delete_profile(id: String) -> Result<String, String> {
+    let mut settings = settings::read_settings();
+    profiles::delete_profile(&mut settings.profiles, &id)?;
+    let new_active = if settings.active_profile_id == id {
+        settings.profiles[0].id.clone()
+    } else {
+        settings.active_profile_id.clone()
+    };
+    settings.active_profile_id = new_active.clone();
+    settings::write_settings(&settings).map_err(|e| e.to_string())?;
+    Ok(new_active)
+}
+
+#[tauri::command]
+fn cmd_select_profile(state: tauri::State<'_, SharedState>, id: String) -> Result<(), String> {
+    let mut settings = settings::read_settings();
+    if !settings.profiles.iter().any(|p| p.id == id) {
+        return Err(format!("Profile not found: {id}"));
+    }
+    settings.active_profile_id = id.clone();
+    settings::write_settings(&settings).map_err(|e| e.to_string())?;
+
+    if let Some(profile) = settings.profiles.iter().find(|p| p.id == id) {
+        let mut s = state.lock().map_err(|e| e.to_string())?;
+        s.mic_volume = profile.mic_volume;
+        s.loopback_volume = profile.loopback_volume;
+        s.active_profile_id = id;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn cmd_get_active_profile() -> Result<profiles::RecordingProfile, String> {
+    let settings = settings::read_settings();
+    settings.profiles.iter()
+        .find(|p| p.id == settings.active_profile_id)
+        .cloned()
+        .ok_or_else(|| "Active profile not found".into())
+}
+
 pub fn play_sound(state: &state::AppState, kind: sounds::SoundKind) {
     if state.sounds_enabled {
         if let Some(ref engine) = state.sound_engine {
@@ -467,6 +533,11 @@ pub fn run() {
                     Err(e) => log::warn!("Sound engine init failed: {e}"),
                 }
                 s.sounds_enabled = settings.sound_enabled;
+                if let Some(profile) = settings.profiles.iter().find(|p| p.id == settings.active_profile_id) {
+                    s.mic_volume = profile.mic_volume;
+                    s.loopback_volume = profile.loopback_volume;
+                }
+                s.active_profile_id = settings.active_profile_id.clone();
             }
 
             // Register global hotkey
@@ -489,6 +560,11 @@ pub fn run() {
             set_loopback_volume,
             set_sound_enabled,
             set_hotkey,
+            cmd_list_profiles,
+            cmd_save_profile,
+            cmd_delete_profile,
+            cmd_select_profile,
+            cmd_get_active_profile,
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { .. } = event {

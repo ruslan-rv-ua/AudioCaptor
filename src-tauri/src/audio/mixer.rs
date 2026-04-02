@@ -19,6 +19,8 @@ pub struct MixerConfig {
     pub mic_volume: f32,
     pub loopback_volume: f32,
     pub writer: Box<dyn OutputWriter>,
+    /// Secondary writer for parallel modes (MixPlusMicrophone, MixPlusLoopback).
+    pub secondary_writer: Option<Box<dyn OutputWriter>>,
     pub command_rx: Receiver<AudioCommand>,
     /// Discard this many milliseconds of audio at startup to avoid capturing
     /// residual notification sound from the WASAPI render pipeline.
@@ -145,6 +147,25 @@ fn convert_channels(samples: Vec<f32>, source_ch: usize, target_ch: usize) -> Ve
         log::warn!("Unsupported channel conversion: {source_ch} → {target_ch}");
         samples
     }
+}
+
+fn mix_samples(
+    mic: &[f32], loopback: &[f32],
+    mic_vol: f32, loop_vol: f32, channels: usize,
+) -> Vec<f32> {
+    let mic_frames = mic.len() / channels;
+    let loop_frames = loopback.len() / channels;
+    let len_frames = mic_frames.max(loop_frames);
+    let mut out = Vec::with_capacity(len_frames * channels);
+    for frame in 0..len_frames {
+        for ch in 0..channels {
+            let idx = frame * channels + ch;
+            let mic_s = mic.get(idx).copied().unwrap_or(0.0) * mic_vol;
+            let loop_s = loopback.get(idx).copied().unwrap_or(0.0) * loop_vol;
+            out.push((mic_s + loop_s).clamp(-1.0, 1.0));
+        }
+    }
+    out
 }
 
 fn mixer_loop(mut config: MixerConfig, running: Arc<AtomicBool>) {
@@ -386,37 +407,34 @@ fn mixer_loop(mut config: MixerConfig, running: Arc<AtomicBool>) {
             OutputMode::Loopback => {
                 loop_processed.iter().map(|&s| (s * loopback_volume).clamp(-1.0, 1.0)).collect::<Vec<_>>()
             }
-            // Fix #5: frame-aligned mix loop
             OutputMode::Mix => {
-                let mic_frames = mic_processed.len() / target_channels;
-                let loop_frames = loop_processed.len() / target_channels;
-                let len_frames = mic_frames.max(loop_frames);
-                let mut out = Vec::with_capacity(len_frames * target_channels);
-                for frame in 0..len_frames {
-                    for ch in 0..target_channels {
-                        let idx = frame * target_channels + ch;
-                        let mic_s = mic_processed.get(idx).copied().unwrap_or(0.0) * mic_volume;
-                        let loop_s = loop_processed.get(idx).copied().unwrap_or(0.0) * loopback_volume;
-                        out.push((mic_s + loop_s).clamp(-1.0, 1.0));
-                    }
-                }
-                out
+                mix_samples(&mic_processed, &loop_processed, mic_volume, loopback_volume, target_channels)
             }
-            // TODO: implement in Task 6 — for now, output mix only
-            OutputMode::MixPlusMicrophone | OutputMode::MixPlusLoopback => {
-                let mic_frames = mic_processed.len() / target_channels;
-                let loop_frames = loop_processed.len() / target_channels;
-                let len_frames = mic_frames.max(loop_frames);
-                let mut out = Vec::with_capacity(len_frames * target_channels);
-                for frame in 0..len_frames {
-                    for ch in 0..target_channels {
-                        let idx = frame * target_channels + ch;
-                        let mic_s = mic_processed.get(idx).copied().unwrap_or(0.0) * mic_volume;
-                        let loop_s = loop_processed.get(idx).copied().unwrap_or(0.0) * loopback_volume;
-                        out.push((mic_s + loop_s).clamp(-1.0, 1.0));
+            OutputMode::MixPlusMicrophone => {
+                let mix = mix_samples(&mic_processed, &loop_processed, mic_volume, loopback_volume, target_channels);
+                let mic_only: Vec<f32> = mic_processed.iter()
+                    .map(|&s| (s * mic_volume).clamp(-1.0, 1.0)).collect();
+                if !mic_only.is_empty() {
+                    if let Some(ref mut sw) = config.secondary_writer {
+                        if let Err(e) = sw.write_samples(&mic_only) {
+                            log::error!("Secondary WAV write error: {}", e);
+                        }
                     }
                 }
-                out
+                mix
+            }
+            OutputMode::MixPlusLoopback => {
+                let mix = mix_samples(&mic_processed, &loop_processed, mic_volume, loopback_volume, target_channels);
+                let loop_only: Vec<f32> = loop_processed.iter()
+                    .map(|&s| (s * loopback_volume).clamp(-1.0, 1.0)).collect();
+                if !loop_only.is_empty() {
+                    if let Some(ref mut sw) = config.secondary_writer {
+                        if let Err(e) = sw.write_samples(&loop_only) {
+                            log::error!("Secondary WAV write error: {}", e);
+                        }
+                    }
+                }
+                mix
             }
         };
 
@@ -432,6 +450,14 @@ fn mixer_loop(mut config: MixerConfig, running: Arc<AtomicBool>) {
     match config.writer.finalize() {
         Ok(path) => log::info!("Recording saved: {}", path.display()),
         Err(e) => log::error!("Failed to finalize WAV: {}", e),
+    }
+
+    // Finalize secondary WAV file (parallel modes)
+    if let Some(sw) = config.secondary_writer {
+        match sw.finalize() {
+            Ok(path) => log::info!("Secondary recording saved: {}", path.display()),
+            Err(e) => log::error!("Failed to finalize secondary WAV: {}", e),
+        }
     }
 
     log::info!("Mixer thread stopped");
@@ -524,5 +550,32 @@ mod tests {
         let data = vec![1.0, 2.0, 3.0];
         let result = convert_channels(data.clone(), 3, 5);
         assert_eq!(result, data);
+    }
+
+    #[test]
+    fn mix_samples_combines_with_volume() {
+        let mic = vec![0.5, 0.5];
+        let loopback = vec![0.3, 0.3];
+        let result = mix_samples(&mic, &loopback, 1.0, 1.0, 2);
+        assert_eq!(result.len(), 2);
+        assert!((result[0] - 0.8).abs() < 0.001);
+        assert!((result[1] - 0.8).abs() < 0.001);
+    }
+
+    #[test]
+    fn mix_samples_clamps_output() {
+        let mic = vec![0.9];
+        let loopback = vec![0.9];
+        let result = mix_samples(&mic, &loopback, 1.0, 1.0, 1);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0], 1.0); // clamped
+    }
+
+    #[test]
+    fn mix_samples_handles_unequal_lengths() {
+        let mic = vec![0.5, 0.5, 0.5, 0.5]; // 2 frames stereo
+        let loopback = vec![0.3, 0.3]; // 1 frame stereo
+        let result = mix_samples(&mic, &loopback, 1.0, 1.0, 2);
+        assert_eq!(result.len(), 4); // max frames * channels
     }
 }

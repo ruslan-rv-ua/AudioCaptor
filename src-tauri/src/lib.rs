@@ -94,9 +94,6 @@ fn start_recording_inner(
     let output_dir = base_dir.join(&profile.output_folder);
     std::fs::create_dir_all(&output_dir).map_err(|e| e.to_string())?;
 
-    let filename = format!("{}_{}.wav", profile.mix_filename, timestamp);
-    let output_path = output_dir.join(&filename);
-
     // Play notification sound BEFORE starting capture so it isn't recorded.
     // The mixer's warmup_discard_ms handles any residual audio that the WASAPI
     // render pipeline delivers after rodio's sink finishes.
@@ -134,9 +131,35 @@ fn start_recording_inner(
     // Determine output channels (stereo)
     let channels = 2u16;
 
-    // Create WAV writer
-    let writer: Box<dyn audio::writer::OutputWriter> =
-        Box::new(WavOutputWriter::new(output_path, sample_rate, channels).map_err(|e| e.to_string())?);
+    // Create WAV writer(s) based on mode
+    let (writer, secondary_writer): (Box<dyn audio::writer::OutputWriter>, Option<Box<dyn audio::writer::OutputWriter>>) = match mode {
+        OutputMode::MixPlusMicrophone => {
+            let mix_path = output_dir.join(format!("{}_{}.wav", profile.mix_filename, timestamp));
+            let mic_path = output_dir.join(format!("{}_{}.wav", profile.mic_filename, timestamp));
+            let w1 = Box::new(WavOutputWriter::new(mix_path, sample_rate, channels).map_err(|e| e.to_string())?);
+            let w2 = Box::new(WavOutputWriter::new(mic_path, sample_rate, channels).map_err(|e| e.to_string())?);
+            (w1, Some(w2))
+        }
+        OutputMode::MixPlusLoopback => {
+            let mix_path = output_dir.join(format!("{}_{}.wav", profile.mix_filename, timestamp));
+            let loop_path = output_dir.join(format!("{}_{}.wav", profile.loopback_filename, timestamp));
+            let w1 = Box::new(WavOutputWriter::new(mix_path, sample_rate, channels).map_err(|e| e.to_string())?);
+            let w2 = Box::new(WavOutputWriter::new(loop_path, sample_rate, channels).map_err(|e| e.to_string())?);
+            (w1, Some(w2))
+        }
+        OutputMode::Microphone => {
+            let path = output_dir.join(format!("{}_{}.wav", profile.mic_filename, timestamp));
+            (Box::new(WavOutputWriter::new(path, sample_rate, channels).map_err(|e| e.to_string())?), None)
+        }
+        OutputMode::Loopback => {
+            let path = output_dir.join(format!("{}_{}.wav", profile.loopback_filename, timestamp));
+            (Box::new(WavOutputWriter::new(path, sample_rate, channels).map_err(|e| e.to_string())?), None)
+        }
+        OutputMode::Mix => {
+            let path = output_dir.join(format!("{}_{}.wav", profile.mix_filename, timestamp));
+            (Box::new(WavOutputWriter::new(path, sample_rate, channels).map_err(|e| e.to_string())?), None)
+        }
+    };
 
     // Create command channel
     let (tx, rx) = crossbeam_channel::bounded::<AudioCommand>(32);
@@ -165,6 +188,7 @@ fn start_recording_inner(
         mic_volume: s.mic_volume,
         loopback_volume: s.loopback_volume,
         writer,
+        secondary_writer,
         command_rx: rx,
         // Give the mixer time to flush any residual notification sound that
         // the WASAPI render pipeline may still deliver to the loopback capture

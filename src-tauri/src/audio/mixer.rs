@@ -312,7 +312,7 @@ fn mixer_loop(mut config: MixerConfig, running: Arc<AtomicBool>) {
 
         // In Mix mode: only process when both sources have staged data.
         // Without this, single-source batches alternate and double the output duration.
-        if matches!(config.output_mode, OutputMode::Mix) {
+        if matches!(config.output_mode, OutputMode::Mix | OutputMode::MixPlusMicrophone | OutputMode::MixPlusLoopback) {
             let mic_min = if mic_resampler.is_some() { chunk_frames * mic_channels } else { mic_channels };
             let loop_min = if loopback_resampler.is_some() { chunk_frames * loopback_channels } else { loopback_channels };
             if mic_staging.len() < mic_min || loopback_staging.len() < loop_min {
@@ -322,7 +322,7 @@ fn mixer_loop(mut config: MixerConfig, running: Arc<AtomicBool>) {
 
         // In Mix mode: drain equal frame counts from both sources to keep them in sync.
         // In single-source modes: drain all available (usize::MAX as sentinel).
-        let (mic_drain_frames, loop_drain_frames) = if matches!(config.output_mode, OutputMode::Mix) {
+        let (mic_drain_frames, loop_drain_frames) = if matches!(config.output_mode, OutputMode::Mix | OutputMode::MixPlusMicrophone | OutputMode::MixPlusLoopback) {
             let mic_avail = mic_staging.len() / mic_channels;
             let loop_avail = loopback_staging.len() / loopback_channels;
             let min_avail = mic_avail.min(loop_avail);
@@ -388,6 +388,22 @@ fn mixer_loop(mut config: MixerConfig, running: Arc<AtomicBool>) {
             }
             // Fix #5: frame-aligned mix loop
             OutputMode::Mix => {
+                let mic_frames = mic_processed.len() / target_channels;
+                let loop_frames = loop_processed.len() / target_channels;
+                let len_frames = mic_frames.max(loop_frames);
+                let mut out = Vec::with_capacity(len_frames * target_channels);
+                for frame in 0..len_frames {
+                    for ch in 0..target_channels {
+                        let idx = frame * target_channels + ch;
+                        let mic_s = mic_processed.get(idx).copied().unwrap_or(0.0) * mic_volume;
+                        let loop_s = loop_processed.get(idx).copied().unwrap_or(0.0) * loopback_volume;
+                        out.push((mic_s + loop_s).clamp(-1.0, 1.0));
+                    }
+                }
+                out
+            }
+            // TODO: implement in Task 6 — for now, output mix only
+            OutputMode::MixPlusMicrophone | OutputMode::MixPlusLoopback => {
                 let mic_frames = mic_processed.len() / target_channels;
                 let loop_frames = loop_processed.len() / target_channels;
                 let len_frames = mic_frames.max(loop_frames);

@@ -4,6 +4,8 @@ pub enum OutputMode {
     Microphone,
     Loopback,
     Mix,
+    MixPlusMicrophone,
+    MixPlusLoopback,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -19,6 +21,39 @@ pub enum RecordingState {
     Idle,
     Recording,
     Paused,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn output_mode_mix_plus_microphone_serializes() {
+        let json = serde_json::to_string(&OutputMode::MixPlusMicrophone).unwrap();
+        assert_eq!(json, "\"MixPlusMicrophone\"");
+    }
+
+    #[test]
+    fn output_mode_mix_plus_loopback_serializes() {
+        let json = serde_json::to_string(&OutputMode::MixPlusLoopback).unwrap();
+        assert_eq!(json, "\"MixPlusLoopback\"");
+    }
+
+    #[test]
+    fn output_mode_mix_plus_microphone_roundtrip() {
+        let mode = OutputMode::MixPlusMicrophone;
+        let json = serde_json::to_string(&mode).unwrap();
+        let deserialized: OutputMode = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized, OutputMode::MixPlusMicrophone);
+    }
+
+    #[test]
+    fn output_mode_mix_plus_loopback_roundtrip() {
+        let mode = OutputMode::MixPlusLoopback;
+        let json = serde_json::to_string(&mode).unwrap();
+        let deserialized: OutputMode = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized, OutputMode::MixPlusLoopback);
+    }
 }
 
 #[derive(Debug)]

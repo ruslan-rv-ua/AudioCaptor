@@ -14,13 +14,13 @@ pub struct Settings {
     pub profiles: Vec<RecordingProfile>,
     pub active_profile_id: String,
     // Legacy fields — used only during migration from v1
-    #[serde(default)]
+    #[serde(default, skip_serializing)]
     mic_volume: f32,
-    #[serde(default)]
+    #[serde(default, skip_serializing)]
     loopback_volume: f32,
-    #[serde(default)]
+    #[serde(default, skip_serializing)]
     output_mode: OutputMode,
-    #[serde(default = "default_sample_rate")]
+    #[serde(default = "default_sample_rate", skip_serializing)]
     sample_rate: u32,
 }
 
@@ -50,7 +50,7 @@ fn settings_path() -> anyhow::Result<PathBuf> {
     Ok(crate::portable::exe_dir()?.join("settings.json"))
 }
 
-fn migrate_settings(mut settings: Settings) -> Settings {
+pub(crate) fn migrate_settings(mut settings: Settings) -> Settings {
     loop {
         match settings.version {
             0 => {

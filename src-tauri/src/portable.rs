@@ -25,7 +25,7 @@ pub fn ensure_dirs() -> anyhow::Result<()> {
 
     let settings_path = base.join("settings.json");
     if !settings_path.exists() {
-        let defaults = crate::settings::Settings::default();
+        let defaults = crate::settings::migrate_settings(crate::settings::Settings::default());
         let json = serde_json::to_string_pretty(&defaults)?;
         fs::write(&settings_path, json)?;
         log::info!("Created default settings.json");

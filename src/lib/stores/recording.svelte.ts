@@ -37,16 +37,16 @@ export function getRecording() {
     set hotkey(v: string) { hotkey = v; },
     get canRecord() {
       const mode = outputMode;
-      const needsMic = mode === "Microphone" || mode === "Mix";
-      const needsLoopback = mode === "Loopback" || mode === "Mix";
+      const needsMic = mode === "Microphone" || mode === "Mix" || mode === "MixPlusMicrophone" || mode === "MixPlusLoopback";
+      const needsLoopback = mode === "Loopback" || mode === "Mix" || mode === "MixPlusMicrophone" || mode === "MixPlusLoopback";
       if (needsMic && !selectedMic) return false;
       if (needsLoopback && !selectedLoopback) return false;
       return true;
     },
     get readinessHint() {
       const mode = outputMode;
-      const needsMic = (mode === "Microphone" || mode === "Mix") && !selectedMic;
-      const needsLoopback = (mode === "Loopback" || mode === "Mix") && !selectedLoopback;
+      const needsMic = (mode === "Microphone" || mode === "Mix" || mode === "MixPlusMicrophone" || mode === "MixPlusLoopback") && !selectedMic;
+      const needsLoopback = (mode === "Loopback" || mode === "Mix" || mode === "MixPlusMicrophone" || mode === "MixPlusLoopback") && !selectedLoopback;
       if (needsMic && needsLoopback) return "Select microphone and system audio device";
       if (needsMic) return "Select a microphone";
       if (needsLoopback) return "Select a system audio device";
@@ -129,10 +129,8 @@ export async function loadSettingsIntoStore() {
   const s = await api.loadSettings();
   selectedMic = s.selectedMic;
   selectedLoopback = s.selectedLoopback;
-  micVolume = s.micVolume;
-  loopbackVolume = s.loopbackVolume;
-  outputMode = s.outputMode;
-  sampleRate = s.sampleRate;
   hotkey = s.hotkey;
   soundEnabled = s.soundEnabled;
+  // Profile-specific fields (micVolume, loopbackVolume, outputMode, sampleRate)
+  // are loaded via applyProfile() after loadProfiles() in App.svelte onMount
 }

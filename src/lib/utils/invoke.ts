@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { AudioDevice, OutputMode, Settings } from "../types";
+import type { AudioDevice, OutputMode, RecordingProfile, Settings } from "../types";
 
 export async function getAudioDevices(): Promise<AudioDevice[]> {
   return invoke<AudioDevice[]>("get_audio_devices");
@@ -53,4 +53,28 @@ export async function setSoundEnabled(enabled: boolean): Promise<void> {
 
 export async function setHotkey(shortcut: string): Promise<void> {
   return invoke("set_hotkey", { shortcut });
+}
+
+export async function cmdListProfiles(): Promise<RecordingProfile[]> {
+  return invoke<RecordingProfile[]>("cmd_list_profiles");
+}
+
+export async function cmdSaveProfile(profile: RecordingProfile): Promise<void> {
+  return invoke("cmd_save_profile", { profile });
+}
+
+export async function cmdDeleteProfile(id: string): Promise<string> {
+  return invoke<string>("cmd_delete_profile", { id });
+}
+
+export async function cmdSelectProfile(id: string): Promise<void> {
+  return invoke("cmd_select_profile", { id });
+}
+
+export async function cmdGetActiveProfile(): Promise<RecordingProfile> {
+  return invoke<RecordingProfile>("cmd_get_active_profile");
+}
+
+export async function refreshDevices(): Promise<AudioDevice[]> {
+  return invoke<AudioDevice[]>("refresh_devices");
 }

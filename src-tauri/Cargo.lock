@@ -283,6 +283,8 @@ dependencies = [
  "tauri-plugin-log",
  "tauri-plugin-single-instance",
  "wasapi",
+ "windows 0.59.0",
+ "windows-core 0.59.0",
 ]
 
 [[package]]

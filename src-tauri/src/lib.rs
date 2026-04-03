@@ -1,4 +1,5 @@
 pub mod audio;
+pub mod device_monitor;
 pub mod hotkey;
 pub mod portable;
 pub mod profiles;
@@ -31,6 +32,17 @@ fn get_audio_devices() -> Vec<AudioDevice> {
         Ok(devices) => devices,
         Err(e) => {
             log::error!("Failed to enumerate audio devices: {}", e);
+            vec![]
+        }
+    }
+}
+
+#[tauri::command]
+fn refresh_devices() -> Vec<AudioDevice> {
+    match audio::devices::list_all_devices() {
+        Ok(devices) => devices,
+        Err(e) => {
+            log::error!("Failed to refresh audio devices: {}", e);
             vec![]
         }
     }
@@ -569,6 +581,16 @@ pub fn run() {
                 log::error!("Failed to register hotkey: {e}");
             }
 
+            // Start device monitor
+            match device_monitor::start_device_monitor(app.handle().clone()) {
+                Ok(handle) => {
+                    if let Ok(mut s) = app.state::<SharedState>().lock() {
+                        s.device_monitor = Some(handle);
+                    }
+                }
+                Err(e) => log::error!("Failed to start device monitor: {e}"),
+            }
+
             log::info!("AudioCaptor started");
             Ok(())
         })
@@ -576,6 +598,7 @@ pub fn run() {
             load_settings,
             save_settings,
             get_audio_devices,
+            refresh_devices,
             start_recording,
             pause_recording,
             resume_recording,

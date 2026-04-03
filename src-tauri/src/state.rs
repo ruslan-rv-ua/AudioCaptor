@@ -26,6 +26,7 @@ pub struct AppState {
     pub mixer: Option<MixerHandle>,
     pub command_tx: Option<Sender<AudioCommand>>,
     pub emitter_running: Arc<AtomicBool>,
+    pub device_monitor: Option<crate::device_monitor::DeviceMonitorHandle>,
 }
 
 impl Default for AppState {
@@ -50,6 +51,7 @@ impl Default for AppState {
             mixer: None,
             command_tx: None,
             emitter_running: Arc::new(AtomicBool::new(false)),
+            device_monitor: None,
         }
     }
 }

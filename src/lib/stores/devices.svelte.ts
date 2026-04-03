@@ -1,3 +1,4 @@
+import { listen } from "@tauri-apps/api/event";
 import { getAudioDevices } from "../utils/invoke";
 import type { AudioDevice } from "../types";
 
@@ -13,6 +14,12 @@ export function getDevices() {
     get loading() { return loading; },
     get error() { return error; },
   };
+}
+
+export async function initDeviceListener() {
+  await listen("audio-devices-changed", async () => {
+    await refreshDevices();
+  });
 }
 
 export async function refreshDevices() {

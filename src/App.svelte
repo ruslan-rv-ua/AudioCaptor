@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import type { OutputMode } from "./lib/types";
-  import { getDevices, refreshDevices } from "./lib/stores/devices.svelte";
+  import type { RecordingProfile } from "./lib/types";
+  import { getDevices, refreshDevices, initDeviceListener } from "./lib/stores/devices.svelte";
   import {
     getRecording,
     initRecordingListener,
@@ -14,23 +14,29 @@
     updateSoundEnabled,
     updateHotkey,
     loadSettingsIntoStore,
+    applyProfile,
   } from "./lib/stores/recording.svelte";
+  import {
+    getProfiles,
+    loadProfiles,
+    saveProfile,
+    deleteProfile,
+    selectProfile,
+  } from "./lib/stores/profiles.svelte";
   import { saveSettings } from "./lib/utils/invoke";
   import DeviceSelect from "./lib/components/DeviceSelect.svelte";
   import VolumeSlider from "./lib/components/VolumeSlider.svelte";
   import RecordControls from "./lib/components/RecordControls.svelte";
   import StatusIndicator from "./lib/components/StatusIndicator.svelte";
+  import ProfileSelector from "./lib/components/ProfileSelector.svelte";
+  import ProfileDialog from "./lib/components/ProfileDialog.svelte";
 
   const devices = getDevices();
   const recording = getRecording();
+  const profileStore = getProfiles();
 
-  const outputModes: { value: OutputMode; label: string }[] = [
-    { value: "Microphone", label: "Microphone only" },
-    { value: "Loopback", label: "System audio only" },
-    { value: "Mix", label: "Mix (Mic + System)" },
-  ];
-
-  const sampleRates = [8000, 16000, 44100, 48000];
+  let dialogOpen = $state(false);
+  let editingProfile = $state<RecordingProfile | null>(null);
 
   let isRecording = $derived(recording.state !== "Idle");
 
@@ -43,15 +49,13 @@
     clearTimeout(saveTimeout);
     saveTimeout = setTimeout(async () => {
       await saveSettings({
-        version: 1,
+        version: 2,
         selectedMic: recording.selectedMic,
         selectedLoopback: recording.selectedLoopback,
-        micVolume: recording.micVolume,
-        loopbackVolume: recording.loopbackVolume,
-        outputMode: recording.outputMode,
-        sampleRate: recording.sampleRate,
         hotkey: recording.hotkey,
         soundEnabled: recording.soundEnabled,
+        profiles: profileStore.list,
+        activeProfileId: profileStore.activeId,
       });
     }, 500);
   }
@@ -100,10 +104,51 @@
     }
   }
 
-  onMount(async () => {
-    await loadSettingsIntoStore();
-    await refreshDevices();
-    await initRecordingListener();
+  async function handleProfileSelect(id: string) {
+    await selectProfile(id);
+    const profile = profileStore.active;
+    if (profile) applyProfile(profile);
+    scheduleSave();
+  }
+
+  function handleProfileCreate() {
+    editingProfile = null;
+    dialogOpen = true;
+  }
+
+  function handleProfileEdit(profile: RecordingProfile) {
+    editingProfile = profile;
+    dialogOpen = true;
+  }
+
+  async function handleProfileSave(profile: RecordingProfile) {
+    await saveProfile(profile);
+    dialogOpen = false;
+    if (profileStore.activeId === profile.id) {
+      applyProfile(profile);
+    }
+    scheduleSave();
+  }
+
+  async function handleProfileDelete(id: string) {
+    if (!confirm("Delete this profile?")) return;
+    await deleteProfile(id);
+    const active = profileStore.active;
+    if (active) applyProfile(active);
+    scheduleSave();
+  }
+
+  onMount(() => {
+    (async () => {
+      await loadSettingsIntoStore();
+      await loadProfiles();
+      // Apply active profile settings on startup
+      const active = profileStore.active;
+      if (active) applyProfile(active);
+      await refreshDevices();
+      await initRecordingListener();
+      await initDeviceListener();
+    })();
     window.addEventListener("keydown", handleMnemonic);
     return () => window.removeEventListener("keydown", handleMnemonic);
   });
@@ -137,24 +182,29 @@
 
     window.addEventListener("keydown", onKeyDown, true);
   }
-
-  function handleOutputModeChange(e: Event) {
-    const target = e.target as HTMLSelectElement;
-    recording.outputMode = target.value as OutputMode;
-    scheduleSave();
-  }
-
-  function handleSampleRateChange(e: Event) {
-    const target = e.target as HTMLSelectElement;
-    recording.sampleRate = parseInt(target.value);
-    scheduleSave();
-  }
 </script>
 
 <main role="application" aria-label="AudioCaptor">
   <h1>AudioCaptor</h1>
 
   <StatusIndicator state={recording.state} durationMs={recording.durationMs} />
+
+  <ProfileSelector
+    profiles={profileStore.list}
+    activeId={profileStore.activeId}
+    disabled={isRecording}
+    onselect={handleProfileSelect}
+    oncreate={handleProfileCreate}
+    onedit={handleProfileEdit}
+    ondelete={handleProfileDelete}
+  />
+
+  <ProfileDialog
+    profile={editingProfile}
+    open={dialogOpen}
+    onclose={() => dialogOpen = false}
+    onsave={handleProfileSave}
+  />
 
   <section aria-label="Audio devices">
     <DeviceSelect
@@ -172,40 +222,6 @@
       onchange={(id) => { recording.selectedLoopback = id; scheduleSave(); }}
       disabled={isRecording}
     />
-  </section>
-
-  <section aria-label="Output settings">
-    <div class="setting-row">
-      <label for="output-mode">Output Mode</label>
-      <select
-        id="output-mode"
-        aria-label="Output mode"
-        disabled={isRecording}
-        onchange={handleOutputModeChange}
-      >
-        {#each outputModes as mode}
-          <option value={mode.value} selected={mode.value === recording.outputMode}>
-            {mode.label}
-          </option>
-        {/each}
-      </select>
-    </div>
-
-    <div class="setting-row">
-      <label for="sample-rate">Sample Rate</label>
-      <select
-        id="sample-rate"
-        aria-label="Sample rate"
-        disabled={isRecording}
-        onchange={handleSampleRateChange}
-      >
-        {#each sampleRates as rate}
-          <option value={rate} selected={rate === recording.sampleRate}>
-            {rate} Hz
-          </option>
-        {/each}
-      </select>
-    </div>
   </section>
 
   <section aria-label="Volume controls">
@@ -310,24 +326,6 @@
   .setting-row label {
     font-weight: 600;
     font-size: 0.875rem;
-  }
-
-  .setting-row select {
-    padding: 8px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    font-size: 0.875rem;
-    background: #fff;
-  }
-
-  .setting-row select:focus-visible {
-    outline: 2px solid #0066cc;
-    outline-offset: 2px;
-  }
-
-  .setting-row select:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
   }
 
   .error {

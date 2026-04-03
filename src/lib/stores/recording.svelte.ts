@@ -1,5 +1,5 @@
 import { listen } from "@tauri-apps/api/event";
-import type { RecordingState, RecordingStateEvent, OutputMode } from "../types";
+import type { RecordingState, RecordingStateEvent, OutputMode, RecordingProfile } from "../types";
 import * as api from "../utils/invoke";
 
 let recordingState = $state<RecordingState>("Idle");
@@ -123,6 +123,16 @@ export async function updateSoundEnabled(enabled: boolean) {
 export async function updateHotkey(shortcut: string) {
   hotkey = shortcut;
   await api.setHotkey(shortcut);
+}
+
+export function applyProfile(profile: RecordingProfile) {
+  micVolume = profile.micVolume;
+  loopbackVolume = profile.loopbackVolume;
+  outputMode = profile.outputMode;
+  sampleRate = profile.sampleRate;
+  // Send volume updates to backend
+  api.setMicVolume(profile.micVolume);
+  api.setLoopbackVolume(profile.loopbackVolume);
 }
 
 export async function loadSettingsIntoStore() {

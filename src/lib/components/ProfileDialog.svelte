@@ -128,6 +128,7 @@
 
 {#if open}
   <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+  <!-- svelte-ignore a11y_interactive_supports_focus -->
   <div class="dialog-backdrop" role="dialog" aria-modal="true" aria-label={title} onkeydown={handleKeydown}>
     <div class="dialog">
       <h2>{title}</h2>

@@ -563,6 +563,7 @@ pub fn run() {
             portable::ensure_dirs().map_err(|e| e.to_string())?;
 
             let settings = settings::read_settings();
+            let _ = settings::write_settings(&settings); // persist migration if version was bumped
             if let Ok(mut s) = app.state::<SharedState>().lock() {
                 match sounds::SoundEngine::new() {
                     Ok(engine) => s.sound_engine = Some(engine),

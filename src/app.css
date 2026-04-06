@@ -36,6 +36,9 @@ body {
   --btn-resume-bg:        #0078d4;
   --status-rec-border:    #dc2626;
   --status-paused-border: #d97706;
+  --status-rec-glow:      rgba(220,  38,  38, 0.08);
+  --status-paused-glow:   rgba(217, 119,   6, 0.08);
+  --surface-shadow:       0 1px 4px rgba(0, 0, 0, 0.05);
   --error-bg:             #fef2f2;
   --error-border:         #fecaca;
   --error-text:           #dc2626;
@@ -61,6 +64,9 @@ body {
   --btn-resume-bg:        #1d4ed8;
   --status-rec-border:    #f87171;
   --status-paused-border: #fbbf24;
+  --status-rec-glow:      rgba(248, 113, 113, 0.08);
+  --status-paused-glow:   rgba(251, 191,  36, 0.08);
+  --surface-shadow:       none;
   --error-bg:             rgba(220, 38, 38, 0.1);
   --error-border:         rgba(248, 113, 113, 0.4);
   --error-text:           #f87171;

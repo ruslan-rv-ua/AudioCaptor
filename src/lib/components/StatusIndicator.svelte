@@ -57,30 +57,18 @@
     flex-direction: column;
     align-items: center;
     gap: 4px;
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
-    transition: border-color 0.2s;
-  }
-
-  [data-theme="dark"] .status-card {
-    box-shadow: none;
+    box-shadow: var(--surface-shadow);
+    transition: border-color 0.2s, box-shadow 0.2s;
   }
 
   .status-card.recording {
     border-color: var(--status-rec-border);
-    box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.08);
-  }
-
-  [data-theme="dark"] .status-card.recording {
-    box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.08);
+    box-shadow: 0 0 0 3px var(--status-rec-glow);
   }
 
   .status-card.paused {
     border-color: var(--status-paused-border);
-    box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.08);
-  }
-
-  [data-theme="dark"] .status-card.paused {
-    box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.08);
+    box-shadow: 0 0 0 3px var(--status-paused-glow);
   }
 
   .state-row {
@@ -129,6 +117,6 @@
   }
 
   .timer.timer-idle {
-    color: var(--text-muted);   /* dimmed when stopped */
+    color: var(--text-muted);
   }
 </style>

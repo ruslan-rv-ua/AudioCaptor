@@ -29,7 +29,7 @@
     <div class="profile-controls">
       <select
         id="profile-select"
-        aria-label="Recording profile"
+        aria-label={m.profile_section()}
         {disabled}
         onchange={handleChange}
       >

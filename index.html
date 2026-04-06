@@ -5,6 +5,19 @@
     <link rel="icon" type="image/png" href="/favicon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>AudioCaptor</title>
+    <script>
+      // Runs synchronously before first paint — prevents theme flash.
+      // Reads the localStorage mirror written by the theme store.
+      (function () {
+        var t = localStorage.getItem("audiocaptor_theme") || "auto";
+        if (t === "auto") {
+          t = window.matchMedia("(prefers-color-scheme: dark)").matches
+            ? "dark"
+            : "light";
+        }
+        document.documentElement.setAttribute("data-theme", t);
+      })();
+    </script>
   </head>
   <body>
     <div id="app"></div>

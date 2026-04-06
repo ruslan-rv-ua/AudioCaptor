@@ -25,6 +25,13 @@
   import { saveSettings, loadSettings } from "./lib/utils/invoke";
   import { initLanguage } from "./lib/i18n";
   import { getSettings, loadSettingsFields } from "./lib/stores/settings.svelte";
+  import {
+    initTheme,
+    setTheme,
+    cleanupTheme,
+  } from "./lib/stores/theme.svelte";
+  import { setThemePreference } from "./lib/stores/settings.svelte";
+  import type { Theme } from "./lib/types";
   import * as m from "./paraglide/messages";
   import DeviceSelect from "./lib/components/DeviceSelect.svelte";
   import VolumeSlider from "./lib/components/VolumeSlider.svelte";
@@ -66,6 +73,7 @@
         confirmExitDuringRecording: appSettings.confirmExitDuringRecording,
         profiles: profileStore.list,
         activeProfileId: profileStore.activeId,
+        theme: appSettings.theme,
       });
     }, 500);
   }
@@ -163,6 +171,12 @@
     scheduleSave();
   }
 
+  function handleThemeChange(t: Theme) {
+    setTheme(t);             // applies to DOM + writes localStorage
+    setThemePreference(t);   // updates settings store reactive state
+    scheduleSave();          // persists to Tauri backend
+  }
+
   async function handleStopAndExit() {
     confirmExitOpen = false;
     try { await stopRecording(); } catch { /* already stopped */ }
@@ -173,6 +187,7 @@
     (async () => {
       const rawSettings = await loadSettings();
       loadSettingsFields(rawSettings);
+      initTheme(appSettings.theme);
       initLanguage(appSettings.language);
       await loadSettingsIntoStore();
       await loadProfiles();
@@ -192,7 +207,10 @@
       initialized = true;
     })();
     window.addEventListener("keydown", handleMnemonic);
-    return () => window.removeEventListener("keydown", handleMnemonic);
+    return () => {
+      window.removeEventListener("keydown", handleMnemonic);
+      cleanupTheme();
+    };
   });
 </script>
 
@@ -210,15 +228,18 @@
 
   <StatusIndicator state={recording.state} durationMs={recording.durationMs} />
 
-  <ProfileSelector
-    profiles={profileStore.list}
-    activeId={profileStore.activeId}
-    disabled={isRecording}
-    onselect={handleProfileSelect}
-    oncreate={handleProfileCreate}
-    onedit={handleProfileEdit}
-    ondelete={handleProfileDelete}
-  />
+  <div class="section-card">
+    <h2 class="sec-label">{m.profile_label()}</h2>
+    <ProfileSelector
+      profiles={profileStore.list}
+      activeId={profileStore.activeId}
+      disabled={isRecording}
+      onselect={handleProfileSelect}
+      oncreate={handleProfileCreate}
+      onedit={handleProfileEdit}
+      ondelete={handleProfileDelete}
+    />
+  </div>
 
   <ProfileDialog
     profile={editingProfile}
@@ -227,7 +248,8 @@
     onsave={handleProfileSave}
   />
 
-  <section aria-label={m.audio_devices_section()}>
+  <div class="section-card" aria-label={m.audio_devices_section()}>
+    <h2 class="sec-label">{m.audio_devices_section()}</h2>
     <DeviceSelect
       label={m.mic_label()}
       devices={devices.microphones}
@@ -242,9 +264,10 @@
       onchange={(id) => { recording.selectedLoopback = id; scheduleSave(); }}
       disabled={isRecording}
     />
-  </section>
+  </div>
 
-  <section aria-label={m.volume_controls_section()}>
+  <div class="section-card" aria-label={m.volume_controls_section()}>
+    <h2 class="sec-label">{m.volume_controls_section()}</h2>
     <VolumeSlider
       label={m.mic_volume_label()}
       value={recording.micVolume}
@@ -255,7 +278,7 @@
       value={recording.loopbackVolume}
       onchange={(v) => { updateLoopbackVolume(v); scheduleSave(); }}
     />
-  </section>
+  </div>
 
   <RecordControls
     recordingState={recording.state}
@@ -282,8 +305,10 @@
     soundEnabled={appSettings.soundEnabled}
     confirmExitDuringRecording={appSettings.confirmExitDuringRecording}
     language={appSettings.language}
+    theme={appSettings.theme}
     onclose={() => settingsOpen = false}
     onsave={handleSettingsSave}
+    onthemechange={handleThemeChange}
   />
 
   <ConfirmExitDialog
@@ -298,45 +323,77 @@
   main {
     max-width: 480px;
     margin: 0 auto;
-    padding: 24px 16px;
+    padding: 20px 16px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
   }
 
   .header-row {
     display: flex;
     align-items: center;
-    justify-content: center;
-    gap: 12px;
-    margin: 0 0 16px;
+    justify-content: space-between;
+    margin-bottom: 4px;
   }
 
-  .header-row h1 { margin: 0; }
+  .header-row h1 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: -0.01em;
+  }
 
   .btn-settings {
-    background: none;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    padding: 4px 8px;
+    width: 32px;
+    height: 32px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 7px;
     cursor: pointer;
-    font-size: 1rem;
+    font-size: 17px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-primary);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+    transition: background 0.1s;
   }
 
-  .btn-settings:hover { background: #f0f0f0; }
+  .btn-settings:hover {
+    background: var(--surface-hover);
+  }
 
-  section {
-    margin-bottom: 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
+  /* Section cards — Profile, Devices, Volume */
+  .section-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px 11px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  }
+
+  [data-theme="dark"] .section-card {
+    box-shadow: none;
+  }
+
+  .sec-label {
+    font-size: 8px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+    color: var(--sec-label);
+    margin: 0 0 8px;
   }
 
   .error {
-    padding: 12px;
-    background: #fef2f2;
-    border: 1px solid #fecaca;
+    padding: 10px 12px;
+    background: var(--error-bg);
+    border: 1px solid var(--error-border);
     border-radius: 6px;
-    color: #dc2626;
+    color: var(--error-text);
     text-align: center;
-    margin-top: 8px;
+    font-size: 0.875rem;
   }
 
   .visually-hidden {
@@ -346,7 +403,7 @@
     padding: 0;
     margin: -1px;
     overflow: hidden;
-    clip: rect(0,0,0,0);
+    clip: rect(0, 0, 0, 0);
     white-space: nowrap;
     border: 0;
   }

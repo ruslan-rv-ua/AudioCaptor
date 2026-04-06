@@ -2,6 +2,7 @@
   import * as m from "../../paraglide/messages";
   import { updateHotkey, updateSoundEnabled, setLanguage, setConfirmExitDuringRecording } from "../stores/settings.svelte";
   import * as api from "../utils/invoke";
+  import type { Theme } from "../types";
 
   interface Props {
     open: boolean;
@@ -9,8 +10,10 @@
     soundEnabled: boolean;
     confirmExitDuringRecording: boolean;
     language: "en" | "uk";
+    theme?: Theme;
     onclose: () => void;
     onsave: (patch: Partial<import("../types").Settings>) => void;
+    onthemechange?: (t: Theme) => void;
   }
 
   let {
@@ -19,8 +22,10 @@
     soundEnabled,
     confirmExitDuringRecording,
     language,
+    theme,
     onclose,
     onsave,
+    onthemechange,
   }: Props = $props();
 
   let capturingHotkey = $state(false);

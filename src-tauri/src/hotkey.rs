@@ -43,6 +43,14 @@ pub fn register(app: &AppHandle, shortcut_str: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// Unregister all global shortcuts. Used during hotkey capture mode so the
+/// current shortcut does not fire while the user presses a new one.
+pub fn unregister(app: &AppHandle) -> Result<(), String> {
+    app.global_shortcut()
+        .unregister_all()
+        .map_err(|e| format!("Failed to unregister hotkey: {e}"))
+}
+
 fn handle_shortcut_event(app: &AppHandle, event: ShortcutEvent) {
     match event.state {
         ShortcutState::Pressed => {

@@ -431,6 +431,11 @@ fn set_hotkey(app: tauri::AppHandle, shortcut: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn unregister_hotkey(app: tauri::AppHandle) -> Result<(), String> {
+    hotkey::unregister(&app)
+}
+
+#[tauri::command]
 fn cmd_list_profiles() -> Vec<profiles::RecordingProfile> {
     let settings = settings::read_settings();
     settings.profiles
@@ -608,27 +613,13 @@ pub fn run() {
             set_loopback_volume,
             set_sound_enabled,
             set_hotkey,
+            unregister_hotkey,
             cmd_list_profiles,
             cmd_save_profile,
             cmd_delete_profile,
             cmd_select_profile,
             cmd_get_active_profile,
         ])
-        .on_window_event(|window, event| {
-            if let tauri::WindowEvent::CloseRequested { .. } = event {
-                let app = window.app_handle();
-                if let Some(state) = app.try_state::<SharedState>() {
-                    let is_recording = state
-                        .lock()
-                        .map(|s| s.recording_state != RecordingState::Idle)
-                        .unwrap_or(false);
-                    if is_recording {
-                        log::info!("Window closing during recording — stopping recording");
-                        let _ = stop_recording_inner(&state);
-                    }
-                }
-            }
-        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

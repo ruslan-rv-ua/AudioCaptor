@@ -21,47 +21,114 @@
   }
 
   let stateLabel = $derived(
-    state === "Idle" ? m.status_ready() : state === "Recording" ? m.status_recording() : m.status_paused()
+    state === "Idle"      ? m.status_ready()     :
+    state === "Recording" ? m.status_recording() : m.status_paused()
   );
-
-  let stateClass = $derived(state.toLowerCase());
 </script>
 
-<div class="status-indicator" aria-label={m.recording_status()}>
-  <span class="state-badge {stateClass}">{stateLabel}</span>
-  {#if state !== "Idle"}
-    <span
-      class="duration"
-      role="timer"
-      aria-label={m.recording_duration({ duration: formattedDuration })}
-    >
-      {formattedDuration}
-    </span>
-  {/if}
+<div
+  class="status-card"
+  class:recording={state === "Recording"}
+  class:paused={state === "Paused"}
+  aria-label={m.recording_status()}
+>
+  <div class="state-row">
+    {#if state === "Recording"}
+      <span class="rec-dot" aria-hidden="true"></span>
+    {/if}
+    <span class="state-label">{stateLabel}</span>
+  </div>
+  <span
+    class="timer"
+    class:timer-idle={state === "Idle"}
+    role="timer"
+    aria-label={m.recording_duration({ duration: formattedDuration })}
+  >{formattedDuration}</span>
 </div>
 
 <style>
-  .status-indicator {
+  .status-card {
+    background: var(--surface);
+    border: 2px solid transparent;
+    border-radius: 10px;
+    padding: 10px 14px 12px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+    transition: border-color 0.2s;
+  }
+
+  [data-theme="dark"] .status-card {
+    box-shadow: none;
+  }
+
+  .status-card.recording {
+    border-color: var(--status-rec-border);
+    box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.08);
+  }
+
+  [data-theme="dark"] .status-card.recording {
+    box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.08);
+  }
+
+  .status-card.paused {
+    border-color: var(--status-paused-border);
+    box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.08);
+  }
+
+  [data-theme="dark"] .status-card.paused {
+    box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.08);
+  }
+
+  .state-row {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 12px;
-    padding: 12px;
-    font-size: 1.25rem;
+    gap: 6px;
   }
-  .state-badge {
-    padding: 4px 12px;
-    border-radius: 4px;
-    font-weight: 600;
-    font-size: 0.875rem;
-    text-transform: uppercase;
-  }
-  .idle { background: #e5e7eb; color: #374151; }
-  .recording { background: #fecaca; color: #dc2626; }
-  .paused { background: #fef3c7; color: #d97706; }
-  .duration {
-    font-family: monospace;
-    font-size: 1.5rem;
+
+  .state-label {
+    font-size: 8.5px;
     font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+  }
+
+  .status-card.recording .state-label {
+    color: var(--status-rec-border);
+  }
+
+  .status-card.paused .state-label {
+    color: var(--status-paused-border);
+  }
+
+  /* Blinking recording dot */
+  .rec-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--status-rec-border);
+    animation: blink 1.2s ease-in-out infinite;
+  }
+
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.3; }
+  }
+
+  .timer {
+    font-family: 'Courier New', monospace;
+    font-size: 26px;
+    font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1;
+  }
+
+  .timer.timer-idle {
+    color: var(--text-muted);   /* dimmed when stopped */
   }
 </style>

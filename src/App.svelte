@@ -115,6 +115,13 @@
           liveRegionText = m.status_ready();
         }
         break;
+      case "f4":
+        // WebView2 may consume WM_SYSKEYDOWN before it reaches the native
+        // window proc, preventing the OS from generating WM_CLOSE for Alt+F4.
+        // Explicitly trigger the same close flow as the title-bar X button.
+        e.preventDefault();
+        void appWindow.close();
+        break;
     }
   }
 

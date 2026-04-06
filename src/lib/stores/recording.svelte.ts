@@ -11,8 +11,6 @@ let loopbackVolume = $state(0.5);
 let outputMode = $state<OutputMode>("Mix");
 let sampleRate = $state(48000);
 let recordingError = $state<string | null>(null);
-let soundEnabled = $state(true);
-let hotkey = $state("Pause");
 
 export function getRecording() {
   return {
@@ -31,10 +29,6 @@ export function getRecording() {
     get sampleRate() { return sampleRate; },
     set sampleRate(v: number) { sampleRate = v; },
     get error() { return recordingError; },
-    get soundEnabled() { return soundEnabled; },
-    set soundEnabled(v: boolean) { soundEnabled = v; },
-    get hotkey() { return hotkey; },
-    set hotkey(v: string) { hotkey = v; },
     get canRecord() {
       const mode = outputMode;
       const needsMic = mode === "Microphone" || mode === "Mix" || mode === "MixPlusMicrophone" || mode === "MixPlusLoopback";
@@ -43,6 +37,8 @@ export function getRecording() {
       if (needsLoopback && !selectedLoopback) return false;
       return true;
     },
+    get needsMic() { return !selectedMic; },
+    get needsLoopback() { return !selectedLoopback; },
     get readinessHint() {
       const mode = outputMode;
       const needsMic = (mode === "Microphone" || mode === "Mix" || mode === "MixPlusMicrophone" || mode === "MixPlusLoopback") && !selectedMic;
@@ -115,16 +111,6 @@ export async function updateLoopbackVolume(volume: number) {
   await api.setLoopbackVolume(volume);
 }
 
-export async function updateSoundEnabled(enabled: boolean) {
-  soundEnabled = enabled;
-  await api.setSoundEnabled(enabled);
-}
-
-export async function updateHotkey(shortcut: string) {
-  hotkey = shortcut;
-  await api.setHotkey(shortcut);
-}
-
 export function applyProfile(profile: RecordingProfile) {
   micVolume = profile.micVolume;
   loopbackVolume = profile.loopbackVolume;
@@ -139,8 +125,6 @@ export async function loadSettingsIntoStore() {
   const s = await api.loadSettings();
   selectedMic = s.selectedMic;
   selectedLoopback = s.selectedLoopback;
-  hotkey = s.hotkey;
-  soundEnabled = s.soundEnabled;
   // Profile-specific fields (micVolume, loopbackVolume, outputMode, sampleRate)
   // are loaded via applyProfile() after loadProfiles() in App.svelte onMount
 }

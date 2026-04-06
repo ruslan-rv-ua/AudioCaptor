@@ -13,6 +13,8 @@ pub struct Settings {
     pub sound_enabled: bool,
     pub profiles: Vec<RecordingProfile>,
     pub active_profile_id: String,
+    pub language: String,                        // NEW in v3
+    pub confirm_exit_during_recording: bool,     // NEW in v3
     // Legacy fields — used only during migration from v1
     #[serde(default, skip_serializing)]
     mic_volume: f32,
@@ -31,13 +33,15 @@ fn default_sample_rate() -> u32 {
 impl Default for Settings {
     fn default() -> Self {
         Self {
-            version: 0,
+            version: 3,
             selected_mic: None,
             selected_loopback: None,
             hotkey: "Pause".to_string(),
             sound_enabled: true,
             profiles: vec![RecordingProfile::default()],
             active_profile_id: "default".to_string(),
+            language: "en".to_string(),
+            confirm_exit_during_recording: true,
             mic_volume: 1.0,
             loopback_volume: 0.5,
             output_mode: OutputMode::Mix,
@@ -83,6 +87,12 @@ pub(crate) fn migrate_settings(mut settings: Settings) -> Settings {
                     settings.profiles = vec![RecordingProfile::default()];
                     settings.active_profile_id = "default".to_string();
                 }
+                settings.version = 3;
+                // No break — loop continues to v3 arm below
+            }
+            3 => {
+                // language and confirm_exit_during_recording have #[serde(default)]
+                // serde fills missing fields automatically — no data transform needed
                 break;
             }
             v => {
@@ -136,7 +146,10 @@ mod tests {
     }
 
     #[test]
-    fn settings_missing_version_defaults_to_zero() {
+    fn settings_missing_version_defaults_to_struct_default() {
+        // When "version" is absent from JSON, serde fills it with Settings::default().version
+        // (because #[serde(default)] on the struct uses Default::default() to seed missing fields).
+        // Since Default::version is now 3, the deserialized value is 3.
         let json = r#"{
             "selectedMic": null,
             "selectedLoopback": null,
@@ -148,7 +161,7 @@ mod tests {
             "soundEnabled": true
         }"#;
         let settings: Settings = serde_json::from_str(json).unwrap();
-        assert_eq!(settings.version, 0);
+        assert_eq!(settings.version, 3);
     }
 
     #[test]
@@ -156,7 +169,7 @@ mod tests {
         let mut settings = Settings::default();
         settings.version = 0;
         let migrated = migrate_settings(settings);
-        assert_eq!(migrated.version, 2);
+        assert_eq!(migrated.version, 3);
         assert_eq!(migrated.profiles.len(), 1);
     }
 
@@ -165,7 +178,7 @@ mod tests {
         let mut settings = Settings::default();
         settings.version = 1;
         let migrated = migrate_settings(settings);
-        assert_eq!(migrated.version, 2);
+        assert_eq!(migrated.version, 3);
         assert_eq!(migrated.profiles.len(), 1);
         assert_eq!(migrated.active_profile_id, "default");
     }
@@ -184,7 +197,7 @@ mod tests {
     #[test]
     fn settings_v2_has_profiles_and_active_id() {
         let settings = Settings::default();
-        assert_eq!(settings.version, 0);
+        assert_eq!(settings.version, 3);
         assert_eq!(settings.profiles.len(), 1);
         assert_eq!(settings.active_profile_id, "default");
         assert_eq!(settings.profiles[0].name, "Default");
@@ -205,7 +218,7 @@ mod tests {
         }"#;
         let settings: Settings = serde_json::from_str(json).unwrap();
         let migrated = migrate_settings(settings);
-        assert_eq!(migrated.version, 2);
+        assert_eq!(migrated.version, 3);
         assert_eq!(migrated.profiles.len(), 1);
         let p = &migrated.profiles[0];
         assert_eq!(p.id, "default");
@@ -233,7 +246,7 @@ mod tests {
         }"#;
         let settings: Settings = serde_json::from_str(json).unwrap();
         let migrated = migrate_settings(settings);
-        assert_eq!(migrated.version, 2);
+        assert_eq!(migrated.version, 3);
         assert_eq!(migrated.profiles.len(), 1);
     }
 
@@ -255,5 +268,31 @@ mod tests {
         assert_eq!(deserialized.profiles.len(), 2);
         assert_eq!(deserialized.active_profile_id, "custom");
         assert_eq!(deserialized.profiles[1].name, "Podcast");
+    }
+
+    #[test]
+    fn migrate_v2_to_v3_adds_language_and_confirm_exit() {
+        let json = r#"{
+            "version": 2,
+            "selectedMic": null,
+            "selectedLoopback": null,
+            "hotkey": "Pause",
+            "soundEnabled": true,
+            "profiles": [],
+            "activeProfileId": "default"
+        }"#;
+        let settings: Settings = serde_json::from_str(json).unwrap();
+        let migrated = migrate_settings(settings);
+        assert_eq!(migrated.version, 3);
+        assert_eq!(migrated.language, "en");
+        assert!(migrated.confirm_exit_during_recording);
+    }
+
+    #[test]
+    fn settings_default_has_version_3() {
+        let s = Settings::default();
+        assert_eq!(s.version, 3);
+        assert_eq!(s.language, "en");
+        assert!(s.confirm_exit_during_recording);
     }
 }

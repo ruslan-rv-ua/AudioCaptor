@@ -15,6 +15,8 @@ pub struct Settings {
     pub active_profile_id: String,
     pub language: String,                        // NEW in v3
     pub confirm_exit_during_recording: bool,     // NEW in v3
+    #[serde(default = "default_theme")]
+    pub theme: String,              // NEW in v4 — "auto" | "light" | "dark"
     // Legacy fields — used only during migration from v1
     #[serde(default, skip_serializing)]
     mic_volume: f32,
@@ -30,10 +32,14 @@ fn default_sample_rate() -> u32 {
     48000
 }
 
+fn default_theme() -> String {
+    "auto".to_string()
+}
+
 impl Default for Settings {
     fn default() -> Self {
         Self {
-            version: 3,
+            version: 4,
             selected_mic: None,
             selected_loopback: None,
             hotkey: "Pause".to_string(),
@@ -42,6 +48,7 @@ impl Default for Settings {
             active_profile_id: "default".to_string(),
             language: "en".to_string(),
             confirm_exit_during_recording: true,
+            theme: "auto".to_string(),
             mic_volume: 1.0,
             loopback_volume: 0.5,
             output_mode: OutputMode::Mix,
@@ -91,9 +98,12 @@ pub(crate) fn migrate_settings(mut settings: Settings) -> Settings {
                 // No break — loop continues to v3 arm below
             }
             3 => {
-                // Terminal version. Fields added in v3 (language, confirm_exit_during_recording)
-                // are populated by serde from Default::default() when loading older files,
-                // so no explicit data transform is required here.
+                // theme added in v4; serde Default fills "auto" for existing files
+                settings.version = 4;
+                // fall through to v4 arm
+            }
+            4 => {
+                // Terminal version.
                 break;
             }
             v => {
@@ -152,7 +162,7 @@ mod tests {
     fn settings_missing_version_defaults_to_struct_default() {
         // When "version" is absent from JSON, serde fills it with Settings::default().version
         // (because #[serde(default)] on the struct uses Default::default() to seed missing fields).
-        // Since Default::version is now 3, the deserialized value is 3.
+        // Since Default::version is now 4, the deserialized value is 4.
         let json = r#"{
             "selectedMic": null,
             "selectedLoopback": null,
@@ -164,24 +174,24 @@ mod tests {
             "soundEnabled": true
         }"#;
         let settings: Settings = serde_json::from_str(json).unwrap();
-        assert_eq!(settings.version, 3);
+        assert_eq!(settings.version, 4);
     }
 
     #[test]
-    fn migrate_settings_upgrades_v0_to_v3() {
+    fn migrate_settings_upgrades_v0_to_v4() {
         let mut settings = Settings::default();
         settings.version = 0;
         let migrated = migrate_settings(settings);
-        assert_eq!(migrated.version, 3);
+        assert_eq!(migrated.version, 4);
         assert_eq!(migrated.profiles.len(), 1);
     }
 
     #[test]
-    fn migrate_settings_upgrades_v1_to_v3() {
+    fn migrate_settings_upgrades_v1_to_v4() {
         let mut settings = Settings::default();
         settings.version = 1;
         let migrated = migrate_settings(settings);
-        assert_eq!(migrated.version, 3);
+        assert_eq!(migrated.version, 4);
         assert_eq!(migrated.profiles.len(), 1);
         assert_eq!(migrated.active_profile_id, "default");
     }
@@ -200,7 +210,7 @@ mod tests {
     #[test]
     fn settings_v2_has_profiles_and_active_id() {
         let settings = Settings::default();
-        assert_eq!(settings.version, 3);
+        assert_eq!(settings.version, 4);
         assert_eq!(settings.profiles.len(), 1);
         assert_eq!(settings.active_profile_id, "default");
         assert_eq!(settings.profiles[0].name, "Default");
@@ -221,7 +231,7 @@ mod tests {
         }"#;
         let settings: Settings = serde_json::from_str(json).unwrap();
         let migrated = migrate_settings(settings);
-        assert_eq!(migrated.version, 3);
+        assert_eq!(migrated.version, 4);
         assert_eq!(migrated.profiles.len(), 1);
         let p = &migrated.profiles[0];
         assert_eq!(p.id, "default");
@@ -236,7 +246,7 @@ mod tests {
     }
 
     #[test]
-    fn migrate_v0_to_v3_goes_through_all_steps() {
+    fn migrate_v0_to_v4_goes_through_all_steps() {
         let json = r#"{
             "selectedMic": null,
             "selectedLoopback": null,
@@ -249,7 +259,7 @@ mod tests {
         }"#;
         let settings: Settings = serde_json::from_str(json).unwrap();
         let migrated = migrate_settings(settings);
-        assert_eq!(migrated.version, 3);
+        assert_eq!(migrated.version, 4);
         assert_eq!(migrated.profiles.len(), 1);
     }
 
@@ -274,7 +284,7 @@ mod tests {
     }
 
     #[test]
-    fn migrate_v2_to_v3_adds_language_and_confirm_exit() {
+    fn migrate_v2_to_v4_adds_language_and_confirm_exit() {
         let json = r#"{
             "version": 2,
             "selectedMic": null,
@@ -286,16 +296,36 @@ mod tests {
         }"#;
         let settings: Settings = serde_json::from_str(json).unwrap();
         let migrated = migrate_settings(settings);
-        assert_eq!(migrated.version, 3);
+        assert_eq!(migrated.version, 4);
         assert_eq!(migrated.language, "en");
         assert!(migrated.confirm_exit_during_recording);
     }
 
     #[test]
-    fn settings_default_has_version_3() {
+    fn settings_default_has_version_4() {
         let s = Settings::default();
-        assert_eq!(s.version, 3);
+        assert_eq!(s.version, 4);
         assert_eq!(s.language, "en");
         assert!(s.confirm_exit_during_recording);
+        assert_eq!(s.theme, "auto");
+    }
+
+    #[test]
+    fn migrate_v3_to_v4_adds_theme() {
+        let json = r#"{
+            "version": 3,
+            "selectedMic": null,
+            "selectedLoopback": null,
+            "hotkey": "Pause",
+            "soundEnabled": true,
+            "profiles": [],
+            "activeProfileId": "default",
+            "language": "en",
+            "confirmExitDuringRecording": true
+        }"#;
+        let settings: Settings = serde_json::from_str(json).unwrap();
+        let migrated = migrate_settings(settings);
+        assert_eq!(migrated.version, 4);
+        assert_eq!(migrated.theme, "auto");
     }
 }

@@ -8,6 +8,8 @@ export type RecordingState = "Idle" | "Recording" | "Paused";
 
 export type OutputMode = "Microphone" | "Loopback" | "Mix" | "MixPlusMicrophone" | "MixPlusLoopback";
 
+export type Theme = "auto" | "light" | "dark";
+
 export interface RecordingProfile {
   id: string;
   name: string;
@@ -32,6 +34,7 @@ export interface Settings {
   activeProfileId: string;
   language: "en" | "uk";
   confirmExitDuringRecording: boolean;
+  theme: Theme;
 }
 
 export interface RecordingStateEvent {

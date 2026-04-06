@@ -1,12 +1,4 @@
-:root {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
-    Ubuntu, Cantarell, sans-serif;
-  font-size: 16px;
-  line-height: 1.5;
-  color: #1a1a1a;
-  background-color: #ffffff;
-}
-
+/* ── Base reset ─────────────────────────────────────────────────── */
 *,
 *::before,
 *::after {
@@ -17,8 +9,64 @@ body {
   margin: 0;
   padding: 0;
   min-height: 100vh;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  background-color: var(--bg);
+  color: var(--text-primary);
 }
 
+/* ── Light theme tokens (default) ───────────────────────────────── */
+:root {
+  --bg:                   #f0f0f0;
+  --surface:              #ffffff;
+  --surface-hover:        #f5f5f5;
+  --border:               rgba(0, 0, 0, 0.12);
+  --track:                #e5e7eb;
+  --text-primary:         #111111;
+  --text-secondary:       #555555;
+  --text-muted:           #6b7280;
+  --accent:               #0078d4;
+  --accent-hover:         #106ebe;
+  --sec-label:            #0078d4;
+  --focus-ring:           #0078d4;
+  --btn-start-bg:         #107c10;
+  --btn-pause-bg:         #9d5d00;
+  --btn-stop-bg:          #c42b1c;
+  --btn-resume-bg:        #0078d4;
+  --status-rec-border:    #dc2626;
+  --status-paused-border: #d97706;
+  --error-bg:             #fef2f2;
+  --error-border:         #fecaca;
+  --error-text:           #dc2626;
+}
+
+/* ── Dark theme overrides ───────────────────────────────────────── */
+[data-theme="dark"] {
+  --bg:                   #1c1c1c;
+  --surface:              #252525;
+  --surface-hover:        #2e2e2e;
+  --border:               rgba(255, 255, 255, 0.08);
+  --track:                #3a3a3a;
+  --text-primary:         #f0f0f0;
+  --text-secondary:       #888888;
+  --text-muted:           #6b7280;
+  --accent:               #60a5fa;
+  --accent-hover:         #93c5fd;
+  --sec-label:            #60a5fa;
+  --focus-ring:           #60a5fa;
+  --btn-start-bg:         #0f7b0f;
+  --btn-pause-bg:         #92400e;
+  --btn-stop-bg:          #991b1b;
+  --btn-resume-bg:        #1d4ed8;
+  --status-rec-border:    #f87171;
+  --status-paused-border: #fbbf24;
+  --error-bg:             rgba(220, 38, 38, 0.1);
+  --error-border:         rgba(248, 113, 113, 0.4);
+  --error-text:           #f87171;
+}
+
+/* ── Accessibility ──────────────────────────────────────────────── */
 .visually-hidden {
   position: absolute;
   width: 1px;
@@ -32,6 +80,62 @@ body {
 }
 
 :focus-visible {
-  outline: 2px solid #0066cc;
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
+}
+
+/* ── Range input: cross-browser custom thumb + filled track ─────── */
+/*
+ * The fill percentage is set as --fill on the <input> via Svelte style binding.
+ * CSS custom properties are inherited by pseudo-elements in Chromium/WebView2.
+ */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 20px;        /* hit area — comfortable without being excessive */
+  background: transparent;
+  cursor: pointer;
+  width: 100%;
+  padding: 0;
+  margin: 0;
+}
+
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 5px;
+  border-radius: 3px;
+  background: linear-gradient(
+    to right,
+    var(--accent)  0%,
+    var(--accent)  var(--fill, 50%),
+    var(--track)   var(--fill, 50%),
+    var(--track)   100%
+  );
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 2px solid var(--accent);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+  margin-top: -4.5px; /* centre on 5px track: (14 - 5) / 2 = 4.5 */
+  cursor: pointer;
+  transition: border-color 0.1s;
+}
+
+input[type="range"]::-webkit-slider-thumb:hover {
+  border-color: var(--accent-hover);
+}
+
+input[type="range"]:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+}
+
+input[type="range"]:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }

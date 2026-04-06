@@ -1,11 +1,12 @@
-import type { Settings } from "../types";
+import type { Settings, Theme } from "../types";
 import * as api from "../utils/invoke";
 
 let language = $state<"en" | "uk">("en");
 let confirmExitDuringRecording = $state(true);
 let hotkey = $state("Pause");
 let soundEnabled = $state(true);
-let settingsVersion = $state(3);
+let settingsVersion = $state(4);
+let theme = $state<Theme>("auto");
 
 export function getSettings() {
   return {
@@ -14,6 +15,7 @@ export function getSettings() {
     get hotkey() { return hotkey; },
     get soundEnabled() { return soundEnabled; },
     get version() { return settingsVersion; },
+    get theme() { return theme; },
   };
 }
 
@@ -23,6 +25,7 @@ export function loadSettingsFields(s: Settings) {
   hotkey = s.hotkey;
   soundEnabled = s.soundEnabled;
   settingsVersion = s.version;
+  theme = s.theme ?? "auto";
 }
 
 export async function updateHotkey(shortcut: string) {
@@ -41,4 +44,8 @@ export function setLanguage(lang: "en" | "uk") {
 
 export function setConfirmExitDuringRecording(value: boolean) {
   confirmExitDuringRecording = value;
+}
+
+export function setThemePreference(t: Theme) {
+  theme = t;
 }

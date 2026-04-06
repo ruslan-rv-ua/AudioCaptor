@@ -24,9 +24,10 @@
   }: Props = $props();
 
   let capturingHotkey = $state(false);
-  let localHotkey = $state(hotkey);
-
-  $effect(() => { localHotkey = hotkey; });
+  // $effect.pre runs before the first DOM paint so there is no visible flash;
+  // it also keeps localHotkey in sync whenever the hotkey prop changes.
+  let localHotkey = $state('');
+  $effect.pre(() => { localHotkey = hotkey; });
 
   async function startHotkeyCapture() {
     capturingHotkey = true;
@@ -113,11 +114,8 @@
 </script>
 
 {#if open}
-  <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-  <!-- svelte-ignore a11y_interactive_supports_focus -->
-  <div class="dialog-backdrop" onkeydown={handleKeydown}>
-    <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-    <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="settings-dialog-title">
+  <div class="dialog-backdrop">
+    <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="settings-dialog-title" tabindex="-1" onkeydown={handleKeydown}>
       <h2 id="settings-dialog-title">{m.settings_dialog_title()}</h2>
 
       <!-- Hotkey section -->

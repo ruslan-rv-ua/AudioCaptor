@@ -128,9 +128,8 @@
 </script>
 
 {#if open}
-  <div class="dialog-backdrop" onkeydown={handleKeydown}>
-    <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-    <div class="dialog" role="dialog" aria-modal="true" aria-label={title}>
+  <div class="dialog-backdrop">
+    <div class="dialog" role="dialog" aria-modal="true" aria-label={title} tabindex="-1" onkeydown={handleKeydown}>
       <h2>{title}</h2>
 
       <div class="field">

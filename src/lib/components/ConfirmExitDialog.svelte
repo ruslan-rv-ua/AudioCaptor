@@ -28,14 +28,15 @@
 </script>
 
 {#if open}
-  <div class="dialog-backdrop" onkeydown={handleKeydown}>
-    <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+  <div class="dialog-backdrop">
     <div
       class="dialog"
       role="alertdialog"
       aria-modal="true"
       aria-labelledby="confirm-exit-title"
       aria-describedby="confirm-exit-body"
+      tabindex="-1"
+      onkeydown={handleKeydown}
     >
       <h2 id="confirm-exit-title">{m.confirm_exit_title()}</h2>
       <p id="confirm-exit-body">{m.confirm_exit_body()}</p>

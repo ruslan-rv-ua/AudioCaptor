@@ -62,39 +62,40 @@
     gap: 8px;
     justify-content: center;
     flex-wrap: wrap;
-    padding: 16px 0;
+    padding: 8px 0 4px;
   }
   .btn {
-    padding: 12px 24px;
+    flex: 1;
+    padding: 11px 20px;
     border: none;
-    border-radius: 6px;
-    font-size: 1rem;
-    font-weight: 600;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 700;
     cursor: pointer;
-    min-width: 100px;
+    min-width: 90px;
+    color: #ffffff;
   }
   .btn:focus-visible {
-    outline: 2px solid #0066cc;
+    outline: 2px solid var(--focus-ring);
     outline-offset: 2px;
   }
-  .btn-start { background: #22c55e; color: white; }
-  .btn-start:hover:not(.disabled) { background: #16a34a; }
+  .btn-start { background: var(--btn-start-bg); }
+  .btn-start:hover:not(.disabled) { filter: brightness(1.1); }
   .btn-start.disabled {
     opacity: 0.5;
     cursor: not-allowed;
-    background: #86efac;
   }
   .hint {
     width: 100%;
     text-align: center;
     font-size: 0.8rem;
-    color: #6b7280;
-    margin: 4px 0 0;
+    color: var(--text-muted);
+    margin: 2px 0 0;
   }
-  .btn-pause { background: #f59e0b; color: white; }
-  .btn-pause:hover { background: #d97706; }
-  .btn-resume { background: #3b82f6; color: white; }
-  .btn-resume:hover { background: #2563eb; }
-  .btn-stop { background: #ef4444; color: white; }
-  .btn-stop:hover { background: #dc2626; }
+  .btn-pause  { background: var(--btn-pause-bg); }
+  .btn-pause:hover  { filter: brightness(1.1); }
+  .btn-resume { background: var(--btn-resume-bg); }
+  .btn-resume:hover { filter: brightness(1.1); }
+  .btn-stop   { background: var(--btn-stop-bg); }
+  .btn-stop:hover   { filter: brightness(1.1); }
 </style>

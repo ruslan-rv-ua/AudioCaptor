@@ -23,93 +23,88 @@
   }
 </script>
 
-<section aria-label={m.profile_section()}>
-  <div class="profile-row">
-    <label for="profile-select">{m.profile_label()}</label>
-    <div class="profile-controls">
-      <select
-        id="profile-select"
-        aria-label={m.profile_section()}
-        {disabled}
-        onchange={handleChange}
-      >
-        {#each profiles as profile}
-          <option value={profile.id} selected={profile.id === activeId}>
-            {profile.name}
-          </option>
-        {/each}
-      </select>
-      <button
-        type="button"
-        class="btn-icon"
-        aria-label={m.create_profile_aria()}
-        {disabled}
-        onclick={oncreate}
-      >+</button>
-      <button
-        type="button"
-        class="btn-icon"
-        aria-label={m.edit_profile_aria()}
-        {disabled}
-        onclick={() => activeProfile && onedit(activeProfile)}
-      >✎</button>
-      <button
-        type="button"
-        class="btn-icon btn-danger"
-        aria-label={m.delete_profile_aria()}
-        disabled={disabled || !canDelete}
-        onclick={() => ondelete(activeId)}
-      >✕</button>
-    </div>
-  </div>
-</section>
+<div class="profile-controls">
+  <select
+    aria-label={m.profile_section()}
+    {disabled}
+    onchange={handleChange}
+  >
+    {#each profiles as profile}
+      <option value={profile.id} selected={profile.id === activeId}>
+        {profile.name}
+      </option>
+    {/each}
+  </select>
+  <button
+    type="button"
+    class="btn-icon"
+    aria-label={m.create_profile_aria()}
+    {disabled}
+    onclick={oncreate}
+  >+</button>
+  <button
+    type="button"
+    class="btn-icon"
+    aria-label={m.edit_profile_aria()}
+    {disabled}
+    onclick={() => activeProfile && onedit(activeProfile)}
+  >✎</button>
+  <button
+    type="button"
+    class="btn-icon btn-danger"
+    aria-label={m.delete_profile_aria()}
+    disabled={disabled || !canDelete}
+    onclick={() => ondelete(activeId)}
+  >✕</button>
+</div>
 
 <style>
-  .profile-row {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
-
-  .profile-row label {
-    font-weight: 600;
-    font-size: 0.875rem;
-  }
-
   .profile-controls {
     display: flex;
     gap: 4px;
     align-items: center;
   }
-
   .profile-controls select {
     flex: 1;
-    padding: 8px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
+    padding: 6px 8px;
+    border: 1px solid var(--border);
+    border-radius: 5px;
     font-size: 0.875rem;
-    background: #fff;
+    background: var(--surface);
+    color: var(--text-primary);
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23888'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    padding-right: 24px;
   }
-
   .profile-controls select:focus-visible {
-    outline: 2px solid #0066cc;
+    outline: 2px solid var(--focus-ring);
     outline-offset: 2px;
   }
-
   .btn-icon {
-    width: 32px;
-    height: 32px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    background: #fff;
+    width: 30px;
+    height: 30px;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    background: var(--surface);
+    color: var(--text-primary);
     cursor: pointer;
     font-size: 1rem;
     display: flex;
     align-items: center;
     justify-content: center;
+    flex-shrink: 0;
   }
-
-  .btn-icon:hover:not(:disabled) { background: #f0f0f0; }
-  .btn-icon:disabled { opacity: 0.4; cursor: not-allowed; }
-  .btn-danger:hover:not(:disabled) { background: #fef2f2; color: #dc2626; }
+  .btn-icon:hover:not(:disabled) {
+    background: var(--surface-hover);
+  }
+  .btn-icon:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+  .btn-danger:hover:not(:disabled) {
+    color: var(--error-text);
+    border-color: var(--error-border);
+  }
 </style>

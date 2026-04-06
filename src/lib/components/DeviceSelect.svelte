@@ -45,21 +45,28 @@
   }
   label {
     font-weight: 600;
-    font-size: 0.875rem;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
   }
   select {
-    padding: 8px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
+    padding: 6px 8px;
+    border: 1px solid var(--border);
+    border-radius: 5px;
     font-size: 0.875rem;
-    background: #fff;
+    background: var(--surface);
+    color: var(--text-primary);
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23888'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    padding-right: 24px;
   }
   select:focus-visible {
-    outline: 2px solid #0066cc;
+    outline: 2px solid var(--focus-ring);
     outline-offset: 2px;
   }
   select:disabled {
-    opacity: 0.6;
+    opacity: 0.5;
     cursor: not-allowed;
   }
 </style>

@@ -19,6 +19,11 @@
     disabled = false,
   }: Props = $props();
 
+  // Percentage for the filled-track gradient defined in app.css
+  let fillPct = $derived(((value - min) / (max - min)) * 100);
+
+  let inputId = $derived(label.toLowerCase().replace(/\s/g, "-"));
+
   function handleInput(e: Event) {
     const target = e.target as HTMLInputElement;
     onchange(parseFloat(target.value));
@@ -26,11 +31,12 @@
 </script>
 
 <div class="volume-slider">
-  <label for={label.toLowerCase().replace(/\s/g, "-")}>
-    {label}: {value.toFixed(1)}
+  <label for={inputId}>
+    {label}
+    <span class="value-display">{value.toFixed(1)}</span>
   </label>
   <input
-    id={label.toLowerCase().replace(/\s/g, "-")}
+    id={inputId}
     type="range"
     aria-valuemin={min}
     aria-valuemax={max}
@@ -40,6 +46,7 @@
     {step}
     {value}
     {disabled}
+    style="--fill: {fillPct}%"
     oninput={handleInput}
   />
 </div>
@@ -48,22 +55,22 @@
   .volume-slider {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 3px;
   }
   label {
     font-weight: 600;
-    font-size: 0.875rem;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
   }
-  input[type="range"] {
-    width: 100%;
-    cursor: pointer;
+  .value-display {
+    font-weight: 700;
+    color: var(--accent);
+    font-size: 0.8rem;
+    min-width: 2.5ch;
+    text-align: right;
   }
-  input[type="range"]:focus-visible {
-    outline: 2px solid #0066cc;
-    outline-offset: 2px;
-  }
-  input[type="range"]:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-  }
+  /* input[type="range"] appearance is handled globally in app.css */
 </style>

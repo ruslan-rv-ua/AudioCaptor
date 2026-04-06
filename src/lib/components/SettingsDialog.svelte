@@ -93,7 +93,7 @@
 
   function handleKeydown(e: KeyboardEvent) {
     if (e.key === "Escape" && !capturingHotkey) { onclose(); return; }
-    if (e.key === "Escape" && capturingHotkey) { cancelCapture(); return; }
+    if (e.key === "Escape" && capturingHotkey) { void cancelCapture(); return; }
     if (e.key === "Tab") {
       const dialog = (e.currentTarget as HTMLElement);
       const focusable = dialog.querySelectorAll<HTMLElement>(
@@ -115,8 +115,9 @@
 {#if open}
   <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
   <!-- svelte-ignore a11y_interactive_supports_focus -->
-  <div class="dialog-backdrop" role="dialog" aria-modal="true" aria-labelledby="settings-dialog-title" onkeydown={handleKeydown}>
-    <div class="dialog">
+  <div class="dialog-backdrop" onkeydown={handleKeydown}>
+    <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+    <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="settings-dialog-title">
       <h2 id="settings-dialog-title">{m.settings_dialog_title()}</h2>
 
       <!-- Hotkey section -->

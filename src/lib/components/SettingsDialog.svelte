@@ -1,8 +1,8 @@
 <script lang="ts">
+  import type { Theme } from "../types";
   import * as m from "../../paraglide/messages";
   import { updateHotkey, updateSoundEnabled, setLanguage, setConfirmExitDuringRecording } from "../stores/settings.svelte";
   import * as api from "../utils/invoke";
-  import type { Theme } from "../types";
 
   interface Props {
     open: boolean;
@@ -10,10 +10,10 @@
     soundEnabled: boolean;
     confirmExitDuringRecording: boolean;
     language: "en" | "uk";
-    theme?: Theme;
+    theme: Theme;
     onclose: () => void;
     onsave: (patch: Partial<import("../types").Settings>) => void;
-    onthemechange?: (t: Theme) => void;
+    onthemechange: (t: Theme) => void;
   }
 
   let {
@@ -28,10 +28,14 @@
     onthemechange,
   }: Props = $props();
 
+  const themeOptions: { value: Theme; label: () => string }[] = [
+    { value: "auto",  label: () => m.settings_theme_auto() },
+    { value: "light", label: () => m.settings_theme_light() },
+    { value: "dark",  label: () => m.settings_theme_dark() },
+  ];
+
   let capturingHotkey = $state(false);
-  // $effect.pre runs before the first DOM paint so there is no visible flash;
-  // it also keeps localHotkey in sync whenever the hotkey prop changes.
-  let localHotkey = $state('');
+  let localHotkey = $state("");
   $effect.pre(() => { localHotkey = hotkey; });
 
   async function startHotkeyCapture() {
@@ -41,15 +45,14 @@
     async function onKeyDown(e: KeyboardEvent) {
       e.preventDefault();
       e.stopPropagation();
-
       if (["Control", "Shift", "Alt", "Meta"].includes(e.key)) return;
 
       const parts: string[] = [];
-      if (e.ctrlKey) parts.push("Ctrl");
-      if (e.altKey) parts.push("Alt");
+      if (e.ctrlKey)  parts.push("Ctrl");
+      if (e.altKey)   parts.push("Alt");
       if (e.shiftKey) parts.push("Shift");
       let key = e.key;
-      if (key === " ") key = "Space";
+      if (key === " ")         key = "Space";
       else if (key.length === 1) key = key.toUpperCase();
       else if (key === "Escape") {
         window.removeEventListener("keydown", onKeyDown, true);
@@ -99,17 +102,17 @@
 
   function handleKeydown(e: KeyboardEvent) {
     if (e.key === "Escape" && !capturingHotkey) { onclose(); return; }
-    if (e.key === "Escape" && capturingHotkey) { void cancelCapture(); return; }
+    if (e.key === "Escape" &&  capturingHotkey) { void cancelCapture(); return; }
     if (e.key === "Tab") {
-      const dialog = (e.currentTarget as HTMLElement);
+      const dialog = e.currentTarget as HTMLElement;
       const focusable = dialog.querySelectorAll<HTMLElement>(
         'input, select, button, [tabindex]:not([tabindex="-1"])'
       );
       if (!focusable.length) return;
       const first = focusable[0];
-      const last = focusable[focusable.length - 1];
+      const last  = focusable[focusable.length - 1];
       if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
-      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+      else if (!e.shiftKey && document.activeElement === last)  { e.preventDefault(); first.focus(); }
     }
   }
 
@@ -120,12 +123,38 @@
 
 {#if open}
   <div class="dialog-backdrop">
-    <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="settings-dialog-title" tabindex="-1" onkeydown={handleKeydown}>
+    <div
+      class="dialog"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="settings-dialog-title"
+      tabindex="-1"
+      onkeydown={handleKeydown}
+    >
       <h2 id="settings-dialog-title">{m.settings_dialog_title()}</h2>
 
-      <!-- Hotkey section -->
+      <!-- Theme -->
       <div class="field">
-        <label for="settings-hotkey-display">{m.settings_hotkey_label()}</label>
+        <label class="field-label">{m.settings_theme_label()}</label>
+        <div class="theme-seg" role="group" aria-label={m.settings_theme_label()}>
+          {#each themeOptions as opt}
+            <button
+              type="button"
+              class="theme-btn"
+              class:active={theme === opt.value}
+              onclick={() => onthemechange(opt.value)}
+              aria-pressed={theme === opt.value}
+            >{opt.label()}</button>
+          {/each}
+        </div>
+        <p class="hint">{m.settings_theme_hint()}</p>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- Hotkey -->
+      <div class="field">
+        <label for="settings-hotkey-display" class="field-label">{m.settings_hotkey_label()}</label>
         <div class="hotkey-row">
           <input
             id="settings-hotkey-display"
@@ -135,52 +164,34 @@
             aria-label={m.settings_hotkey_current_aria({ hotkey: localHotkey })}
             class="hotkey-input"
           />
-          <button
-            type="button"
-            class="btn-small"
-            onclick={startHotkeyCapture}
-            disabled={capturingHotkey}
-          >
+          <button type="button" class="btn-sm" onclick={startHotkeyCapture} disabled={capturingHotkey}>
             {capturingHotkey ? m.settings_hotkey_capturing() : m.settings_hotkey_capture_btn()}
           </button>
-          <button
-            type="button"
-            class="btn-small btn-secondary"
-            onclick={resetHotkey}
-            disabled={capturingHotkey}
-          >
+          <button type="button" class="btn-sm btn-secondary" onclick={resetHotkey} disabled={capturingHotkey}>
             {m.settings_hotkey_reset_btn()}
           </button>
         </div>
       </div>
 
-      <!-- Sound toggle -->
+      <!-- Sound -->
       <div class="field">
         <label class="checkbox-label">
-          <input
-            type="checkbox"
-            checked={soundEnabled}
-            onchange={handleSoundToggle}
-          />
+          <input type="checkbox" checked={soundEnabled} onchange={handleSoundToggle} />
           {m.settings_sound_label()}
         </label>
       </div>
 
-      <!-- Confirm exit toggle -->
+      <!-- Confirm exit -->
       <div class="field">
         <label class="checkbox-label">
-          <input
-            type="checkbox"
-            checked={confirmExitDuringRecording}
-            onchange={handleConfirmExitToggle}
-          />
+          <input type="checkbox" checked={confirmExitDuringRecording} onchange={handleConfirmExitToggle} />
           {m.settings_confirm_exit_label()}
         </label>
       </div>
 
-      <!-- Language selector -->
+      <!-- Language -->
       <div class="field">
-        <label for="settings-language">{m.settings_language_label()}</label>
+        <label for="settings-language" class="field-label">{m.settings_language_label()}</label>
         <select id="settings-language" value={language} onchange={handleLanguageChange}>
           <option value="en">{m.settings_language_en()}</option>
           <option value="uk">{m.settings_language_uk()}</option>
@@ -189,7 +200,11 @@
       </div>
 
       <div class="actions">
-        <button type="button" class="btn-primary" onclick={async () => { if (capturingHotkey) await cancelCapture(); onclose(); }}>{m.btn_close()}</button>
+        <button
+          type="button"
+          class="btn-primary"
+          onclick={async () => { if (capturingHotkey) await cancelCapture(); onclose(); }}
+        >{m.btn_close()}</button>
       </div>
     </div>
   </div>
@@ -199,33 +214,73 @@
   .dialog-backdrop {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.4);
+    background: rgba(0, 0, 0, 0.5);
     display: flex;
     align-items: center;
     justify-content: center;
     z-index: 100;
   }
   .dialog {
-    background: white;
-    border-radius: 8px;
-    padding: 24px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 22px 22px 20px;
     width: 380px;
-    box-shadow: 0 4px 24px rgba(0,0,0,0.2);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    color: var(--text-primary);
   }
-  h2 { margin: 0 0 16px; font-size: 1.2rem; }
-  .field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 16px; }
-  .field label { font-weight: 600; font-size: 0.875rem; }
-  .field select { padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 0.875rem; }
-  .hotkey-row { display: flex; gap: 8px; align-items: center; }
-  .hotkey-input { flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 0.875rem; background: #f5f5f5; cursor: default; }
-  .checkbox-label { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.875rem; font-weight: normal; }
-  .hint { margin: 4px 0 0; font-size: 0.8rem; color: #6b7280; }
-  .btn-small { padding: 8px 10px; border: none; border-radius: 4px; font-size: 0.8rem; font-weight: 600; cursor: pointer; background: #6b7280; color: white; white-space: nowrap; }
-  .btn-small:hover:not(:disabled) { background: #4b5563; }
-  .btn-small:disabled { opacity: 0.6; cursor: not-allowed; }
-  .btn-small.btn-secondary { background: #e5e7eb; color: #374151; }
-  .btn-small.btn-secondary:hover:not(:disabled) { background: #d1d5db; }
-  .actions { display: flex; justify-content: flex-end; margin-top: 8px; }
-  .btn-primary { padding: 8px 16px; border: none; border-radius: 4px; font-size: 0.875rem; font-weight: 600; cursor: pointer; background: #2563eb; color: white; }
-  .btn-primary:hover { background: #1d4ed8; }
+  h2 { margin: 0 0 16px; font-size: 1.1rem; color: var(--text-primary); }
+
+  .field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 14px; }
+  .field:last-of-type { margin-bottom: 0; }
+  .field-label { font-weight: 700; font-size: 0.8rem; color: var(--text-secondary); }
+
+  /* Theme segmented control */
+  .theme-seg { display: flex; border-radius: 7px; overflow: hidden; border: 1px solid var(--border); }
+  .theme-btn {
+    flex: 1; padding: 6px 4px; text-align: center;
+    font-size: 0.8rem; font-weight: 600; cursor: pointer;
+    border: none; border-right: 1px solid var(--border);
+    background: var(--surface); color: var(--text-secondary);
+    transition: background 0.1s, color 0.1s;
+  }
+  .theme-btn:last-child { border-right: none; }
+  .theme-btn:hover:not(.active) { background: var(--surface-hover); }
+  .theme-btn.active { background: var(--accent); color: #ffffff; }
+
+  .divider { height: 1px; background: var(--border); margin: 2px 0 14px; }
+
+  select {
+    padding: 7px 8px; border: 1px solid var(--border); border-radius: 5px;
+    font-size: 0.875rem; background: var(--surface); color: var(--text-primary);
+  }
+  .hotkey-row { display: flex; gap: 6px; align-items: center; }
+  .hotkey-input {
+    flex: 1; padding: 7px 8px; border: 1px solid var(--border); border-radius: 5px;
+    font-size: 0.875rem; background: var(--surface-hover); color: var(--text-primary);
+    cursor: default;
+  }
+  .checkbox-label {
+    display: flex; align-items: center; gap: 8px;
+    cursor: pointer; font-size: 0.875rem; font-weight: normal;
+    color: var(--text-primary);
+  }
+  .hint { margin: 0; font-size: 0.75rem; color: var(--text-muted); }
+
+  .btn-sm {
+    padding: 6px 10px; border: 1px solid var(--border); border-radius: 5px;
+    font-size: 0.8rem; font-weight: 600; cursor: pointer;
+    background: var(--surface-hover); color: var(--text-primary); white-space: nowrap;
+  }
+  .btn-sm:hover:not(:disabled) { background: var(--border); }
+  .btn-sm:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-sm.btn-secondary { background: var(--surface); }
+
+  .actions { display: flex; justify-content: flex-end; margin-top: 16px; }
+  .btn-primary {
+    padding: 8px 18px; border: none; border-radius: 6px;
+    font-size: 0.875rem; font-weight: 700; cursor: pointer;
+    background: var(--accent); color: #ffffff;
+  }
+  .btn-primary:hover { background: var(--accent-hover); }
 </style>

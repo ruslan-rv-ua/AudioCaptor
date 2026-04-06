@@ -135,7 +135,7 @@
 
       <!-- Theme -->
       <div class="field">
-        <label class="field-label">{m.settings_theme_label()}</label>
+        <span class="field-label">{m.settings_theme_label()}</span>
         <div class="theme-seg" role="group" aria-label={m.settings_theme_label()}>
           {#each themeOptions as opt}
             <button

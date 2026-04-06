@@ -370,11 +370,7 @@
     border: 1px solid var(--border);
     border-radius: 8px;
     padding: 10px 12px 11px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
-  }
-
-  [data-theme="dark"] .section-card {
-    box-shadow: none;
+    box-shadow: var(--section-card-shadow);
   }
 
   .sec-label {

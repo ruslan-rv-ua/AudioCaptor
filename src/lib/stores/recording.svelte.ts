@@ -37,8 +37,14 @@ export function getRecording() {
       if (needsLoopback && !selectedLoopback) return false;
       return true;
     },
-    get needsMic() { return !selectedMic; },
-    get needsLoopback() { return !selectedLoopback; },
+    get needsMic() {
+      return (outputMode === "Microphone" || outputMode === "Mix" || outputMode === "MixPlusMicrophone" || outputMode === "MixPlusLoopback")
+        && !selectedMic;
+    },
+    get needsLoopback() {
+      return (outputMode === "Loopback" || outputMode === "Mix" || outputMode === "MixPlusMicrophone" || outputMode === "MixPlusLoopback")
+        && !selectedLoopback;
+    },
     get readinessHint() {
       const mode = outputMode;
       const needsMic = (mode === "Microphone" || mode === "Mix" || mode === "MixPlusMicrophone" || mode === "MixPlusLoopback") && !selectedMic;

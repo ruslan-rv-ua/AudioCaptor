@@ -91,8 +91,9 @@ pub(crate) fn migrate_settings(mut settings: Settings) -> Settings {
                 // No break — loop continues to v3 arm below
             }
             3 => {
-                // language and confirm_exit_during_recording have #[serde(default)]
-                // serde fills missing fields automatically — no data transform needed
+                // Terminal version. Fields added in v3 (language, confirm_exit_during_recording)
+                // are populated by serde from Default::default() when loading older files,
+                // so no explicit data transform is required here.
                 break;
             }
             v => {
@@ -143,6 +144,8 @@ mod tests {
         assert_eq!(deserialized.profiles[0].sample_rate, 48000);
         assert_eq!(deserialized.hotkey, "Pause");
         assert!(deserialized.sound_enabled);
+        assert_eq!(deserialized.language, "en");
+        assert!(deserialized.confirm_exit_during_recording);
     }
 
     #[test]
@@ -165,7 +168,7 @@ mod tests {
     }
 
     #[test]
-    fn migrate_settings_upgrades_v0_to_v2() {
+    fn migrate_settings_upgrades_v0_to_v3() {
         let mut settings = Settings::default();
         settings.version = 0;
         let migrated = migrate_settings(settings);
@@ -174,7 +177,7 @@ mod tests {
     }
 
     #[test]
-    fn migrate_settings_upgrades_v1_to_v2() {
+    fn migrate_settings_upgrades_v1_to_v3() {
         let mut settings = Settings::default();
         settings.version = 1;
         let migrated = migrate_settings(settings);
@@ -233,7 +236,7 @@ mod tests {
     }
 
     #[test]
-    fn migrate_v0_to_v2_goes_through_both_steps() {
+    fn migrate_v0_to_v3_goes_through_all_steps() {
         let json = r#"{
             "selectedMic": null,
             "selectedLoopback": null,

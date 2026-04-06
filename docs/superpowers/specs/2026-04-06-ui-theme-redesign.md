@@ -128,6 +128,19 @@ export type Theme = 'auto' | 'light' | 'dark';
 
 Add `theme: Theme` to the `Settings` interface (default: `'auto'`).
 
+### Settings version bump — `src-tauri/src/settings.rs`
+
+Bump `version` from **3** to **4**.
+
+Add `pub theme: String` with `#[serde(default = "default_theme")]`.  
+Add `fn default_theme() -> String { "auto".to_string() }`.
+
+The `migrate_settings` loop gains:
+- `3 =>` arm: sets `version = 4`, falls through
+- `4 =>` arm: breaks (terminal)
+
+No data transform needed — serde fills `"auto"` from the default function when loading v3 files that lack the `theme` key.
+
 ### First-launch behavior
 
 1. No saved `theme` in settings → default to `'auto'`
@@ -272,7 +285,8 @@ Simple, no changes to layout. Apply theme tokens only (replace hardcoded colors)
 | `src/app.css` | Add all CSS custom properties (light + dark tokens); remove per-component hardcoded colors; add slider thumb CSS |
 | `src/lib/types/index.ts` | Add `theme: 'auto' \| 'light' \| 'dark'` to `Settings` |
 | `src/lib/stores/theme.svelte.ts` | **New** — theme store: get/set, auto-detection, `data-theme` application, `matchMedia` listener |
-| `src/lib/stores/settings.svelte.ts` | Add `theme` field; expose `setTheme()` |
+| `src/lib/stores/settings.svelte.ts` | Add `theme` field; expose `setTheme()`; bump `settingsVersion` to 4 |
+| `src-tauri/src/settings.rs` | Add `theme` field; bump default version to 4; add v3→v4 migration arm and tests |
 | `src/lib/utils/invoke.ts` | No changes needed (settings save already handles new fields) |
 | `index.html` | Add inline `<script>` in `<head>` for FOUC prevention |
 | `src/App.svelte` | Replace hardcoded colors with CSS vars; update header size |

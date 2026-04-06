@@ -19,7 +19,8 @@
 | `src/app.css` | Modify | All CSS custom property tokens; global slider thumb styles; body/html base |
 | `src/lib/types/index.ts` | Modify | Add `Theme` type; add `theme` field to `Settings` |
 | `src/lib/stores/theme.svelte.ts` | Create | Theme store: preference state, DOM application, matchMedia listener |
-| `src/lib/stores/settings.svelte.ts` | Modify | Add `theme` field + `setThemePreference()` |
+| `src/lib/stores/settings.svelte.ts` | Modify | Add `theme` field + `setThemePreference()`; bump `settingsVersion` to 4 |
+| `src-tauri/src/settings.rs` | Modify | Add `theme` field; bump version 3→4; migration arm; tests |
 | `index.html` | Modify | Inline FOUC-prevention script in `<head>` |
 | `src/App.svelte` | Modify | Wire theme store; add section card styles + sec labels; fix header; add theme to save |
 | `src/lib/components/DeviceSelect.svelte` | Modify | CSS vars only |
@@ -406,19 +407,57 @@ export function setThemePreference(t: Theme) {
 }
 ```
 
-- [ ] **Step 5: Verify check passes**
+- [ ] **Step 5: Update `src-tauri/src/settings.rs`**
+
+5a. Add `default_theme` function after `default_sample_rate`:
+```rust
+fn default_theme() -> String {
+    "auto".to_string()
+}
+```
+
+5b. Add `theme` field after `confirm_exit_during_recording` in the struct:
+```rust
+#[serde(default = "default_theme")]
+pub theme: String,              // NEW in v4 — "auto" | "light" | "dark"
+```
+
+5c. In `Default::default()`: change `version: 3` → `version: 4`, add `theme: "auto".to_string()`.
+
+5d. In `migrate_settings` loop, replace the `3 =>` arm:
+```rust
+3 => {
+    // theme added in v4; serde Default fills "auto" for existing files
+    settings.version = 4;
+    // fall through to v4 arm
+}
+4 => {
+    break;
+}
+```
+
+5e. Update tests:
+- Rename `settings_default_has_version_3` → `settings_default_has_version_4`, expect `version == 4` and `theme == "auto"`
+- Add `migrate_v3_to_v4_adds_theme`: deserialize v3 JSON (no `theme` key), migrate, assert `version == 4` and `theme == "auto"`
+
+- [ ] **Step 6: Update `settingsVersion` in `src/lib/stores/settings.svelte.ts`**
+
+Line 8: `let settingsVersion = $state(3)` → `$state(4)`
+
+- [ ] **Step 7: Verify**
 
 ```bash
+cargo test -p audiocaptor-lib
 pnpm check
 ```
 
-Expected: 0 errors, 0 warnings.
+Expected: all Rust tests pass, 0 svelte-check errors.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
-git add src/app.css src/lib/types/index.ts src/lib/stores/theme.svelte.ts src/lib/stores/settings.svelte.ts
-git commit -m "feat(theme): add CSS tokens, Theme type, and theme store"
+git add src/app.css src/lib/types/index.ts src/lib/stores/theme.svelte.ts src/lib/stores/settings.svelte.ts src-tauri/src/settings.rs
+git commit -m "feat(theme): add CSS tokens, Theme type, theme store, and settings v4 migration"
 ```
 
 ---

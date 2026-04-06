@@ -30,6 +30,8 @@ export interface Settings {
   soundEnabled: boolean;
   profiles: RecordingProfile[];
   activeProfileId: string;
+  language: "en" | "uk";
+  confirmExitDuringRecording: boolean;
 }
 
 export interface RecordingStateEvent {

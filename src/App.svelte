@@ -56,6 +56,8 @@
         soundEnabled: recording.soundEnabled,
         profiles: profileStore.list,
         activeProfileId: profileStore.activeId,
+        language: "en",
+        confirmExitDuringRecording: true,
       });
     }, 500);
   }

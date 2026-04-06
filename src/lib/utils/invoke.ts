@@ -55,6 +55,10 @@ export async function setHotkey(shortcut: string): Promise<void> {
   return invoke("set_hotkey", { shortcut });
 }
 
+export async function unregisterHotkey(): Promise<void> {
+  return invoke("unregister_hotkey");
+}
+
 export async function cmdListProfiles(): Promise<RecordingProfile[]> {
   return invoke<RecordingProfile[]>("cmd_list_profiles");
 }

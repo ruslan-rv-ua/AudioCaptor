@@ -30,9 +30,10 @@ export function getTheme() {
 
 /** Call once in App.svelte onMount, after settings are loaded. */
 export function initTheme(saved: Theme) {
+  if (mediaQuery) mediaQuery.removeEventListener("change", onMediaChange);
   preference = saved;
-  applyToDOM(resolve(saved));
   mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+  applyToDOM(preference === "auto" ? (mediaQuery.matches ? "dark" : "light") : preference);
   mediaQuery.addEventListener("change", onMediaChange);
 }
 

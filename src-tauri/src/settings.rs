@@ -156,6 +156,7 @@ mod tests {
         assert!(deserialized.sound_enabled);
         assert_eq!(deserialized.language, "en");
         assert!(deserialized.confirm_exit_during_recording);
+        assert_eq!(deserialized.theme, "auto");
     }
 
     #[test]

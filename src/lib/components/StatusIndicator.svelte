@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { RecordingState } from "../types";
+  import * as m from "../../paraglide/messages";
 
   interface Props {
     state: RecordingState;
@@ -20,19 +21,19 @@
   }
 
   let stateLabel = $derived(
-    state === "Idle" ? "Ready" : state === "Recording" ? "Recording" : "Paused"
+    state === "Idle" ? m.status_ready() : state === "Recording" ? m.status_recording() : m.status_paused()
   );
 
   let stateClass = $derived(state.toLowerCase());
 </script>
 
-<div class="status-indicator" aria-label="Recording status">
+<div class="status-indicator" aria-label={m.recording_status()}>
   <span class="state-badge {stateClass}">{stateLabel}</span>
   {#if state !== "Idle"}
     <span
       class="duration"
       role="timer"
-      aria-label="Recording duration: {formattedDuration}"
+      aria-label={m.recording_duration({ duration: formattedDuration })}
     >
       {formattedDuration}
     </span>

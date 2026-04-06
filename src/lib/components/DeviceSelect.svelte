@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { AudioDevice } from "../types";
+  import * as m from "../../paraglide/messages";
 
   interface Props {
     label: string;
@@ -27,7 +28,7 @@
     {disabled}
     onchange={handleChange}
   >
-    <option value="">-- Select {label} --</option>
+    <option value="">{m.select_device_placeholder({ label })}</option>
     {#each devices as device}
       <option value={device.id} selected={device.id === value}>
         {device.name}

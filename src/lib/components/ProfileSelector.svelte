@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { RecordingProfile } from "../types";
+  import * as m from "../../paraglide/messages";
 
   interface Props {
     profiles: RecordingProfile[];
@@ -22,9 +23,9 @@
   }
 </script>
 
-<section aria-label="Recording profile">
+<section aria-label={m.profile_section()}>
   <div class="profile-row">
-    <label for="profile-select">Profile</label>
+    <label for="profile-select">{m.profile_label()}</label>
     <div class="profile-controls">
       <select
         id="profile-select"
@@ -41,21 +42,21 @@
       <button
         type="button"
         class="btn-icon"
-        aria-label="Create new profile"
+        aria-label={m.create_profile_aria()}
         {disabled}
         onclick={oncreate}
       >+</button>
       <button
         type="button"
         class="btn-icon"
-        aria-label="Edit profile"
+        aria-label={m.edit_profile_aria()}
         {disabled}
         onclick={() => activeProfile && onedit(activeProfile)}
       >✎</button>
       <button
         type="button"
         class="btn-icon btn-danger"
-        aria-label="Delete profile"
+        aria-label={m.delete_profile_aria()}
         disabled={disabled || !canDelete}
         onclick={() => ondelete(activeId)}
       >✕</button>

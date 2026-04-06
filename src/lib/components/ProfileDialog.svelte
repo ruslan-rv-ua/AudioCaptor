@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { RecordingProfile, OutputMode } from "../types";
+  import * as m from "../../paraglide/messages";
 
   interface Props {
     profile: RecordingProfile | null;
@@ -24,11 +25,11 @@
   let editId = $state<string | null>(null);
 
   const outputModes: { value: OutputMode; label: string }[] = [
-    { value: "Microphone", label: "Microphone only" },
-    { value: "Loopback", label: "System audio only" },
-    { value: "Mix", label: "Mix (Mic + System)" },
-    { value: "MixPlusMicrophone", label: "Mix + Microphone (2 files)" },
-    { value: "MixPlusLoopback", label: "Mix + System audio (2 files)" },
+    { value: "Microphone", label: m.mode_microphone() },
+    { value: "Loopback", label: m.mode_loopback() },
+    { value: "Mix", label: m.mode_mix() },
+    { value: "MixPlusMicrophone", label: m.mode_mix_plus_mic() },
+    { value: "MixPlusLoopback", label: m.mode_mix_plus_loopback() },
   ];
 
   const sampleRates = [8000, 16000, 44100, 48000];
@@ -63,17 +64,17 @@
   });
 
   let isEdit = $derived(editId !== null);
-  let title = $derived(isEdit ? "Edit Profile" : "New Profile");
+  let title = $derived(isEdit ? m.profile_dialog_edit_title() : m.profile_dialog_create_title());
 
   function handleSubmit() {
     if (!name.trim()) {
-      error = "Profile name is required";
+      error = m.error_profile_name_required();
       return;
     }
     const forbidden = /[<>:"/\\|?*]/;
     for (const fn of [micFilename, loopbackFilename, mixFilename]) {
       if (!fn.trim() || forbidden.test(fn)) {
-        error = 'Filenames must not be empty or contain < > : " / \\ | ? *';
+        error = m.error_filename_invalid();
         return;
       }
     }
@@ -127,29 +128,28 @@
 </script>
 
 {#if open}
-  <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-  <!-- svelte-ignore a11y_interactive_supports_focus -->
-  <div class="dialog-backdrop" role="dialog" aria-modal="true" aria-label={title} onkeydown={handleKeydown}>
-    <div class="dialog">
+  <div class="dialog-backdrop" onkeydown={handleKeydown}>
+    <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+    <div class="dialog" role="dialog" aria-modal="true" aria-label={title}>
       <h2>{title}</h2>
 
       <div class="field">
-        <label for="profile-name">Name</label>
+        <label for="profile-name">{m.field_name()}</label>
         <input id="profile-name" type="text" bind:value={name} />
       </div>
 
       <div class="field">
-        <label for="profile-desc">Description</label>
+        <label for="profile-desc">{m.field_description()}</label>
         <input id="profile-desc" type="text" bind:value={description} />
       </div>
 
       <div class="field">
-        <label for="profile-folder">Output Folder</label>
+        <label for="profile-folder">{m.field_output_folder()}</label>
         <input id="profile-folder" type="text" bind:value={outputFolder} />
       </div>
 
       <div class="field">
-        <label for="profile-mode">Output Mode</label>
+        <label for="profile-mode">{m.field_output_mode()}</label>
         <select id="profile-mode" bind:value={outputMode}>
           {#each outputModes as mode}
             <option value={mode.value}>{mode.label}</option>
@@ -158,7 +158,7 @@
       </div>
 
       <div class="field">
-        <label for="profile-rate">Sample Rate</label>
+        <label for="profile-rate">{m.field_sample_rate()}</label>
         <select id="profile-rate" bind:value={sampleRate}>
           {#each sampleRates as rate}
             <option value={rate}>{rate} Hz</option>
@@ -168,29 +168,29 @@
 
       <div class="field-row">
         <div class="field">
-          <label for="profile-mic-vol">Mic Volume</label>
+          <label for="profile-mic-vol">{m.field_mic_volume()}</label>
           <input id="profile-mic-vol" type="range" min="0" max="4" step="0.1" bind:value={micVolume} />
           <span>{micVolume.toFixed(1)}</span>
         </div>
         <div class="field">
-          <label for="profile-loop-vol">Loopback Volume</label>
+          <label for="profile-loop-vol">{m.field_loopback_volume()}</label>
           <input id="profile-loop-vol" type="range" min="0" max="4" step="0.1" bind:value={loopbackVolume} />
           <span>{loopbackVolume.toFixed(1)}</span>
         </div>
       </div>
 
       <div class="field">
-        <label for="profile-mic-fn">Mic Filename</label>
+        <label for="profile-mic-fn">{m.field_mic_filename()}</label>
         <input id="profile-mic-fn" type="text" bind:value={micFilename} />
       </div>
 
       <div class="field">
-        <label for="profile-loop-fn">Loopback Filename</label>
+        <label for="profile-loop-fn">{m.field_loopback_filename()}</label>
         <input id="profile-loop-fn" type="text" bind:value={loopbackFilename} />
       </div>
 
       <div class="field">
-        <label for="profile-mix-fn">Mix Filename</label>
+        <label for="profile-mix-fn">{m.field_mix_filename()}</label>
         <input id="profile-mix-fn" type="text" bind:value={mixFilename} />
       </div>
 
@@ -199,9 +199,9 @@
       {/if}
 
       <div class="actions">
-        <button type="button" class="btn-secondary" onclick={onclose}>Cancel</button>
+        <button type="button" class="btn-secondary" onclick={onclose}>{m.btn_cancel()}</button>
         <button type="button" class="btn-primary" onclick={handleSubmit}>
-          {isEdit ? "Save" : "Create"}
+          {isEdit ? m.btn_save() : m.btn_create()}
         </button>
       </div>
     </div>

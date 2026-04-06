@@ -253,7 +253,8 @@
   <RecordControls
     recordingState={recording.state}
     canRecord={recording.canRecord}
-    readinessHint={recording.readinessHint}
+    needsMic={recording.needsMic}
+    needsLoopback={recording.needsLoopback}
     onstart={startRecording}
     onpause={pauseRecording}
     onresume={resumeRecording}

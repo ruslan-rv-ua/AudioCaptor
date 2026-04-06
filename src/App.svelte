@@ -56,6 +56,7 @@
         soundEnabled: recording.soundEnabled,
         profiles: profileStore.list,
         activeProfileId: profileStore.activeId,
+        // TODO(Task 11): replace with appSettings.language and appSettings.confirmExitDuringRecording
         language: "en",
         confirmExitDuringRecording: true,
       });

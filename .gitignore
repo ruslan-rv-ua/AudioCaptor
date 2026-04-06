@@ -16,6 +16,7 @@ package-lock.json.bak
 dist/
 .vite/
 .svelte-kit/
+src/paraglide/
 
 # ─── Tauri ───────────────────────────────────────────────────────────────────
 src-tauri/target/

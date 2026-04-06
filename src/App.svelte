@@ -23,7 +23,9 @@
     deleteProfile,
     selectProfile,
   } from "./lib/stores/profiles.svelte";
-  import { saveSettings } from "./lib/utils/invoke";
+  import { saveSettings, loadSettings } from "./lib/utils/invoke";
+  import { initLanguage } from "./lib/i18n";
+  import { getSettings, loadSettingsFields } from "./lib/stores/settings.svelte";
   import DeviceSelect from "./lib/components/DeviceSelect.svelte";
   import VolumeSlider from "./lib/components/VolumeSlider.svelte";
   import RecordControls from "./lib/components/RecordControls.svelte";
@@ -34,6 +36,9 @@
   const devices = getDevices();
   const recording = getRecording();
   const profileStore = getProfiles();
+
+  let initialized = $state(false);
+  const appSettings = getSettings();
 
   let dialogOpen = $state(false);
   let editingProfile = $state<RecordingProfile | null>(null);
@@ -143,6 +148,9 @@
 
   onMount(() => {
     (async () => {
+      const rawSettings = await loadSettings();
+      loadSettingsFields(rawSettings);
+      initLanguage(appSettings.language);
       await loadSettingsIntoStore();
       await loadProfiles();
       // Apply active profile settings on startup
@@ -151,6 +159,7 @@
       await refreshDevices();
       await initRecordingListener();
       await initDeviceListener();
+      initialized = true;
     })();
     window.addEventListener("keydown", handleMnemonic);
     return () => window.removeEventListener("keydown", handleMnemonic);
@@ -187,6 +196,7 @@
   }
 </script>
 
+{#if initialized}
 <main role="application" aria-label="AudioCaptor">
   <h1>AudioCaptor</h1>
 
@@ -299,6 +309,7 @@
   <!-- Live region for screen reader announcements -->
   <div aria-live="polite" aria-atomic="true" class="visually-hidden">{liveRegionText}</div>
 </main>
+{/if}
 
 <style>
   main {

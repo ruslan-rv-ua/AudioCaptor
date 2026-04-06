@@ -57,7 +57,7 @@ mod tests {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum AudioCommand {
     Pause,
     Resume,

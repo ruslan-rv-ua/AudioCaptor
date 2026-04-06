@@ -26,7 +26,12 @@ impl IMMNotificationClient_Impl for DeviceNotificationClient_Impl {
         let _ = self.app.emit("audio-devices-changed", ());
 
         // Check if removed device is currently being recorded
-        let id_str = unsafe { device_id.to_string().unwrap_or_default() };
+        let id_str = unsafe {
+            device_id.to_string().unwrap_or_else(|e| {
+                log::warn!("Failed to convert removed device ID to string: {}", e);
+                String::new()
+            })
+        };
         if let Some(state) = self.app.try_state::<crate::state::SharedState>() {
             if let Ok(s) = state.inner().lock() {
                 let is_active = s.recording_mic_id.as_deref() == Some(&id_str)

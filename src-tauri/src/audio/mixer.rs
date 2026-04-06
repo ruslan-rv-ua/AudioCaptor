@@ -363,7 +363,7 @@ fn mixer_loop(mut config: MixerConfig, running: Arc<AtomicBool>) {
             let mut drained = 0;
             while mic_staging.len() >= required && drained + required <= max_drain {
                 let chunk: Vec<f32> = mic_staging.drain(..required).collect();
-                let resampled = resample_chunk(&chunk, mic_channels, mic_resampler.as_mut().unwrap());
+                let resampled = resample_chunk(&chunk, mic_channels, mic_resampler.as_mut().expect("mic_resampler is Some when mic sample rate differs from target rate"));
                 output.extend(resampled);
                 drained += required;
             }
@@ -385,7 +385,7 @@ fn mixer_loop(mut config: MixerConfig, running: Arc<AtomicBool>) {
             let mut drained = 0;
             while loopback_staging.len() >= required && drained + required <= max_drain {
                 let chunk: Vec<f32> = loopback_staging.drain(..required).collect();
-                let resampled = resample_chunk(&chunk, loopback_channels, loopback_resampler.as_mut().unwrap());
+                let resampled = resample_chunk(&chunk, loopback_channels, loopback_resampler.as_mut().expect("loopback_resampler is Some when loopback sample rate differs from target rate"));
                 output.extend(resampled);
                 drained += required;
             }

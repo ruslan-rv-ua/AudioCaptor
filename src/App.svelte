@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import { getCurrentWindow } from "@tauri-apps/api/window";
   import type { RecordingProfile } from "./lib/types";
   import { getDevices, refreshDevices, initDeviceListener } from "./lib/stores/devices.svelte";
   import {
@@ -11,8 +12,6 @@
     stopRecording,
     updateMicVolume,
     updateLoopbackVolume,
-    updateSoundEnabled,
-    updateHotkey,
     loadSettingsIntoStore,
     applyProfile,
   } from "./lib/stores/recording.svelte";
@@ -26,12 +25,15 @@
   import { saveSettings, loadSettings } from "./lib/utils/invoke";
   import { initLanguage } from "./lib/i18n";
   import { getSettings, loadSettingsFields } from "./lib/stores/settings.svelte";
+  import * as m from "./paraglide/messages";
   import DeviceSelect from "./lib/components/DeviceSelect.svelte";
   import VolumeSlider from "./lib/components/VolumeSlider.svelte";
   import RecordControls from "./lib/components/RecordControls.svelte";
   import StatusIndicator from "./lib/components/StatusIndicator.svelte";
   import ProfileSelector from "./lib/components/ProfileSelector.svelte";
   import ProfileDialog from "./lib/components/ProfileDialog.svelte";
+  import SettingsDialog from "./lib/components/SettingsDialog.svelte";
+  import ConfirmExitDialog from "./lib/components/ConfirmExitDialog.svelte";
 
   const devices = getDevices();
   const recording = getRecording();
@@ -39,40 +41,41 @@
 
   let initialized = $state(false);
   const appSettings = getSettings();
+  const appWindow = getCurrentWindow();
 
   let dialogOpen = $state(false);
   let editingProfile = $state<RecordingProfile | null>(null);
+  let settingsOpen = $state(false);
+  let confirmExitOpen = $state(false);
 
   let isRecording = $derived(recording.state !== "Idle");
 
   let liveRegionText = $state("");
-  let capturingHotkey = $state(false);
-
   let saveTimeout: ReturnType<typeof setTimeout> | undefined;
 
   function scheduleSave() {
     clearTimeout(saveTimeout);
     saveTimeout = setTimeout(async () => {
       await saveSettings({
-        version: 2,
+        version: appSettings.version,
         selectedMic: recording.selectedMic,
         selectedLoopback: recording.selectedLoopback,
-        hotkey: recording.hotkey,
-        soundEnabled: recording.soundEnabled,
+        hotkey: appSettings.hotkey,
+        soundEnabled: appSettings.soundEnabled,
+        language: appSettings.language,
+        confirmExitDuringRecording: appSettings.confirmExitDuringRecording,
         profiles: profileStore.list,
         activeProfileId: profileStore.activeId,
-        // TODO(Task 11): replace with appSettings.language and appSettings.confirmExitDuringRecording
-        language: "en",
-        confirmExitDuringRecording: true,
       });
     }, 500);
   }
 
   $effect(() => {
+    if (!initialized) return;
     const state = recording.state;
-    if (state === "Recording") liveRegionText = "Recording started";
-    else if (state === "Paused") liveRegionText = "Recording paused";
-    else if (state === "Idle") liveRegionText = "Recording stopped";
+    if (state === "Recording") liveRegionText = m.live_recording_started();
+    else if (state === "Paused") liveRegionText = m.live_recording_paused();
+    else if (state === "Idle") liveRegionText = m.live_recording_stopped();
   });
 
   function formatDuration(ms: number): string {
@@ -104,9 +107,12 @@
       case "i":
         e.preventDefault();
         if (recording.state !== "Idle") {
-          liveRegionText = `${recording.state === "Paused" ? "Paused" : "Recording"}, ${formatDuration(recording.durationMs)}`;
+          liveRegionText = m.live_status_info({
+            state: recording.state === "Paused" ? m.status_paused() : m.status_recording(),
+            duration: formatDuration(recording.durationMs),
+          });
         } else {
-          liveRegionText = "Ready";
+          liveRegionText = m.status_ready();
         }
         break;
     }
@@ -139,11 +145,21 @@
   }
 
   async function handleProfileDelete(id: string) {
-    if (!confirm("Delete this profile?")) return;
+    if (!confirm(m.delete_profile_confirm())) return;
     await deleteProfile(id);
     const active = profileStore.active;
     if (active) applyProfile(active);
     scheduleSave();
+  }
+
+  function handleSettingsSave(_patch: Partial<import("./lib/types").Settings>) {
+    scheduleSave();
+  }
+
+  async function handleStopAndExit() {
+    confirmExitOpen = false;
+    try { await stopRecording(); } catch { /* already stopped */ }
+    await appWindow.close();
   }
 
   onMount(() => {
@@ -153,52 +169,37 @@
       initLanguage(appSettings.language);
       await loadSettingsIntoStore();
       await loadProfiles();
-      // Apply active profile settings on startup
       const active = profileStore.active;
       if (active) applyProfile(active);
       await refreshDevices();
       await initRecordingListener();
       await initDeviceListener();
+
+      await appWindow.onCloseRequested(async (event) => {
+        if (appSettings.confirmExitDuringRecording && isRecording) {
+          event.preventDefault();
+          confirmExitOpen = true;
+        }
+      });
+
       initialized = true;
     })();
     window.addEventListener("keydown", handleMnemonic);
     return () => window.removeEventListener("keydown", handleMnemonic);
   });
-
-  function startHotkeyCapture() {
-    capturingHotkey = true;
-
-    function onKeyDown(e: KeyboardEvent) {
-      e.preventDefault();
-      e.stopPropagation();
-
-      if (["Control", "Shift", "Alt", "Meta"].includes(e.key)) return;
-
-      const parts: string[] = [];
-      if (e.ctrlKey) parts.push("Ctrl");
-      if (e.altKey) parts.push("Alt");
-      if (e.shiftKey) parts.push("Shift");
-
-      let key = e.key;
-      if (key === " ") key = "Space";
-      else if (key.length === 1) key = key.toUpperCase();
-
-      parts.push(key);
-      const shortcut = parts.join("+");
-
-      updateHotkey(shortcut);
-      scheduleSave();
-      capturingHotkey = false;
-      window.removeEventListener("keydown", onKeyDown, true);
-    }
-
-    window.addEventListener("keydown", onKeyDown, true);
-  }
 </script>
 
 {#if initialized}
 <main role="application" aria-label="AudioCaptor">
-  <h1>AudioCaptor</h1>
+  <div class="header-row">
+    <h1>{m.app_title()}</h1>
+    <button
+      type="button"
+      class="btn-settings"
+      aria-label={m.settings_btn_aria()}
+      onclick={() => settingsOpen = true}
+    >⚙</button>
+  </div>
 
   <StatusIndicator state={recording.state} durationMs={recording.durationMs} />
 
@@ -219,17 +220,16 @@
     onsave={handleProfileSave}
   />
 
-  <section aria-label="Audio devices">
+  <section aria-label={m.audio_devices_section()}>
     <DeviceSelect
-      label="Microphone"
+      label={m.mic_label()}
       devices={devices.microphones}
       value={recording.selectedMic}
       onchange={(id) => { recording.selectedMic = id; scheduleSave(); }}
       disabled={isRecording}
     />
-
     <DeviceSelect
-      label="Loopback Device"
+      label={m.loopback_label()}
       devices={devices.loopbacks}
       value={recording.selectedLoopback}
       onchange={(id) => { recording.selectedLoopback = id; scheduleSave(); }}
@@ -237,57 +237,17 @@
     />
   </section>
 
-  <section aria-label="Volume controls">
+  <section aria-label={m.volume_controls_section()}>
     <VolumeSlider
-      label="Microphone Volume"
+      label={m.mic_volume_label()}
       value={recording.micVolume}
       onchange={(v) => { updateMicVolume(v); scheduleSave(); }}
     />
-
     <VolumeSlider
-      label="Loopback Volume"
+      label={m.loopback_volume_label()}
       value={recording.loopbackVolume}
       onchange={(v) => { updateLoopbackVolume(v); scheduleSave(); }}
     />
-  </section>
-
-  <section aria-label="Settings">
-    <div class="setting-row">
-      <label for="hotkey-display">Global Hotkey</label>
-      <div class="hotkey-row">
-        <input
-          id="hotkey-display"
-          type="text"
-          value={recording.hotkey}
-          readonly
-          aria-label="Current hotkey: {recording.hotkey}"
-          class="hotkey-input"
-        />
-        <button
-          type="button"
-          class="btn-small"
-          onclick={startHotkeyCapture}
-          disabled={isRecording || capturingHotkey}
-        >
-          {capturingHotkey ? "Press a key..." : "Change"}
-        </button>
-      </div>
-    </div>
-
-    <div class="setting-row">
-      <label class="checkbox-label">
-        <input
-          type="checkbox"
-          checked={recording.soundEnabled}
-          onchange={(e) => {
-            const target = e.target as HTMLInputElement;
-            updateSoundEnabled(target.checked);
-            scheduleSave();
-          }}
-        />
-        Sound notifications
-      </label>
-    </div>
   </section>
 
   <RecordControls
@@ -306,8 +266,23 @@
     </div>
   {/if}
 
-  <!-- Live region for screen reader announcements -->
-  <div aria-live="polite" aria-atomic="true" class="visually-hidden">{liveRegionText}</div>
+  <div role="status" aria-atomic="true" class="visually-hidden">{liveRegionText}</div>
+
+  <SettingsDialog
+    open={settingsOpen}
+    hotkey={appSettings.hotkey}
+    soundEnabled={appSettings.soundEnabled}
+    confirmExitDuringRecording={appSettings.confirmExitDuringRecording}
+    language={appSettings.language}
+    onclose={() => settingsOpen = false}
+    onsave={handleSettingsSave}
+  />
+
+  <ConfirmExitDialog
+    open={confirmExitOpen}
+    onstopandexit={handleStopAndExit}
+    oncancel={() => confirmExitOpen = false}
+  />
 </main>
 {/if}
 
@@ -318,28 +293,32 @@
     padding: 24px 16px;
   }
 
-  h1 {
-    text-align: center;
+  .header-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
     margin: 0 0 16px;
-    font-size: 1.5rem;
   }
+
+  .header-row h1 { margin: 0; }
+
+  .btn-settings {
+    background: none;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    padding: 4px 8px;
+    cursor: pointer;
+    font-size: 1rem;
+  }
+
+  .btn-settings:hover { background: #f0f0f0; }
 
   section {
     margin-bottom: 16px;
     display: flex;
     flex-direction: column;
     gap: 12px;
-  }
-
-  .setting-row {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
-
-  .setting-row label {
-    font-weight: 600;
-    font-size: 0.875rem;
   }
 
   .error {
@@ -352,42 +331,15 @@
     margin-top: 8px;
   }
 
-  .hotkey-row {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-  }
-
-  .hotkey-input {
-    flex: 1;
-    padding: 8px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    font-size: 0.875rem;
-    background: #f5f5f5;
-    cursor: default;
-  }
-
-  .btn-small {
-    padding: 8px 12px;
-    border: none;
-    border-radius: 4px;
-    font-size: 0.8rem;
-    font-weight: 600;
-    cursor: pointer;
-    background: #6b7280;
-    color: white;
+  .visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0,0,0,0);
     white-space: nowrap;
-  }
-
-  .btn-small:hover:not(:disabled) { background: #4b5563; }
-  .btn-small:disabled { opacity: 0.6; cursor: not-allowed; }
-
-  .checkbox-label {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    cursor: pointer;
-    font-size: 0.875rem;
+    border: 0;
   }
 </style>

@@ -18,9 +18,10 @@
     "@tauri-apps/api": "^2"
   },
   "devDependencies": {
+    "@inlang/paraglide-js": "^2.15.1",
     "@sveltejs/vite-plugin-svelte": "^7.0.0",
-    "@tsconfig/svelte": "^5.0.8",
     "@tauri-apps/cli": "^2",
+    "@tsconfig/svelte": "^5.0.8",
     "svelte": "^5.0.0",
     "svelte-check": "^4.0.0",
     "typescript": "~5.6.2",

@@ -10,11 +10,13 @@
     hotkey: string | null;
     soundEnabled: boolean;
     confirmExitDuringRecording: boolean;
+    minimizeToTrayOnFocusLoss: boolean;
     language: "en" | "uk";
     theme: Theme;
     onclose: () => void;
     onsave: (patch: Partial<import("../types").Settings>) => void;
     onthemechange: (t: Theme) => void;
+    onminimizetotraytoggle: (v: boolean) => void;
   }
 
   let {
@@ -22,11 +24,13 @@
     hotkey,
     soundEnabled,
     confirmExitDuringRecording,
+    minimizeToTrayOnFocusLoss,
     language,
     theme,
     onclose,
     onsave,
     onthemechange,
+    onminimizetotraytoggle,
   }: Props = $props();
 
   const themeOptions: { value: Theme; label: () => string }[] = [
@@ -200,6 +204,15 @@
         <label class="checkbox-label">
           <input type="checkbox" checked={confirmExitDuringRecording} onchange={handleConfirmExitToggle} />
           {m.settings_confirm_exit_label()}
+        </label>
+      </div>
+
+      <!-- Minimize to tray on focus loss -->
+      <div class="field">
+        <label class="checkbox-label">
+          <input type="checkbox" checked={minimizeToTrayOnFocusLoss}
+                 onchange={(e) => onminimizetotraytoggle((e.target as HTMLInputElement).checked)} />
+          {m.settings_minimize_on_focus_loss()}
         </label>
       </div>
 

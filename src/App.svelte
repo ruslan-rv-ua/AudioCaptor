@@ -185,9 +185,15 @@
 
   onMount(() => {
     (async () => {
-      const rawSettings = await loadSettings();
-      loadSettingsFields(rawSettings);
-      initTheme(appSettings.theme);
+      try {
+        const rawSettings = await loadSettings();
+        loadSettingsFields(rawSettings);
+        initTheme(appSettings.theme);
+      } catch {
+        // settings load failed — show window with default theme anyway
+      } finally {
+        await appWindow.show();
+      }
       initLanguage(appSettings.language);
       await loadSettingsIntoStore();
       await loadProfiles();

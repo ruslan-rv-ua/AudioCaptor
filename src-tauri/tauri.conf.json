@@ -15,7 +15,8 @@
         "title": "AudioCaptor",
         "width": 480,
         "height": 600,
-        "decorations": true
+        "decorations": true,
+        "visible": false
       }
     ],
     "security": {

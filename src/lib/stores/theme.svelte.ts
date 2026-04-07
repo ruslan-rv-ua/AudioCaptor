@@ -32,6 +32,7 @@ export function getTheme() {
 export function initTheme(saved: Theme) {
   if (mediaQuery) mediaQuery.removeEventListener("change", onMediaChange);
   preference = saved;
+  localStorage.setItem(STORAGE_KEY, preference);
   mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
   applyToDOM(preference === "auto" ? (mediaQuery.matches ? "dark" : "light") : preference);
   mediaQuery.addEventListener("change", onMediaChange);

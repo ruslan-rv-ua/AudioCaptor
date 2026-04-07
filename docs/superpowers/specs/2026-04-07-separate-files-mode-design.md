@@ -108,25 +108,39 @@ const outputModes: { value: OutputMode; label: string }[] = [
 
 ### `src/lib/stores/recording.svelte.ts`
 
-`SeparateFiles` requires both mic and loopback. Update all 4 locations that check `needsMic`/`needsLoopback`:
+`SeparateFiles` requires both mic and loopback. Update all 4 locations that check `needsMic`/`needsLoopback`. The four locations have slightly different shapes:
 
-- `canRecord` — add `SeparateFiles` to both `needsMic` and `needsLoopback` checks
-- `needsMic` getter — add `SeparateFiles`
-- `needsLoopback` getter — add `SeparateFiles`
-- `readinessHint` — add `SeparateFiles` to both `needsMic` and `needsLoopback` inline checks
+- **`canRecord`** (lines ~34–36) — inline `const needsMic` and `const needsLoopback` locals: append `|| mode === "SeparateFiles"` to each.
+- **`needsMic` getter** (lines ~40–42) — the condition before `&& !selectedMic`: append `|| outputMode === "SeparateFiles"`.
+- **`needsLoopback` getter** (lines ~43–47) — the condition before `&& !selectedLoopback`: append `|| outputMode === "SeparateFiles"`.
+- **`readinessHint`** (lines ~48–56) — inline `const needsMic` and `const needsLoopback` locals: append `|| mode === "SeparateFiles"` to each.
 
-Pattern for each `needsMic` check:
+Example for the `canRecord` inline locals (no `&& !selected*` suffix — these are pure boolean flags):
 ```ts
 const needsMic = mode === "Microphone" || mode === "Mix"
   || mode === "MixPlusMicrophone" || mode === "MixPlusLoopback"
   || mode === "SeparateFiles";
-```
-
-Pattern for each `needsLoopback` check:
-```ts
 const needsLoopback = mode === "Loopback" || mode === "Mix"
   || mode === "MixPlusMicrophone" || mode === "MixPlusLoopback"
   || mode === "SeparateFiles";
+```
+
+Example for the `readinessHint` inline locals (these **include** `&& !selected*` — they mean "mode needs device AND device is missing"):
+```ts
+const needsMic = (mode === "Microphone" || mode === "Mix"
+  || mode === "MixPlusMicrophone" || mode === "MixPlusLoopback"
+  || mode === "SeparateFiles") && !selectedMic;
+const needsLoopback = (mode === "Loopback" || mode === "Mix"
+  || mode === "MixPlusMicrophone" || mode === "MixPlusLoopback"
+  || mode === "SeparateFiles") && !selectedLoopback;
+```
+
+Example for the `needsMic` getter body (keeps the `&& !selectedMic` suffix):
+```ts
+return (outputMode === "Microphone" || outputMode === "Mix"
+  || outputMode === "MixPlusMicrophone" || outputMode === "MixPlusLoopback"
+  || outputMode === "SeparateFiles")
+  && !selectedMic;
 ```
 
 ---
@@ -137,23 +151,57 @@ const needsLoopback = mode === "Loopback" || mode === "Mix"
 
 **1. Device validation (2 match arms)**
 
-Add `SeparateFiles` to the mic-required arm:
+Both existing arms use `_ => {}` wildcards. `SeparateFiles` would silently skip validation via the wildcard — add it explicitly to the correct arm in each match. **The `_ => {}` wildcard is retained** after the change; it now covers only the one remaining single-source mode (see below).
+
+Add `SeparateFiles` to the mic-required arm. The `_ => {}` arm is retained and covers only `Loopback` (the only mode that does not need a mic):
 ```rust
 OutputMode::Microphone | OutputMode::Mix
 | OutputMode::MixPlusMicrophone | OutputMode::MixPlusLoopback
-| OutputMode::SeparateFiles => { /* mic required */ }
+| OutputMode::SeparateFiles => {
+    if mic_id.is_none() {
+        return Err("DEVICE_NOT_FOUND: Microphone device required for this mode".into());
+    }
+}
+_ => {}   // covers Loopback only
 ```
 
-Add `SeparateFiles` to the loopback-required arm:
+Add `SeparateFiles` to the loopback-required arm. The `_ => {}` arm is retained and covers only `Microphone` (the only mode that does not need loopback):
 ```rust
 OutputMode::Loopback | OutputMode::Mix
 | OutputMode::MixPlusMicrophone | OutputMode::MixPlusLoopback
-| OutputMode::SeparateFiles => { /* loopback required */ }
+| OutputMode::SeparateFiles => {
+    if loopback_id.is_none() {
+        return Err("DEVICE_NOT_FOUND: Loopback device required for this mode".into());
+    }
+}
+_ => {}   // covers Microphone only
 ```
 
 **2. Capture thread startup (2 match arms)**
 
-Same pattern — add `SeparateFiles` to both mic and loopback capture match arms.
+Same wildcard issue. Both capture match blocks (`mic_id` and `loopback_id`) use `_ => (None, None)`. Without explicit `SeparateFiles` arms, no capture threads would start. Add `SeparateFiles` to the explicit arm in each match. **The `_ => (None, None)` wildcard is retained** and covers only the one opposite single-source mode.
+
+Mic capture match — add `| OutputMode::SeparateFiles` (wildcard then covers only `Loopback`):
+```rust
+OutputMode::Microphone | OutputMode::Mix
+| OutputMode::MixPlusMicrophone | OutputMode::MixPlusLoopback
+| OutputMode::SeparateFiles => {
+    let (handle, consumer) = capture::start_mic_capture(id).map_err(|e| e.to_string())?;
+    (Some(handle), Some(consumer))
+}
+_ => (None, None)   // covers Loopback only
+```
+
+Loopback capture match — add `| OutputMode::SeparateFiles` (wildcard then covers only `Microphone`):
+```rust
+OutputMode::Loopback | OutputMode::Mix
+| OutputMode::MixPlusMicrophone | OutputMode::MixPlusLoopback
+| OutputMode::SeparateFiles => {
+    let (handle, consumer) = capture::start_loopback_capture(id).map_err(|e| e.to_string())?;
+    (Some(handle), Some(consumer))
+}
+_ => (None, None)   // covers Microphone only
+```
 
 **3. WAV writer creation**
 
@@ -174,6 +222,11 @@ Files produced: `<mic_filename>_<timestamp>.wav` and `<loopback_filename>_<times
 
 **Approach:** Synchronized — both sources must accumulate data before writing (same as Mix modes). Primary writer receives mic-only, secondary writer receives loopback-only.
 
+Also update the `MixerConfig.secondary_writer` doc comment to include `SeparateFiles`:
+```rust
+/// Secondary writer for parallel modes (MixPlusMicrophone, MixPlusLoopback, SeparateFiles).
+```
+
 **1. Sync guard — `matches!` for "wait for both sources"**
 
 Add `SeparateFiles` to the existing check:
@@ -185,7 +238,10 @@ if matches!(config.output_mode,
 
 **2. Drain frames — second `matches!`**
 
-Same addition in the drain-frames block.
+Same addition in the drain-frames block. Also update the `// In Mix mode:` comment on that block to reflect that `SeparateFiles` is now included:
+```rust
+// In Mix / SeparateFiles mode: drain equal frame counts from both sources to keep them in sync.
+```
 
 **3. Output match — new arm**
 
@@ -217,9 +273,9 @@ Primary writer receives mic samples; secondary writer receives loopback samples.
 
 | File | Change |
 |------|--------|
-| `src-tauri/src/audio/types.rs` | Add `SeparateFiles` variant |
-| `src-tauri/src/lib.rs` | Device validation, capture startup, WAV writer arm |
-| `src-tauri/src/audio/mixer.rs` | Sync guards (×2) + output match arm |
+| `src-tauri/src/audio/types.rs` | Add `SeparateFiles` variant + 2 serialization/roundtrip tests |
+| `src-tauri/src/lib.rs` | Device validation (×2 arms), capture startup (×2 arms), WAV writer arm |
+| `src-tauri/src/audio/mixer.rs` | Doc comment, sync guards (×2), output match arm |
 | `src/lib/types/index.ts` | Add `"SeparateFiles"` to union type |
 | `src/lib/stores/recording.svelte.ts` | Add `SeparateFiles` to 4 mode checks |
 | `src/lib/components/ProfileDialog.svelte` | Add mode to combobox array |
@@ -227,3 +283,23 @@ Primary writer receives mic samples; secondary writer receives loopback samples.
 | `messages/uk.json` | Add `mode_separate_files` key |
 | `src/paraglide/messages/mode_separate_files.js` | New paraglide message file |
 | `src/paraglide/messages/_index.js` | Export new message file |
+
+## Tests
+
+Add to `src-tauri/src/audio/types.rs` (following existing `MixPlusMicrophone`/`MixPlusLoopback` test pattern):
+
+```rust
+#[test]
+fn output_mode_separate_files_serializes() {
+    let json = serde_json::to_string(&OutputMode::SeparateFiles).unwrap();
+    assert_eq!(json, "\"SeparateFiles\"");
+}
+
+#[test]
+fn output_mode_separate_files_roundtrip() {
+    let mode = OutputMode::SeparateFiles;
+    let json = serde_json::to_string(&mode).unwrap();
+    let deserialized: OutputMode = serde_json::from_str(&json).unwrap();
+    assert_eq!(deserialized, OutputMode::SeparateFiles);
+}
+```

@@ -6,6 +6,7 @@ pub mod profiles;
 pub mod settings;
 pub mod sounds;
 pub mod state;
+pub mod tray;
 
 use audio::capture;
 use audio::mixer::{self, MixerConfig};
@@ -426,6 +427,11 @@ fn set_sound_enabled(state: tauri::State<'_, SharedState>, enabled: bool) {
 }
 
 #[tauri::command]
+fn quit_app(app: tauri::AppHandle) {
+    app.exit(0);
+}
+
+#[tauri::command]
 fn set_hotkey(app: tauri::AppHandle, shortcut: String) -> Result<(), String> {
     hotkey::register(&app, &shortcut)
 }
@@ -630,6 +636,7 @@ pub fn run() {
             cmd_select_profile,
             cmd_get_active_profile,
             get_recordings_dir,
+            quit_app,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

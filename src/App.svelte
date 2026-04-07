@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onMount, tick } from "svelte";
   import { getCurrentWindow } from "@tauri-apps/api/window";
   import type { RecordingProfile } from "./lib/types";
   import { getDevices, refreshDevices, initDeviceListener } from "./lib/stores/devices.svelte";
@@ -211,6 +211,8 @@
       });
 
       initialized = true;
+      await tick();
+      document.querySelector<HTMLSelectElement>('.profile-controls select')?.focus();
     })();
     window.addEventListener("keydown", handleMnemonic);
     return () => {

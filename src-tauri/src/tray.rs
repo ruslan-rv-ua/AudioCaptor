@@ -28,6 +28,10 @@ pub fn setup_tray(app: &tauri::AppHandle, language: &str) -> tauri::Result<()> {
                     .map(|s| s.recording_state != RecordingState::Idle)
                     .unwrap_or(false);
                 if is_recording {
+                    if let Some(w) = app.get_webview_window("main") {
+                        let _ = w.show();
+                        let _ = w.set_focus();
+                    }
                     let _ = app.emit("tray-quit-requested", ());
                 } else {
                     app.exit(0);

@@ -355,8 +355,29 @@ mod tests {
     }
 
     #[test]
-    fn migrate_v4_preserves_existing_minimize_to_tray_false() {
-        // If somehow the field is already present, serde preserves it
+    fn migrate_v4_uses_serde_default_when_field_absent() {
+        // Field not present in JSON → serde fills false (the default)
+        let json = r#"{
+            "version": 4,
+            "selectedMic": null,
+            "selectedLoopback": null,
+            "hotkey": "Pause",
+            "soundEnabled": true,
+            "profiles": [],
+            "activeProfileId": "default",
+            "language": "en",
+            "confirmExitDuringRecording": true,
+            "theme": "auto"
+        }"#;
+        let settings: Settings = serde_json::from_str(json).unwrap();
+        let migrated = migrate_settings(settings);
+        assert_eq!(migrated.version, 5);
+        assert!(!migrated.minimize_to_tray_on_focus_loss);
+    }
+
+    #[test]
+    fn migrate_v4_preserves_existing_minimize_to_tray_true() {
+        // Field present with non-default value → serde must preserve it
         let json = r#"{
             "version": 4,
             "selectedMic": null,
@@ -368,11 +389,11 @@ mod tests {
             "language": "en",
             "confirmExitDuringRecording": true,
             "theme": "auto",
-            "minimizeToTrayOnFocusLoss": false
+            "minimizeToTrayOnFocusLoss": true
         }"#;
         let settings: Settings = serde_json::from_str(json).unwrap();
         let migrated = migrate_settings(settings);
         assert_eq!(migrated.version, 5);
-        assert!(!migrated.minimize_to_tray_on_focus_loss);
+        assert!(migrated.minimize_to_tray_on_focus_loss);
     }
 }

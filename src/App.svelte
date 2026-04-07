@@ -177,6 +177,11 @@
     scheduleSave();          // persists to Tauri backend
   }
 
+  async function focusProfileSelect() {
+    await tick();
+    document.getElementById("profile-select")?.focus();
+  }
+
   async function handleStopAndExit() {
     confirmExitOpen = false;
     try { await stopRecording(); } catch { /* already stopped */ }
@@ -252,7 +257,7 @@
   <ProfileDialog
     profile={editingProfile}
     open={dialogOpen}
-    onclose={() => dialogOpen = false}
+    onclose={async () => { dialogOpen = false; await focusProfileSelect(); }}
     onsave={handleProfileSave}
   />
 
@@ -314,7 +319,7 @@
     confirmExitDuringRecording={appSettings.confirmExitDuringRecording}
     language={appSettings.language}
     theme={appSettings.theme}
-    onclose={() => settingsOpen = false}
+    onclose={async () => { settingsOpen = false; await focusProfileSelect(); }}
     onsave={handleSettingsSave}
     onthemechange={handleThemeChange}
   />
@@ -322,7 +327,7 @@
   <ConfirmExitDialog
     open={confirmExitOpen}
     onstopandexit={handleStopAndExit}
-    oncancel={() => confirmExitOpen = false}
+    oncancel={async () => { confirmExitOpen = false; await focusProfileSelect(); }}
   />
 </main>
 {/if}

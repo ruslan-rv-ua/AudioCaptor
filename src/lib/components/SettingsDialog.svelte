@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { tick } from "svelte";
   import type { Theme } from "../types";
   import * as m from "../../paraglide/messages";
   import { updateHotkey, updateSoundEnabled, setLanguage, setConfirmExitDuringRecording } from "../stores/settings.svelte";
@@ -66,6 +67,8 @@
       onsave({ hotkey: shortcut });
       capturingHotkey = false;
       window.removeEventListener("keydown", onKeyDown, true);
+      await tick();
+      document.getElementById("settings-hotkey-display")?.focus();
     }
 
     window.addEventListener("keydown", onKeyDown, true);
@@ -171,10 +174,14 @@
               : m.settings_hotkey_none()}
             class="hotkey-input"
           />
-          <button type="button" class="btn-sm" onclick={startHotkeyCapture} disabled={capturingHotkey}>
+          <button type="button" class="btn-sm"
+            aria-label={capturingHotkey ? m.settings_hotkey_capturing() : m.settings_hotkey_capture_btn_aria()}
+            onclick={startHotkeyCapture} disabled={capturingHotkey}>
             {capturingHotkey ? m.settings_hotkey_capturing() : m.settings_hotkey_capture_btn()}
           </button>
-          <button type="button" class="btn-sm btn-secondary" onclick={resetHotkey} disabled={capturingHotkey}>
+          <button type="button" class="btn-sm btn-secondary"
+            aria-label={m.settings_hotkey_reset_btn_aria()}
+            onclick={resetHotkey} disabled={capturingHotkey}>
             {m.settings_hotkey_reset_btn()}
           </button>
         </div>

@@ -41,6 +41,7 @@
   import ProfileDialog from "./lib/components/ProfileDialog.svelte";
   import SettingsDialog from "./lib/components/SettingsDialog.svelte";
   import ConfirmExitDialog from "./lib/components/ConfirmExitDialog.svelte";
+  import ConfirmDeleteDialog from "./lib/components/ConfirmDeleteDialog.svelte";
 
   const devices = getDevices();
   const recording = getRecording();
@@ -54,6 +55,13 @@
   let editingProfile = $state<RecordingProfile | null>(null);
   let settingsOpen = $state(false);
   let confirmExitOpen = $state(false);
+  let deleteConfirmOpen = $state(false);
+  let deletingProfileId = $state<string | null>(null);
+  let deletingProfileName = $derived(
+    deletingProfileId
+      ? (profileStore.list.find(p => p.id === deletingProfileId)?.name ?? "")
+      : ""
+  );
 
   let isRecording = $derived(recording.state !== "Idle");
 
@@ -161,11 +169,26 @@
   }
 
   async function handleProfileDelete(id: string) {
-    if (!confirm(m.delete_profile_confirm())) return;
+    deletingProfileId = id;
+    deleteConfirmOpen = true;
+  }
+
+  async function handleDeleteConfirm() {
+    deleteConfirmOpen = false;
+    const id = deletingProfileId;
+    deletingProfileId = null;
+    if (!id) return;
     await deleteProfile(id);
     const active = profileStore.active;
     if (active) applyProfile(active);
     scheduleSave();
+    await focusProfileSelect();
+  }
+
+  async function handleDeleteCancel() {
+    deleteConfirmOpen = false;
+    deletingProfileId = null;
+    await focusProfileSelect();
   }
 
   function handleSettingsSave(_patch: Partial<import("./lib/types").Settings>) {
@@ -329,6 +352,13 @@
     open={confirmExitOpen}
     onstopandexit={handleStopAndExit}
     oncancel={async () => { confirmExitOpen = false; await focusProfileSelect(); }}
+  />
+
+  <ConfirmDeleteDialog
+    open={deleteConfirmOpen}
+    profileName={deletingProfileName}
+    onconfirm={handleDeleteConfirm}
+    oncancel={handleDeleteCancel}
   />
 </main>
 {/if}

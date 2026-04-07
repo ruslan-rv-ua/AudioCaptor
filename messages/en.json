@@ -81,6 +81,8 @@
   "confirm_exit_title": "Stop recording?",
   "confirm_exit_body": "Recording is in progress. Do you want to stop and exit?",
   "btn_stop_and_exit": "Stop and exit",
+  "confirm_delete_body": "Profile \u2018{name}\u2019 will be permanently deleted.",
+  "btn_delete": "Delete",
   "live_recording_started": "Recording started",
   "live_recording_paused": "Recording paused",
   "live_recording_stopped": "Recording stopped",

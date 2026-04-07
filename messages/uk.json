@@ -81,6 +81,8 @@
   "confirm_exit_title": "Зупинити запис?",
   "confirm_exit_body": "Запис триває. Зупинити та вийти?",
   "btn_stop_and_exit": "Зупинити і вийти",
+  "confirm_delete_body": "Профіль \u2018{name}\u2019 буде видалено назавжди.",
+  "btn_delete": "Видалити",
   "live_recording_started": "Запис розпочато",
   "live_recording_paused": "Запис призупинено",
   "live_recording_stopped": "Запис зупинено",

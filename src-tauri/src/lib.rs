@@ -613,6 +613,11 @@ pub fn run() {
                 Err(e) => log::error!("Failed to start device monitor: {e}"),
             }
 
+            // Set up system tray icon
+            if let Err(e) = tray::setup_tray(app.handle(), &settings.language) {
+                log::error!("Failed to set up tray icon: {e}");
+            }
+
             log::info!("AudioCaptor started");
             Ok(())
         })

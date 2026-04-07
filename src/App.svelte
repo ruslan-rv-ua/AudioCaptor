@@ -346,20 +346,20 @@
 
   .header-row h1 {
     margin: 0;
-    font-size: 16px;
+    font-size: 18px;
     font-weight: 700;
     color: var(--text-primary);
     letter-spacing: -0.01em;
   }
 
   .btn-settings {
-    width: 32px;
-    height: 32px;
+    width: 36px;
+    height: 36px;
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 7px;
     cursor: pointer;
-    font-size: 17px;
+    font-size: 20px;
     display: flex;
     align-items: center;
     justify-content: center;

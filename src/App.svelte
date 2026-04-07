@@ -244,12 +244,15 @@
       await initDeviceListener();
 
       await appWindow.onCloseRequested(async (event) => {
-        if (appSettings.confirmExitDuringRecording && isRecording) {
-          event.preventDefault();
-          confirmExitOpen = true;
+        event.preventDefault();
+        if (isRecording) {
+          if (appSettings.confirmExitDuringRecording) {
+            if (!confirmExitOpen) confirmExitOpen = true;
+          } else {
+            await handleStopAndExit();
+          }
         } else {
-          event.preventDefault();
-          await appWindow.hide();
+          void api.quitApp();
         }
       });
 

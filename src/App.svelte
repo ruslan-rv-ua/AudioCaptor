@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount, tick } from "svelte";
   import { getCurrentWindow } from "@tauri-apps/api/window";
+  import { listen } from "@tauri-apps/api/event";
   import type { RecordingProfile } from "./lib/types";
   import { getDevices, refreshDevices, initDeviceListener } from "./lib/stores/devices.svelte";
   import {
@@ -23,8 +24,9 @@
     selectProfile,
   } from "./lib/stores/profiles.svelte";
   import { saveSettings, loadSettings } from "./lib/utils/invoke";
+  import * as api from "./lib/utils/invoke";
   import { initLanguage } from "./lib/i18n";
-  import { getSettings, loadSettingsFields } from "./lib/stores/settings.svelte";
+  import { getSettings, loadSettingsFields, setMinimizeToTrayOnFocusLoss } from "./lib/stores/settings.svelte";
   import {
     initTheme,
     setTheme,
@@ -79,6 +81,7 @@
         soundEnabled: appSettings.soundEnabled,
         language: appSettings.language,
         confirmExitDuringRecording: appSettings.confirmExitDuringRecording,
+        minimizeToTrayOnFocusLoss: appSettings.minimizeToTrayOnFocusLoss,
         profiles: profileStore.list,
         activeProfileId: profileStore.activeId,
         theme: appSettings.theme,
@@ -104,6 +107,11 @@
   }
 
   function handleMnemonic(e: KeyboardEvent) {
+    if (e.key === "Escape" && !settingsOpen && !dialogOpen && !confirmExitOpen && !deleteConfirmOpen) {
+      e.preventDefault();
+      void appWindow.hide();
+      return;
+    }
     if (!e.altKey) return;
 
     const key = e.key.toLowerCase();
@@ -209,10 +217,13 @@
   async function handleStopAndExit() {
     confirmExitOpen = false;
     try { await stopRecording(); } catch { /* already stopped */ }
-    await appWindow.close();
+    await api.quitApp();
   }
 
   onMount(() => {
+    let unlistenFocus: (() => void) | undefined;
+    let unlistenTrayQuit: (() => void) | undefined;
+
     (async () => {
       try {
         const rawSettings = await loadSettings();
@@ -236,6 +247,29 @@
         if (appSettings.confirmExitDuringRecording && isRecording) {
           event.preventDefault();
           confirmExitOpen = true;
+        } else {
+          event.preventDefault();
+          await appWindow.hide();
+        }
+      });
+
+      unlistenFocus = await appWindow.onFocusChanged(({ payload: focused }) => {
+        if (!focused
+            && appSettings.minimizeToTrayOnFocusLoss
+            && !settingsOpen && !dialogOpen && !confirmExitOpen && !deleteConfirmOpen) {
+          void appWindow.hide();
+        }
+      });
+
+      unlistenTrayQuit = await listen("tray-quit-requested", async () => {
+        if (isRecording) {
+          if (appSettings.confirmExitDuringRecording) {
+            if (!confirmExitOpen) confirmExitOpen = true;
+          } else {
+            await handleStopAndExit();
+          }
+        } else {
+          void api.quitApp();
         }
       });
 
@@ -247,6 +281,8 @@
     return () => {
       window.removeEventListener("keydown", handleMnemonic);
       cleanupTheme();
+      unlistenFocus?.();
+      unlistenTrayQuit?.();
     };
   });
 </script>
@@ -255,12 +291,20 @@
 <main aria-label="AudioCaptor">
   <div class="header-row">
     <h1>{m.app_title()}</h1>
-    <button
-      type="button"
-      class="btn-settings"
-      aria-label={m.settings_btn_aria()}
-      onclick={() => settingsOpen = true}
-    >⚙</button>
+    <div class="header-btns">
+      <button
+        type="button"
+        class="btn-tray"
+        aria-label={m.btn_minimize_to_tray_aria()}
+        onclick={() => appWindow.hide()}
+      >⊟</button>
+      <button
+        type="button"
+        class="btn-settings"
+        aria-label={m.settings_btn_aria()}
+        onclick={() => settingsOpen = true}
+      >⚙</button>
+    </div>
   </div>
 
   <StatusIndicator state={recording.state} durationMs={recording.durationMs} />
@@ -341,11 +385,13 @@
     hotkey={appSettings.hotkey}
     soundEnabled={appSettings.soundEnabled}
     confirmExitDuringRecording={appSettings.confirmExitDuringRecording}
+    minimizeToTrayOnFocusLoss={appSettings.minimizeToTrayOnFocusLoss}
     language={appSettings.language}
     theme={appSettings.theme}
     onclose={async () => { settingsOpen = false; await focusProfileSelect(); }}
     onsave={handleSettingsSave}
     onthemechange={handleThemeChange}
+    onminimizetotraytoggle={(v) => { setMinimizeToTrayOnFocusLoss(v); scheduleSave(); }}
   />
 
   <ConfirmExitDialog
@@ -388,6 +434,13 @@
     letter-spacing: -0.01em;
   }
 
+  .header-btns {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+
+  .btn-tray,
   .btn-settings {
     width: 36px;
     height: 36px;
@@ -404,6 +457,7 @@
     transition: background 0.1s;
   }
 
+  .btn-tray:hover,
   .btn-settings:hover {
     background: var(--surface-hover);
   }

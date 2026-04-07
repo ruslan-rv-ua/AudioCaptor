@@ -15,6 +15,12 @@
         "title": "AudioCaptor",
         "width": 480,
         "height": 600,
+        "minWidth": 480,
+        "minHeight": 600,
+        "maxWidth": 480,
+        "maxHeight": 600,
+        "resizable": false,
+        "center": true,
         "decorations": true,
         "visible": false
       }

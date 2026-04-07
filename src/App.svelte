@@ -223,7 +223,7 @@
 </script>
 
 {#if initialized}
-<main role="application" aria-label="AudioCaptor">
+<main aria-label="AudioCaptor">
   <div class="header-row">
     <h1>{m.app_title()}</h1>
     <button

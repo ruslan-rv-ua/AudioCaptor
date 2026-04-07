@@ -19,21 +19,21 @@ Add system tray support to AudioCaptor. The app minimizes to tray instead of exi
 | Trigger | Condition |
 |---|---|
 | Escape key | Main window focused, no dialog open |
-| X button (close) | Window not recording |
+| X button (close) — not recording | Always minimizes to tray |
+| X button (close) — recording, `confirmExitDuringRecording = true` | Shows ConfirmExitDialog (unchanged) |
+| X button (close) — recording, `confirmExitDuringRecording = false` | Minimizes to tray (recording continues silently — deliberate improvement over old "exit immediately") |
+| Alt+F4 | Same as X button — goes through `onCloseRequested` |
 | Dedicated button (⊟) in header | Always |
-| Window loses focus | Only when `minimizeToTrayOnFocusLoss = true` (opt-in setting, default `false`) |
-
-### X button during recording
-Unchanged — existing `ConfirmExitDialog` is shown («Зупинити та вийти» / «Скасувати»).
+| Window loses focus | Only when `minimizeToTrayOnFocusLoss = true` (opt-in, default `false`), and no dialog open |
 
 ### Tray icon
-- **Left click** → `window.show()` + `window.set_focus()`
+- **Left click** → `window.show()` + `window.set_focus()` (safe when already visible — Tauri no-op)
 - **Right click** → context menu with single item: **«Вийти»** / **«Quit»**
 
 ### «Вийти» / «Quit» from tray
 - **Not recording** → `app.exit(0)` immediately (handled in Rust)
 - **Recording** → Rust emits `tray-quit-requested` event → frontend opens existing `ConfirmExitDialog`
-  - «Зупинити та вийти» → `stopRecording()` then `invoke("quit_app")` → `app.exit(0)`
+  - «Зупинити та вийти» → `stopRecording()` then `api.quitApp()` → `app.exit(0)`
   - «Скасувати» → dialog closes, recording continues, window stays hidden
 
 ---
@@ -61,12 +61,15 @@ Consistent with existing module pattern (`hotkey.rs`, `device_monitor.rs`). Keep
 | File | Change |
 |---|---|
 | `src-tauri/Cargo.toml` | Add `"tray-icon"` feature to `tauri` |
-| `src-tauri/src/lib.rs` | `pub mod tray`, call `tray::setup_tray()` in setup, add `quit_app` command |
+| `src-tauri/tauri.conf.json` | Add `"trayIcon"` config block under `"app"` |
+| `src-tauri/src/lib.rs` | `pub mod tray`, call `tray::setup_tray()` in setup, add `quit_app` command to handler list |
 | `src-tauri/src/settings.rs` | New field `minimize_to_tray_on_focus_loss: bool`, migration v4→v5 |
-| `src-tauri/capabilities/default.json` | Add `core:window:allow-hide` |
-| `src/App.svelte` | X button, Escape, focus loss, tray-quit-requested listener, new button |
+| `src-tauri/capabilities/default.json` | Add `core:window:allow-hide` and `core:tray:default` |
+| `src/lib/types/index.ts` | Add `minimizeToTrayOnFocusLoss: boolean` to `Settings` interface |
+| `src/lib/utils/invoke.ts` | Add `quitApp()` wrapper |
+| `src/lib/stores/settings.svelte.ts` | New state var, getter, `loadSettingsFields`, setter |
+| `src/App.svelte` | X button, Escape, focus loss, tray-quit-requested listener, new button, update `handleStopAndExit`, update `scheduleSave` |
 | `src/lib/components/SettingsDialog.svelte` | New checkbox, new prop |
-| `src/lib/stores/settings.svelte.ts` | New field + setter |
 | `messages/en.json` | 2 new keys |
 | `messages/uk.json` | 2 new keys |
 
@@ -75,6 +78,13 @@ Consistent with existing module pattern (`hotkey.rs`, `device_monitor.rs`). Keep
 ## Rust: `tray.rs`
 
 ```rust
+use tauri::{
+    menu::{Menu, MenuItem},
+    tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
+    Manager,
+};
+use crate::{audio::types::RecordingState, state::SharedState};
+
 pub fn setup_tray(app: &tauri::AppHandle, language: &str) -> tauri::Result<()> {
     let quit_label = if language == "uk" { "Вийти" } else { "Quit" };
     let quit_item = MenuItem::with_id(app, "quit", quit_label, true, None::<&str>)?;
@@ -120,16 +130,24 @@ pub fn setup_tray(app: &tauri::AppHandle, language: &str) -> tauri::Result<()> {
 
 ```rust
 // New field in Settings struct
-pub minimize_to_tray_on_focus_loss: bool,  // NEW in v5, default false
+#[serde(default)]
+pub minimize_to_tray_on_focus_loss: bool,  // NEW in v5
 
-// Default::default() — version bumped to 5
-// Migration arm:
+// impl Default for Settings — bump version to 5:
+version: 5,
+minimize_to_tray_on_focus_loss: false,
+
+// migrate_settings — REPLACE existing `4 => { break; }` arm with:
 4 => {
     settings.version = 5;
-    // serde #[serde(default)] fills minimize_to_tray_on_focus_loss = false
+    // serde #[serde(default)] fills minimize_to_tray_on_focus_loss = false for old files
 }
-5 => { break; }
+5 => {
+    break; // terminal version
+}
 ```
+
+**Note:** The existing `4 => { break; }` arm must be **replaced** (not supplemented). The new `5 => { break; }` is the terminal arm.
 
 ---
 
@@ -146,26 +164,158 @@ tray::setup_tray(app.handle(), &settings.language)?;
 fn quit_app(app: tauri::AppHandle) {
     app.exit(0);
 }
+
+// Add quit_app to invoke_handler — the full updated list:
+.invoke_handler(tauri::generate_handler![
+    load_settings,
+    save_settings,
+    get_audio_devices,
+    refresh_devices,
+    start_recording,
+    pause_recording,
+    resume_recording,
+    stop_recording,
+    set_mic_volume,
+    set_loopback_volume,
+    set_sound_enabled,
+    set_hotkey,
+    unregister_hotkey,
+    cmd_list_profiles,
+    cmd_save_profile,
+    cmd_delete_profile,
+    cmd_select_profile,
+    cmd_get_active_profile,
+    get_recordings_dir,
+    quit_app,          // NEW
+])
+```
+
+---
+
+## Rust: `Cargo.toml`
+
+```toml
+tauri = { version = "2", features = ["tray-icon"] }
+```
+
+---
+
+## Config: `tauri.conf.json`
+
+Add inside the `"app"` object:
+
+```json
+"trayIcon": {
+  "iconPath": "icons/icon.ico",
+  "iconAsTemplate": false
+}
+```
+
+---
+
+## TypeScript: `src/lib/types/index.ts`
+
+Add to the `Settings` interface:
+
+```ts
+minimizeToTrayOnFocusLoss: boolean;
+```
+
+---
+
+## TypeScript: `src/lib/utils/invoke.ts`
+
+Add one function following the existing pattern:
+
+```ts
+export async function quitApp(): Promise<void> {
+  return invoke("quit_app");
+}
+```
+
+---
+
+## TypeScript: `src/lib/stores/settings.svelte.ts`
+
+```ts
+// New $state variable (alongside existing ones):
+let minimizeToTrayOnFocusLoss = $state(false);
+
+// Add getter to getSettings() return object:
+get minimizeToTrayOnFocusLoss() { return minimizeToTrayOnFocusLoss; },
+
+// Add to loadSettingsFields():
+minimizeToTrayOnFocusLoss = s.minimizeToTrayOnFocusLoss ?? false;
+
+// New setter (alongside existing setters):
+export function setMinimizeToTrayOnFocusLoss(value: boolean) {
+  minimizeToTrayOnFocusLoss = value;
+}
 ```
 
 ---
 
 ## Frontend: `App.svelte` changes
 
-### X button (onCloseRequested)
+### Imports — add namespace import for `invoke.ts`
+
+Add alongside the existing `{ saveSettings, loadSettings }` import:
+
+```ts
+import * as api from "./lib/utils/invoke";
+```
+
+### X button + Alt+F4 (onCloseRequested)
+
+`Alt+F4` already calls `appWindow.close()` via the existing mnemonic handler, so it also flows through `onCloseRequested` — same behavior as X button, no extra change needed.
+
 ```ts
 await appWindow.onCloseRequested(async (event) => {
-    if (isRecording) {
+    if (appSettings.confirmExitDuringRecording && isRecording) {
         event.preventDefault();
         confirmExitOpen = true;
     } else {
+        // Not recording → minimize to tray.
+        // Recording + confirmExitDuringRecording=false → also minimize to tray
+        // (recording continues silently; deliberate improvement over old "exit immediately").
         event.preventDefault();
         await appWindow.hide();
     }
 });
 ```
 
+### handleStopAndExit — use `api.quitApp()` instead of `appWindow.close()`
+
+`appWindow.close()` would now trigger `onCloseRequested` → minimize to tray instead of quitting.
+
+```ts
+async function handleStopAndExit() {
+    confirmExitOpen = false;
+    try { await stopRecording(); } catch { /* already stopped */ }
+    await api.quitApp();
+}
+```
+
+### scheduleSave — add new field to payload
+
+```ts
+await saveSettings({
+    version: appSettings.version,
+    selectedMic: recording.selectedMic,
+    selectedLoopback: recording.selectedLoopback,
+    hotkey: appSettings.hotkey,
+    soundEnabled: appSettings.soundEnabled,
+    language: appSettings.language,
+    confirmExitDuringRecording: appSettings.confirmExitDuringRecording,
+    minimizeToTrayOnFocusLoss: appSettings.minimizeToTrayOnFocusLoss,  // NEW
+    profiles: profileStore.list,
+    activeProfileId: profileStore.activeId,
+    theme: appSettings.theme,
+});
+```
+
 ### Escape key (handleMnemonic)
+
 ```ts
 case "Escape":
     if (!settingsOpen && !dialogOpen && !confirmExitOpen && !deleteConfirmOpen) {
@@ -175,48 +325,90 @@ case "Escape":
     break;
 ```
 
-### Focus loss (onMount)
+### Focus loss (onMount) — guard against open dialogs
+
 ```ts
 const unlistenFocus = await appWindow.onFocusChanged(({ payload: focused }) => {
-    if (!focused && appSettings.minimizeToTrayOnFocusLoss) {
+    if (!focused
+        && appSettings.minimizeToTrayOnFocusLoss
+        && !settingsOpen && !dialogOpen && !confirmExitOpen && !deleteConfirmOpen) {
         void appWindow.hide();
     }
 });
-// in cleanup: unlistenFocus();
+// in cleanup return: unlistenFocus();
 ```
 
 ### tray-quit-requested listener (onMount)
+
 ```ts
 const unlistenTrayQuit = await listen("tray-quit-requested", () => {
-    if (isRecording) confirmExitOpen = true;
-    else invoke("quit_app");
+    if (isRecording) {
+        if (!confirmExitOpen) confirmExitOpen = true;
+    } else {
+        void api.quitApp();
+    }
 });
-// in cleanup: unlistenTrayQuit();
+// in cleanup return: unlistenTrayQuit();
 ```
 
-### New button in header
+### New button in header (left of settings button)
+
 ```svelte
-<button class="btn-tray" aria-label={m.btn_minimize_to_tray_aria()}
-    onclick={() => appWindow.hide()}>⊟</button>
-<button class="btn-settings" ...>⚙</button>
+<button
+  type="button"
+  class="btn-tray"
+  aria-label={m.btn_minimize_to_tray_aria()}
+  onclick={() => appWindow.hide()}
+>⊟</button>
+<button type="button" class="btn-settings" ...>⚙</button>
 ```
-Style: identical to `.btn-settings` (36×36px, same border/radius/hover).
+
+Style — identical to `.btn-settings` (36×36px, same border, radius, hover):
+
+```css
+.btn-tray {
+  width: 36px; height: 36px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 7px; cursor: pointer; font-size: 20px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-primary);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  transition: background 0.1s;
+}
+.btn-tray:hover { background: var(--surface-hover); }
+```
 
 ---
 
 ## Frontend: `SettingsDialog.svelte` changes
 
-New prop `minimizeToTrayOnFocusLoss: boolean` and handler `onminimizetotraytoggle`.
+New prop and handler:
+```ts
+interface Props {
+  // ... existing props ...
+  minimizeToTrayOnFocusLoss: boolean;
+  onminimizetotraytoggle: (v: boolean) => void;
+}
+```
 
 New checkbox field (after «Confirm exit during recording»):
 ```svelte
 <div class="field">
     <label class="checkbox-label">
         <input type="checkbox" checked={minimizeToTrayOnFocusLoss}
-               onchange={handleMinimizeToTrayToggle} />
+               onchange={(e) => onminimizetotraytoggle((e.target as HTMLInputElement).checked)} />
         {m.settings_minimize_on_focus_loss()}
     </label>
 </div>
+```
+
+In `App.svelte`, pass the new props to `<SettingsDialog>`:
+```svelte
+minimizeToTrayOnFocusLoss={appSettings.minimizeToTrayOnFocusLoss}
+onminimizetotraytoggle={(v) => {
+    setMinimizeToTrayOnFocusLoss(v);
+    scheduleSave();
+}}
 ```
 
 ---
@@ -253,7 +445,8 @@ Old settings files (v4) get `minimizeToTrayOnFocusLoss: false` automatically via
 ## Capabilities
 
 ```json
-"core:window:allow-hide"
+"core:window:allow-hide",
+"core:tray:default"
 ```
 
 ---

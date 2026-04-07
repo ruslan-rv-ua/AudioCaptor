@@ -17,6 +17,8 @@ pub struct Settings {
     pub confirm_exit_during_recording: bool,     // NEW in v3
     #[serde(default = "default_theme")]
     pub theme: String,              // NEW in v4 — "auto" | "light" | "dark"
+    #[serde(default)]
+    pub minimize_to_tray_on_focus_loss: bool,  // NEW in v5
     // Legacy fields — used only during migration from v1
     #[serde(default, skip_serializing)]
     mic_volume: f32,
@@ -39,7 +41,7 @@ fn default_theme() -> String {
 impl Default for Settings {
     fn default() -> Self {
         Self {
-            version: 4,
+            version: 5,
             selected_mic: None,
             selected_loopback: None,
             hotkey: Some("Pause".to_string()),
@@ -49,6 +51,7 @@ impl Default for Settings {
             language: "en".to_string(),
             confirm_exit_during_recording: true,
             theme: "auto".to_string(),
+            minimize_to_tray_on_focus_loss: false,
             mic_volume: 1.0,
             loopback_volume: 0.5,
             output_mode: OutputMode::Mix,
@@ -103,8 +106,11 @@ pub(crate) fn migrate_settings(mut settings: Settings) -> Settings {
                 // fall through to v4 arm
             }
             4 => {
-                // Terminal version.
-                break;
+                settings.version = 5;
+                // serde #[serde(default)] fills minimize_to_tray_on_focus_loss = false for old files
+            }
+            5 => {
+                break; // terminal version
             }
             v => {
                 log::warn!("Unknown settings version: {v}");
@@ -163,7 +169,7 @@ mod tests {
     fn settings_missing_version_defaults_to_struct_default() {
         // When "version" is absent from JSON, serde fills it with Settings::default().version
         // (because #[serde(default)] on the struct uses Default::default() to seed missing fields).
-        // Since Default::version is now 4, the deserialized value is 4.
+        // Since Default::version is now 5, the deserialized value is 5.
         let json = r#"{
             "selectedMic": null,
             "selectedLoopback": null,
@@ -175,24 +181,24 @@ mod tests {
             "soundEnabled": true
         }"#;
         let settings: Settings = serde_json::from_str(json).unwrap();
-        assert_eq!(settings.version, 4);
+        assert_eq!(settings.version, 5);
     }
 
     #[test]
-    fn migrate_settings_upgrades_v0_to_v4() {
+    fn migrate_settings_upgrades_v0_to_v5() {
         let mut settings = Settings::default();
         settings.version = 0;
         let migrated = migrate_settings(settings);
-        assert_eq!(migrated.version, 4);
+        assert_eq!(migrated.version, 5);
         assert_eq!(migrated.profiles.len(), 1);
     }
 
     #[test]
-    fn migrate_settings_upgrades_v1_to_v4() {
+    fn migrate_settings_upgrades_v1_to_v5() {
         let mut settings = Settings::default();
         settings.version = 1;
         let migrated = migrate_settings(settings);
-        assert_eq!(migrated.version, 4);
+        assert_eq!(migrated.version, 5);
         assert_eq!(migrated.profiles.len(), 1);
         assert_eq!(migrated.active_profile_id, "default");
     }
@@ -211,7 +217,7 @@ mod tests {
     #[test]
     fn settings_v2_has_profiles_and_active_id() {
         let settings = Settings::default();
-        assert_eq!(settings.version, 4);
+        assert_eq!(settings.version, 5);
         assert_eq!(settings.profiles.len(), 1);
         assert_eq!(settings.active_profile_id, "default");
         assert_eq!(settings.profiles[0].name, "Default");
@@ -232,7 +238,7 @@ mod tests {
         }"#;
         let settings: Settings = serde_json::from_str(json).unwrap();
         let migrated = migrate_settings(settings);
-        assert_eq!(migrated.version, 4);
+        assert_eq!(migrated.version, 5);
         assert_eq!(migrated.profiles.len(), 1);
         let p = &migrated.profiles[0];
         assert_eq!(p.id, "default");
@@ -242,12 +248,12 @@ mod tests {
         assert_eq!(p.sample_rate, 44100);
         assert_eq!(migrated.active_profile_id, "default");
         assert_eq!(migrated.selected_mic, Some("mic-123".into()));
-        assert_eq!(migrated.hotkey, "F9");
+        assert_eq!(migrated.hotkey, Some("F9".into()));
         assert!(!migrated.sound_enabled);
     }
 
     #[test]
-    fn migrate_v0_to_v4_goes_through_all_steps() {
+    fn migrate_v0_to_v5_goes_through_all_steps() {
         let json = r#"{
             "selectedMic": null,
             "selectedLoopback": null,
@@ -260,7 +266,7 @@ mod tests {
         }"#;
         let settings: Settings = serde_json::from_str(json).unwrap();
         let migrated = migrate_settings(settings);
-        assert_eq!(migrated.version, 4);
+        assert_eq!(migrated.version, 5);
         assert_eq!(migrated.profiles.len(), 1);
     }
 
@@ -285,7 +291,7 @@ mod tests {
     }
 
     #[test]
-    fn migrate_v2_to_v4_adds_language_and_confirm_exit() {
+    fn migrate_v2_to_v5_adds_language_and_confirm_exit() {
         let json = r#"{
             "version": 2,
             "selectedMic": null,
@@ -297,22 +303,13 @@ mod tests {
         }"#;
         let settings: Settings = serde_json::from_str(json).unwrap();
         let migrated = migrate_settings(settings);
-        assert_eq!(migrated.version, 4);
+        assert_eq!(migrated.version, 5);
         assert_eq!(migrated.language, "en");
         assert!(migrated.confirm_exit_during_recording);
     }
 
     #[test]
-    fn settings_default_has_version_4() {
-        let s = Settings::default();
-        assert_eq!(s.version, 4);
-        assert_eq!(s.language, "en");
-        assert!(s.confirm_exit_during_recording);
-        assert_eq!(s.theme, "auto");
-    }
-
-    #[test]
-    fn migrate_v3_to_v4_adds_theme() {
+    fn migrate_v3_to_v5_adds_theme() {
         let json = r#"{
             "version": 3,
             "selectedMic": null,
@@ -326,7 +323,56 @@ mod tests {
         }"#;
         let settings: Settings = serde_json::from_str(json).unwrap();
         let migrated = migrate_settings(settings);
-        assert_eq!(migrated.version, 4);
+        assert_eq!(migrated.version, 5);
         assert_eq!(migrated.theme, "auto");
+    }
+
+    #[test]
+    fn settings_default_has_version_5() {
+        let s = Settings::default();
+        assert_eq!(s.version, 5);
+        assert!(!s.minimize_to_tray_on_focus_loss);
+    }
+
+    #[test]
+    fn migrate_v4_to_v5_adds_minimize_to_tray_on_focus_loss() {
+        let json = r#"{
+            "version": 4,
+            "selectedMic": null,
+            "selectedLoopback": null,
+            "hotkey": "Pause",
+            "soundEnabled": true,
+            "profiles": [],
+            "activeProfileId": "default",
+            "language": "en",
+            "confirmExitDuringRecording": true,
+            "theme": "auto"
+        }"#;
+        let settings: Settings = serde_json::from_str(json).unwrap();
+        let migrated = migrate_settings(settings);
+        assert_eq!(migrated.version, 5);
+        assert!(!migrated.minimize_to_tray_on_focus_loss);
+    }
+
+    #[test]
+    fn migrate_v4_preserves_existing_minimize_to_tray_false() {
+        // If somehow the field is already present, serde preserves it
+        let json = r#"{
+            "version": 4,
+            "selectedMic": null,
+            "selectedLoopback": null,
+            "hotkey": "Pause",
+            "soundEnabled": true,
+            "profiles": [],
+            "activeProfileId": "default",
+            "language": "en",
+            "confirmExitDuringRecording": true,
+            "theme": "auto",
+            "minimizeToTrayOnFocusLoss": false
+        }"#;
+        let settings: Settings = serde_json::from_str(json).unwrap();
+        let migrated = migrate_settings(settings);
+        assert_eq!(migrated.version, 5);
+        assert!(!migrated.minimize_to_tray_on_focus_loss);
     }
 }

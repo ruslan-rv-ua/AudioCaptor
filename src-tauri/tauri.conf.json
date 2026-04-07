@@ -20,6 +20,7 @@
         "maxWidth": 480,
         "maxHeight": 600,
         "resizable": false,
+        "maximizable": false,
         "center": true,
         "decorations": true,
         "visible": false

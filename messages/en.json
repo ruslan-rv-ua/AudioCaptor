@@ -87,5 +87,7 @@
   "live_recording_started": "Recording started",
   "live_recording_paused": "Recording paused",
   "live_recording_stopped": "Recording stopped",
-  "live_status_info": "{state}, {duration}"
+  "live_status_info": "{state}, {duration}",
+  "btn_minimize_to_tray_aria": "Minimize to tray",
+  "settings_minimize_on_focus_loss": "Minimize to tray when window loses focus"
 }

@@ -87,5 +87,7 @@
   "live_recording_started": "Запис розпочато",
   "live_recording_paused": "Запис призупинено",
   "live_recording_stopped": "Запис зупинено",
-  "live_status_info": "{state}, {duration}"
+  "live_status_info": "{state}, {duration}",
+  "btn_minimize_to_tray_aria": "Згорнути в трей",
+  "settings_minimize_on_focus_loss": "Згортати в трей при втраті фокуса"
 }

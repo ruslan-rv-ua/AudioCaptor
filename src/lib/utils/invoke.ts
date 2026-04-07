@@ -79,6 +79,10 @@ export async function cmdGetActiveProfile(): Promise<RecordingProfile> {
   return invoke<RecordingProfile>("cmd_get_active_profile");
 }
 
+export async function getRecordingsDir(): Promise<string> {
+  return invoke<string>("get_recordings_dir");
+}
+
 export async function refreshDevices(): Promise<AudioDevice[]> {
   return invoke<AudioDevice[]>("refresh_devices");
 }

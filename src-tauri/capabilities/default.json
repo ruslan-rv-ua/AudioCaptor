@@ -13,6 +13,7 @@
     "core:event:allow-emit",
     "core:event:allow-listen",
     "log:default",
-    "global-shortcut:default"
+    "global-shortcut:default",
+    "dialog:allow-open"
   ]
 }

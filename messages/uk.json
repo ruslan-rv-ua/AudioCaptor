@@ -83,6 +83,7 @@
   "btn_stop_and_exit": "Зупинити і вийти",
   "confirm_delete_body": "Профіль \u2018{name}\u2019 буде видалено назавжди.",
   "btn_delete": "Видалити",
+  "btn_browse_folder": "Огляд...",
   "live_recording_started": "Запис розпочато",
   "live_recording_paused": "Запис призупинено",
   "live_recording_stopped": "Запис зупинено",

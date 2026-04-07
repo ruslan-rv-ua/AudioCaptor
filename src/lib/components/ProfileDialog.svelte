@@ -1,6 +1,8 @@
 <script lang="ts">
   import type { RecordingProfile, OutputMode } from "../types";
   import * as m from "../../paraglide/messages";
+  import { open as openDialog } from "@tauri-apps/plugin-dialog";
+  import { getRecordingsDir } from "../utils/invoke";
 
   interface Props {
     profile: RecordingProfile | null;
@@ -23,6 +25,21 @@
   let mixFilename      = $state("mix");
   let error  = $state("");
   let editId = $state<string | null>(null);
+  let folderInputEl = $state<HTMLInputElement | null>(null);
+
+  async function browseFolder() {
+    let defaultPath: string | undefined;
+    try { defaultPath = await getRecordingsDir(); } catch { /* ignore */ }
+    const selected = await openDialog({
+      directory: true,
+      multiple: false,
+      defaultPath,
+    });
+    if (selected && typeof selected === "string") {
+      outputFolder = selected;
+      requestAnimationFrame(() => folderInputEl?.focus());
+    }
+  }
 
   const outputModes: { value: OutputMode; label: string }[] = [
     { value: "Microphone",        label: m.mode_microphone() },
@@ -134,7 +151,19 @@
         </div>
         <div class="field col-span">
           <label for="profile-folder">{m.field_output_folder()}</label>
-          <input id="profile-folder" type="text" bind:value={outputFolder} />
+          <div class="folder-row">
+            <input
+              id="profile-folder"
+              type="text"
+              bind:value={outputFolder}
+              bind:this={folderInputEl}
+              readonly
+              aria-readonly="true"
+            />
+            <button type="button" class="btn-browse" onclick={browseFolder}>
+              {m.btn_browse_folder()}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -288,6 +317,37 @@
   }
   input[type="text"]:focus-visible,
   select:focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+  }
+
+  .folder-row {
+    display: flex;
+    gap: 5px;
+    align-items: center;
+  }
+  .folder-row input[type="text"] {
+    flex: 1;
+    min-width: 0;
+    cursor: default;
+    color: var(--text-secondary);
+  }
+  .btn-browse {
+    flex-shrink: 0;
+    padding: 5px 10px;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    background: var(--surface);
+    color: var(--text-primary);
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .btn-browse:hover {
+    background: var(--surface-hover, var(--border));
+  }
+  .btn-browse:focus-visible {
     outline: 2px solid var(--focus-ring);
     outline-offset: 2px;
   }

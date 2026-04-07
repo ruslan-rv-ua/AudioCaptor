@@ -490,6 +490,13 @@ fn cmd_get_active_profile() -> Result<profiles::RecordingProfile, String> {
         .ok_or_else(|| "Active profile not found".into())
 }
 
+#[tauri::command]
+fn get_recordings_dir() -> String {
+    portable::exe_dir()
+        .map(|p| p.join("Recordings").to_string_lossy().into_owned())
+        .unwrap_or_else(|_| "Recordings".to_string())
+}
+
 pub fn play_sound(state: &state::AppState, kind: sounds::SoundKind) {
     if state.sounds_enabled {
         if let Some(ref engine) = state.sound_engine {
@@ -544,6 +551,7 @@ fn state_event_loop(app: tauri::AppHandle, state: SharedState, running: Arc<Atom
 
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             if let Some(w) = app.get_webview_window("main") {
@@ -621,6 +629,7 @@ pub fn run() {
             cmd_delete_profile,
             cmd_select_profile,
             cmd_get_active_profile,
+            get_recordings_dir,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -32,9 +32,11 @@ Add system tray support to AudioCaptor. The app minimizes to tray instead of exi
 
 ### «Вийти» / «Quit» from tray
 - **Not recording** → `app.exit(0)` immediately (handled in Rust)
-- **Recording** → Rust emits `tray-quit-requested` event → frontend opens existing `ConfirmExitDialog`
-  - «Зупинити та вийти» → `stopRecording()` then `api.quitApp()` → `app.exit(0)`
-  - «Скасувати» → dialog closes, recording continues, window stays hidden
+- **Recording** → Rust emits `tray-quit-requested` event → frontend checks `confirmExitDuringRecording`:
+  - `true` → opens existing `ConfirmExitDialog`
+    - «Зупинити та вийти» → `handleStopAndExit()` → `stopRecording()` + `api.quitApp()`
+    - «Скасувати» → dialog closes, recording continues, window stays hidden
+  - `false` → calls `handleStopAndExit()` directly, no dialog shown (consistent with X button behavior)
 
 ---
 
@@ -90,8 +92,13 @@ pub fn setup_tray(app: &tauri::AppHandle, language: &str) -> tauri::Result<()> {
     let quit_item = MenuItem::with_id(app, "quit", quit_label, true, None::<&str>)?;
     let menu = Menu::with_items(app, &[&quit_item])?;
 
+    let Some(icon) = app.default_window_icon() else {
+        log::warn!("No default window icon configured; tray icon not created");
+        return Ok(());
+    };
+
     TrayIconBuilder::new()
-        .icon(app.default_window_icon().unwrap().clone())
+        .icon(icon.clone())
         .menu(&menu)
         .tooltip("AudioCaptor")
         .on_menu_event(|app, event| {
@@ -340,10 +347,16 @@ const unlistenFocus = await appWindow.onFocusChanged(({ payload: focused }) => {
 
 ### tray-quit-requested listener (onMount)
 
+Respects `confirmExitDuringRecording` for consistency with the X button:
+
 ```ts
-const unlistenTrayQuit = await listen("tray-quit-requested", () => {
+const unlistenTrayQuit = await listen("tray-quit-requested", async () => {
     if (isRecording) {
-        if (!confirmExitOpen) confirmExitOpen = true;
+        if (appSettings.confirmExitDuringRecording) {
+            if (!confirmExitOpen) confirmExitOpen = true;
+        } else {
+            await handleStopAndExit();
+        }
     } else {
         void api.quitApp();
     }

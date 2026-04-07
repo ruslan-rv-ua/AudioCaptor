@@ -157,6 +157,7 @@
       applyProfile(profile);
     }
     scheduleSave();
+    await focusProfileSelect();
   }
 
   async function handleProfileDelete(id: string) {

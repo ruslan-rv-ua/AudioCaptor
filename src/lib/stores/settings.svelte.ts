@@ -3,7 +3,7 @@ import * as api from "../utils/invoke";
 
 let language = $state<"en" | "uk">("en");
 let confirmExitDuringRecording = $state(true);
-let hotkey = $state("Pause");
+let hotkey = $state<string | null>("Pause");
 let soundEnabled = $state(true);
 let settingsVersion = $state(4);
 let theme = $state<Theme>("auto");
@@ -28,9 +28,13 @@ export function loadSettingsFields(s: Settings) {
   theme = s.theme ?? "auto";
 }
 
-export async function updateHotkey(shortcut: string) {
+export async function updateHotkey(shortcut: string | null) {
   hotkey = shortcut;
-  await api.setHotkey(shortcut);
+  if (shortcut === null) {
+    await api.unregisterHotkey();
+  } else {
+    await api.setHotkey(shortcut);
+  }
 }
 
 export async function updateSoundEnabled(enabled: boolean) {

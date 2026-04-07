@@ -28,7 +28,7 @@ export interface Settings {
   version: number;
   selectedMic: string | null;
   selectedLoopback: string | null;
-  hotkey: string;
+  hotkey: string | null;
   soundEnabled: boolean;
   profiles: RecordingProfile[];
   activeProfileId: string;

@@ -6,7 +6,7 @@
 
   interface Props {
     open: boolean;
-    hotkey: string;
+    hotkey: string | null;
     soundEnabled: boolean;
     confirmExitDuringRecording: boolean;
     language: "en" | "uk";
@@ -35,7 +35,7 @@
   ];
 
   let capturingHotkey = $state(false);
-  let localHotkey = $state("");
+  let localHotkey = $state<string | null>(null);
   $effect.pre(() => { localHotkey = hotkey; });
 
   async function startHotkeyCapture() {
@@ -73,13 +73,17 @@
 
   async function cancelCapture() {
     capturingHotkey = false;
-    await api.setHotkey(localHotkey);
+    if (localHotkey === null) {
+      await api.unregisterHotkey();
+    } else {
+      await api.setHotkey(localHotkey);
+    }
   }
 
   async function resetHotkey() {
-    localHotkey = "Pause";
-    await updateHotkey("Pause");
-    onsave({ hotkey: "Pause" });
+    localHotkey = null;
+    await updateHotkey(null);
+    onsave({ hotkey: null });
   }
 
   function handleSoundToggle(e: Event) {
@@ -159,9 +163,12 @@
           <input
             id="settings-hotkey-display"
             type="text"
-            value={localHotkey}
+            value={localHotkey ?? ""}
+            placeholder={m.settings_hotkey_none()}
             readonly
-            aria-label={m.settings_hotkey_current_aria({ hotkey: localHotkey })}
+            aria-label={localHotkey
+              ? m.settings_hotkey_current_aria({ hotkey: localHotkey })
+              : m.settings_hotkey_none()}
             class="hotkey-input"
           />
           <button type="button" class="btn-sm" onclick={startHotkeyCapture} disabled={capturingHotkey}>

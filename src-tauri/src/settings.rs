@@ -9,7 +9,7 @@ pub struct Settings {
     pub version: u32,
     pub selected_mic: Option<String>,
     pub selected_loopback: Option<String>,
-    pub hotkey: String,
+    pub hotkey: Option<String>,
     pub sound_enabled: bool,
     pub profiles: Vec<RecordingProfile>,
     pub active_profile_id: String,
@@ -42,7 +42,7 @@ impl Default for Settings {
             version: 4,
             selected_mic: None,
             selected_loopback: None,
-            hotkey: "Pause".to_string(),
+            hotkey: Some("Pause".to_string()),
             sound_enabled: true,
             profiles: vec![RecordingProfile::default()],
             active_profile_id: "default".to_string(),
@@ -152,7 +152,7 @@ mod tests {
         assert_eq!(deserialized.profiles[0].loopback_volume, 0.5);
         assert_eq!(deserialized.profiles[0].output_mode, OutputMode::Mix);
         assert_eq!(deserialized.profiles[0].sample_rate, 48000);
-        assert_eq!(deserialized.hotkey, "Pause");
+        assert_eq!(deserialized.hotkey, Some("Pause".to_string()));
         assert!(deserialized.sound_enabled);
         assert_eq!(deserialized.language, "en");
         assert!(deserialized.confirm_exit_during_recording);

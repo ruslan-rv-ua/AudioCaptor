@@ -582,9 +582,11 @@ pub fn run() {
                 s.active_profile_id = settings.active_profile_id.clone();
             }
 
-            // Register global hotkey
-            if let Err(e) = hotkey::register(&app.handle(), &settings.hotkey) {
-                log::error!("Failed to register hotkey: {e}");
+            // Register global hotkey (only if one is configured)
+            if let Some(ref hk) = settings.hotkey {
+                if let Err(e) = hotkey::register(&app.handle(), hk) {
+                    log::error!("Failed to register hotkey: {e}");
+                }
             }
 
             // Start device monitor

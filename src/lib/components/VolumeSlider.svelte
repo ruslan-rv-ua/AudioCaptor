@@ -33,14 +33,11 @@
 <div class="volume-slider">
   <label for={inputId}>
     {label}
-    <span class="value-display">{value.toFixed(1)}</span>
+    <span class="value-display" aria-hidden="true">{value.toFixed(1)}</span>
   </label>
   <input
     id={inputId}
     type="range"
-    aria-valuemin={min}
-    aria-valuemax={max}
-    aria-valuenow={value}
     {min}
     {max}
     {step}

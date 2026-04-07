@@ -160,7 +160,7 @@
         <div class="field">
           <label for="profile-mic-vol">
             {m.field_mic_volume()}
-            <span class="slider-val">{micVolume.toFixed(1)}</span>
+            <span class="slider-val" aria-hidden="true">{micVolume.toFixed(1)}</span>
           </label>
           <input
             id="profile-mic-vol" type="range" min="0" max="4" step="0.1"
@@ -171,7 +171,7 @@
         <div class="field">
           <label for="profile-loop-vol">
             {m.field_loopback_volume()}
-            <span class="slider-val">{loopbackVolume.toFixed(1)}</span>
+            <span class="slider-val" aria-hidden="true">{loopbackVolume.toFixed(1)}</span>
           </label>
           <input
             id="profile-loop-vol" type="range" min="0" max="4" step="0.1"

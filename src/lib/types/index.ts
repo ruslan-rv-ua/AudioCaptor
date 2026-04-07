@@ -34,6 +34,7 @@ export interface Settings {
   activeProfileId: string;
   language: "en" | "uk";
   confirmExitDuringRecording: boolean;
+  minimizeToTrayOnFocusLoss: boolean;
   theme: Theme;
 }
 

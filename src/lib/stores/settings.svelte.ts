@@ -7,6 +7,7 @@ let hotkey = $state<string | null>("Pause");
 let soundEnabled = $state(true);
 let settingsVersion = $state(4);
 let theme = $state<Theme>("auto");
+let minimizeToTrayOnFocusLoss = $state(false);
 
 export function getSettings() {
   return {
@@ -16,6 +17,7 @@ export function getSettings() {
     get soundEnabled() { return soundEnabled; },
     get version() { return settingsVersion; },
     get theme() { return theme; },
+    get minimizeToTrayOnFocusLoss() { return minimizeToTrayOnFocusLoss; },
   };
 }
 
@@ -26,6 +28,7 @@ export function loadSettingsFields(s: Settings) {
   soundEnabled = s.soundEnabled;
   settingsVersion = s.version;
   theme = s.theme ?? "auto";
+  minimizeToTrayOnFocusLoss = s.minimizeToTrayOnFocusLoss ?? false;
 }
 
 export async function updateHotkey(shortcut: string | null) {
@@ -52,4 +55,8 @@ export function setConfirmExitDuringRecording(value: boolean) {
 
 export function setThemePreference(t: Theme) {
   theme = t;
+}
+
+export function setMinimizeToTrayOnFocusLoss(value: boolean) {
+  minimizeToTrayOnFocusLoss = value;
 }

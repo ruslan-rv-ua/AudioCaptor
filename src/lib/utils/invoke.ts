@@ -86,3 +86,7 @@ export async function getRecordingsDir(): Promise<string> {
 export async function refreshDevices(): Promise<AudioDevice[]> {
   return invoke<AudioDevice[]>("refresh_devices");
 }
+
+export async function quitApp(): Promise<void> {
+  return invoke("quit_app");
+}

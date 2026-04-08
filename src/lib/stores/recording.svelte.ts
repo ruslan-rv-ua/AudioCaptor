@@ -31,24 +31,24 @@ export function getRecording() {
     get error() { return recordingError; },
     get canRecord() {
       const mode = outputMode;
-      const needsMic = mode === "Microphone" || mode === "Mix" || mode === "MixPlusMicrophone" || mode === "MixPlusLoopback";
-      const needsLoopback = mode === "Loopback" || mode === "Mix" || mode === "MixPlusMicrophone" || mode === "MixPlusLoopback";
+      const needsMic = mode === "Microphone" || mode === "Mix" || mode === "MixPlusMicrophone" || mode === "MixPlusLoopback" || mode === "SeparateFiles";
+      const needsLoopback = mode === "Loopback" || mode === "Mix" || mode === "MixPlusMicrophone" || mode === "MixPlusLoopback" || mode === "SeparateFiles";
       if (needsMic && !selectedMic) return false;
       if (needsLoopback && !selectedLoopback) return false;
       return true;
     },
     get needsMic() {
-      return (outputMode === "Microphone" || outputMode === "Mix" || outputMode === "MixPlusMicrophone" || outputMode === "MixPlusLoopback")
+      return (outputMode === "Microphone" || outputMode === "Mix" || outputMode === "MixPlusMicrophone" || outputMode === "MixPlusLoopback" || outputMode === "SeparateFiles")
         && !selectedMic;
     },
     get needsLoopback() {
-      return (outputMode === "Loopback" || outputMode === "Mix" || outputMode === "MixPlusMicrophone" || outputMode === "MixPlusLoopback")
+      return (outputMode === "Loopback" || outputMode === "Mix" || outputMode === "MixPlusMicrophone" || outputMode === "MixPlusLoopback" || outputMode === "SeparateFiles")
         && !selectedLoopback;
     },
     get readinessHint() {
       const mode = outputMode;
-      const needsMic = (mode === "Microphone" || mode === "Mix" || mode === "MixPlusMicrophone" || mode === "MixPlusLoopback") && !selectedMic;
-      const needsLoopback = (mode === "Loopback" || mode === "Mix" || mode === "MixPlusMicrophone" || mode === "MixPlusLoopback") && !selectedLoopback;
+      const needsMic = (mode === "Microphone" || mode === "Mix" || mode === "MixPlusMicrophone" || mode === "MixPlusLoopback" || mode === "SeparateFiles") && !selectedMic;
+      const needsLoopback = (mode === "Loopback" || mode === "Mix" || mode === "MixPlusMicrophone" || mode === "MixPlusLoopback" || mode === "SeparateFiles") && !selectedLoopback;
       if (needsMic && needsLoopback) return "Select microphone and system audio device";
       if (needsMic) return "Select a microphone";
       if (needsLoopback) return "Select a system audio device";

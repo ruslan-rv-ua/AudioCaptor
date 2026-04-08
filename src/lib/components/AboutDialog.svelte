@@ -51,56 +51,61 @@
       tabindex="-1"
       bind:this={dialogEl}
     >
-      <!-- tabindex="-1": programmatically focusable but not in Tab cycle -->
-      <!-- APG: focus static heading so screen readers announce dialog context first -->
-      <h2 id="about-dialog-title" tabindex="-1" bind:this={headingEl}>{m.about_title()}</h2>
+      <!-- role="document" lets NVDA/JAWS use browse mode (arrow-key navigation)
+           even after programmatic focus inside role="dialog".
+           The heading stays tabindex="-1": focusable by JS, not by Tab. -->
+      <div role="document">
+        <!-- tabindex="-1": programmatically focusable but not in Tab cycle -->
+        <!-- APG: focus static heading so screen readers announce dialog context first -->
+        <h2 id="about-dialog-title" tabindex="-1" bind:this={headingEl}>{m.about_title()}</h2>
 
-      <div class="version-row">
-        <span class="app-name">AudioCaptor</span>
-        <span class="version-badge">v{appVersion}</span>
-      </div>
+        <div class="version-row">
+          <span class="app-name">AudioCaptor</span>
+          <span class="version-badge">v{appVersion}</span>
+        </div>
 
-      <div class="divider"></div>
+        <div class="divider"></div>
 
-      <!-- Keyboard Shortcuts -->
-      <section>
-        <h3 class="section-label">{m.about_hotkeys()}</h3>
+        <!-- Keyboard Shortcuts -->
+        <section>
+          <h3 class="section-label">{m.about_hotkeys()}</h3>
 
-        <p class="subsection-label">{m.about_hotkey_global()}</p>
-        {#if hotkey}
+          <p class="subsection-label">{m.about_hotkey_global()}</p>
+          {#if hotkey}
+            <dl class="hotkey-dl">
+              <dt><kbd>{hotkey}</kbd> &ndash; {m.about_hotkey_short_press()}</dt>
+              <dd>{m.about_hotkey_start_pause()}</dd>
+              <dt><kbd>{hotkey}</kbd> &ndash; {m.about_hotkey_long_press()}</dt>
+              <dd>{m.about_hotkey_stop()}</dd>
+            </dl>
+          {:else}
+            <p class="hotkey-unset">{m.settings_hotkey_none()}</p>
+          {/if}
+
+          <p class="subsection-label">{m.about_in_app_shortcuts()}</p>
           <dl class="hotkey-dl">
-            <dt><kbd>{hotkey}</kbd> &ndash; {m.about_hotkey_short_press()}</dt>
-            <dd>{m.about_hotkey_start_pause()}</dd>
-            <dt><kbd>{hotkey}</kbd> &ndash; {m.about_hotkey_long_press()}</dt>
-            <dd>{m.about_hotkey_stop()}</dd>
+            <dt><kbd>Alt+S</kbd></dt><dd>{m.btn_start()}</dd>
+            <dt><kbd>Alt+P</kbd></dt><dd>{m.btn_pause()}</dd>
+            <dt><kbd>Alt+R</kbd></dt><dd>{m.btn_resume()}</dd>
+            <dt><kbd>Alt+T</kbd></dt><dd>{m.btn_stop()}</dd>
+            <dt><kbd>Alt+I</kbd></dt><dd>{m.about_shortcut_status()}</dd>
+            <dt><kbd>Escape</kbd></dt><dd>{m.about_shortcut_minimize()}</dd>
           </dl>
-        {:else}
-          <p class="hotkey-unset">{m.settings_hotkey_none()}</p>
-        {/if}
+        </section>
 
-        <p class="subsection-label">{m.about_in_app_shortcuts()}</p>
-        <dl class="hotkey-dl">
-          <dt><kbd>Alt+S</kbd></dt><dd>{m.btn_start()}</dd>
-          <dt><kbd>Alt+P</kbd></dt><dd>{m.btn_pause()}</dd>
-          <dt><kbd>Alt+R</kbd></dt><dd>{m.btn_resume()}</dd>
-          <dt><kbd>Alt+T</kbd></dt><dd>{m.btn_stop()}</dd>
-          <dt><kbd>Alt+I</kbd></dt><dd>{m.about_shortcut_status()}</dd>
-          <dt><kbd>Escape</kbd></dt><dd>{m.about_shortcut_minimize()}</dd>
-        </dl>
-      </section>
+        <div class="divider"></div>
 
-      <div class="divider"></div>
-
-      <!-- Quick Start -->
-      <section>
-        <h3 class="section-label">{m.about_quick_start()}</h3>
-        <ol class="quick-start">
-          <li>{m.about_step_select_devices()}</li>
-          <li>{m.about_step_configure_profile()}</li>
-          <li>{m.about_step_press_start()}</li>
-          <li>{m.about_step_files_saved()}</li>
-        </ol>
-      </section>
+        <!-- Quick Start -->
+        <section>
+          <h3 class="section-label">{m.about_quick_start()}</h3>
+          <ol class="quick-start">
+            <li>{m.about_step_select_devices()}</li>
+            <li>{m.about_step_configure_profile()}</li>
+            <li>{m.about_step_press_start()}</li>
+            <li>{m.about_step_files_saved()}</li>
+          </ol>
+        </section>
+      </div>
 
       <div class="actions">
         <button type="button" class="btn-close btn-primary" onclick={onclose}>

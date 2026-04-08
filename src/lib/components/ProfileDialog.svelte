@@ -52,8 +52,12 @@
   const sampleRates = [8000, 16000, 44100, 48000];
 
   // Filename visibility depends on which streams are produced
-  let showMicFilename = $derived(outputMode !== "Loopback");
-  let showLoopbackFilename = $derived(outputMode !== "Microphone");
+  let showMicFilename = $derived(
+    outputMode === "Microphone" || outputMode === "MixPlusMicrophone" || outputMode === "SeparateFiles"
+  );
+  let showLoopbackFilename = $derived(
+    outputMode === "Loopback" || outputMode === "MixPlusLoopback" || outputMode === "SeparateFiles"
+  );
   let showMixFilename = $derived(
     outputMode === "Mix" || outputMode === "MixPlusMicrophone" || outputMode === "MixPlusLoopback"
   );

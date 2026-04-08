@@ -78,7 +78,8 @@ fn start_recording_inner(
     // Validate devices for the selected mode (FR3.13)
     match mode {
         OutputMode::Microphone | OutputMode::Mix
-        | OutputMode::MixPlusMicrophone | OutputMode::MixPlusLoopback => {
+        | OutputMode::MixPlusMicrophone | OutputMode::MixPlusLoopback
+        | OutputMode::SeparateFiles => {
             if mic_id.is_none() {
                 return Err("DEVICE_NOT_FOUND: Microphone device required for this mode".into());
             }
@@ -87,7 +88,8 @@ fn start_recording_inner(
     }
     match mode {
         OutputMode::Loopback | OutputMode::Mix
-        | OutputMode::MixPlusMicrophone | OutputMode::MixPlusLoopback => {
+        | OutputMode::MixPlusMicrophone | OutputMode::MixPlusLoopback
+        | OutputMode::SeparateFiles => {
             if loopback_id.is_none() {
                 return Err("DEVICE_NOT_FOUND: Loopback device required for this mode".into());
             }
@@ -116,7 +118,8 @@ fn start_recording_inner(
     let (mic_handle, mic_consumer) = if let Some(ref id) = mic_id {
         match mode {
             OutputMode::Microphone | OutputMode::Mix
-            | OutputMode::MixPlusMicrophone | OutputMode::MixPlusLoopback => {
+            | OutputMode::MixPlusMicrophone | OutputMode::MixPlusLoopback
+            | OutputMode::SeparateFiles => {
                 let (handle, consumer) =
                     capture::start_mic_capture(id).map_err(|e| e.to_string())?;
                 (Some(handle), Some(consumer))
@@ -130,7 +133,8 @@ fn start_recording_inner(
     let (loopback_handle, loopback_consumer) = if let Some(ref id) = loopback_id {
         match mode {
             OutputMode::Loopback | OutputMode::Mix
-            | OutputMode::MixPlusMicrophone | OutputMode::MixPlusLoopback => {
+            | OutputMode::MixPlusMicrophone | OutputMode::MixPlusLoopback
+            | OutputMode::SeparateFiles => {
                 let (handle, consumer) =
                     capture::start_loopback_capture(id).map_err(|e| e.to_string())?;
                 (Some(handle), Some(consumer))
@@ -171,6 +175,13 @@ fn start_recording_inner(
         OutputMode::Mix => {
             let path = output_dir.join(format!("{}_{}.wav", profile.mix_filename, timestamp));
             (Box::new(WavOutputWriter::new(path, sample_rate, channels).map_err(|e| e.to_string())?), None)
+        }
+        OutputMode::SeparateFiles => {
+            let mic_path  = output_dir.join(format!("{}_{}.wav", profile.mic_filename, timestamp));
+            let loop_path = output_dir.join(format!("{}_{}.wav", profile.loopback_filename, timestamp));
+            let w1 = Box::new(WavOutputWriter::new(mic_path, sample_rate, channels).map_err(|e| e.to_string())?);
+            let w2 = Box::new(WavOutputWriter::new(loop_path, sample_rate, channels).map_err(|e| e.to_string())?);
+            (w1, Some(w2))
         }
     };
 

@@ -170,8 +170,12 @@
   }
 
   async function handleProfileSave(profile: RecordingProfile) {
+    const isNew = !profileStore.list.some(p => p.id === profile.id);
     await saveProfile(profile);
     dialogOpen = false;
+    if (isNew) {
+      await selectProfile(profile.id);
+    }
     if (profileStore.activeId === profile.id) {
       applyProfile(profile);
     }

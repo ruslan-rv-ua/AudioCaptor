@@ -45,6 +45,7 @@
   "field_mix_filename": "Ім'я файлу мікшу",
   "mode_microphone": "Тільки мікрофон",
   "mode_loopback": "Тільки системний звук",
+  "mode_separate_files": "Окремо: Мікрофон + Системний звук (2 файли)",
   "mode_mix": "Мікс (Мік + Система)",
   "mode_mix_plus_mic": "Мікс + Мікрофон (2 файли)",
   "mode_mix_plus_loopback": "Мікс + Системний звук (2 файли)",

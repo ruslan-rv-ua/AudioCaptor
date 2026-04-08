@@ -45,6 +45,7 @@
   "field_mix_filename": "Mix Filename",
   "mode_microphone": "Microphone only",
   "mode_loopback": "System audio only",
+  "mode_separate_files": "Separate: Mic + System audio (2 files)",
   "mode_mix": "Mix (Mic + System)",
   "mode_mix_plus_mic": "Mix + Microphone (2 files)",
   "mode_mix_plus_loopback": "Mix + System audio (2 files)",

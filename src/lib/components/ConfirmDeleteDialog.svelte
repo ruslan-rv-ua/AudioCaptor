@@ -11,7 +11,7 @@
   let { open, profileName, onconfirm, oncancel }: Props = $props();
 
   function handleKeydown(e: KeyboardEvent) {
-    if (e.key === "Escape") { oncancel(); return; }
+    if (e.key === "Escape") { e.stopPropagation(); oncancel(); return; }
     if (e.key === "Tab") {
       const dialog = e.currentTarget as HTMLElement;
       const focusable = dialog.querySelectorAll<HTMLElement>("button");

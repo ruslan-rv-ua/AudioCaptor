@@ -44,6 +44,7 @@
   const outputModes: { value: OutputMode; label: string }[] = [
     { value: "Microphone",        label: m.mode_microphone() },
     { value: "Loopback",          label: m.mode_loopback() },
+    { value: "SeparateFiles",     label: m.mode_separate_files() },
     { value: "Mix",               label: m.mode_mix() },
     { value: "MixPlusMicrophone", label: m.mode_mix_plus_mic() },
     { value: "MixPlusLoopback",   label: m.mode_mix_plus_loopback() },

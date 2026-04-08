@@ -112,9 +112,9 @@
   }
 
   function handleKeydown(e: KeyboardEvent) {
-    if (e.key === "Escape" && !capturingHotkey) { onclose(); return; }
+    if (e.key === "Escape" && !capturingHotkey) { e.stopPropagation(); onclose(); return; }
     if (e.key === "Escape" &&  capturingHotkey) { void cancelCapture(); return; }
-    if (e.key === "Enter"  && !capturingHotkey) { e.preventDefault(); onclose(); return; }
+    if (e.key === "Enter"  && !capturingHotkey) { e.preventDefault(); e.stopPropagation(); onclose(); return; }
     if (e.key === "Tab") {
       const dialog = e.currentTarget as HTMLElement;
       const focusable = dialog.querySelectorAll<HTMLElement>(

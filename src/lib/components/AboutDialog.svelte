@@ -24,8 +24,8 @@
   });
 
   function handleKeydown(e: KeyboardEvent) {
-    if (e.key === "Escape") { e.preventDefault(); onclose(); return; }
-    if (e.key === "Enter")  { e.preventDefault(); onclose(); return; }
+    if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); onclose(); return; }
+    if (e.key === "Enter")  { e.preventDefault(); e.stopPropagation(); onclose(); return; }
     if (e.key === "Tab") {
       // Tab cycle only over tabbable elements (not tabindex="-1" heading)
       const focusable = dialogEl?.querySelectorAll<HTMLElement>(

@@ -117,7 +117,7 @@
   }
 
   function handleKeydown(e: KeyboardEvent) {
-    if (e.key === "Escape") { onclose(); return; }
+    if (e.key === "Escape") { e.stopPropagation(); onclose(); return; }
     if (e.key === "Tab") {
       const dialog = e.currentTarget as HTMLElement;
       const focusable = dialog.querySelectorAll<HTMLElement>(

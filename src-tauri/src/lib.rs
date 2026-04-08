@@ -177,7 +177,7 @@ fn start_recording_inner(
             (Box::new(WavOutputWriter::new(path, sample_rate, channels).map_err(|e| e.to_string())?), None)
         }
         OutputMode::SeparateFiles => {
-            let mic_path  = output_dir.join(format!("{}_{}.wav", profile.mic_filename, timestamp));
+            let mic_path = output_dir.join(format!("{}_{}.wav", profile.mic_filename, timestamp));
             let loop_path = output_dir.join(format!("{}_{}.wav", profile.loopback_filename, timestamp));
             let w1 = Box::new(WavOutputWriter::new(mic_path, sample_rate, channels).map_err(|e| e.to_string())?);
             let w2 = Box::new(WavOutputWriter::new(loop_path, sample_rate, channels).map_err(|e| e.to_string())?);

@@ -7,6 +7,7 @@ pub enum OutputMode {
     Mix,
     MixPlusMicrophone,
     MixPlusLoopback,
+    SeparateFiles,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

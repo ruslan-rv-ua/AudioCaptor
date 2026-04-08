@@ -90,5 +90,21 @@
   "live_recording_stopped": "Запис зупинено",
   "live_status_info": "{state}, {duration}",
   "btn_minimize_to_tray_aria": "Згорнути в трей",
-  "settings_minimize_on_focus_loss": "Згортати в трей при втраті фокуса"
+  "settings_minimize_on_focus_loss": "Згортати в трей при втраті фокуса",
+  "about_btn_aria": "Про AudioCaptor",
+  "about_title": "Про AudioCaptor",
+  "about_hotkeys": "Гарячі клавіші",
+  "about_hotkey_global": "Глобальна гаряча клавіша (налаштовується)",
+  "about_hotkey_short_press": "Коротке натискання",
+  "about_hotkey_long_press": "Утримання \u2265 0.5с",
+  "about_hotkey_start_pause": "Старт / Пауза / Продовження",
+  "about_hotkey_stop": "Зупинити запис",
+  "about_in_app_shortcuts": "Клавіші у вікні програми",
+  "about_shortcut_status": "Інфо про стан",
+  "about_shortcut_minimize": "Згорнути в трей",
+  "about_quick_start": "Швидкий старт",
+  "about_step_select_devices": "Оберіть аудіопристрої (мікрофон та/або системний звук)",
+  "about_step_configure_profile": "Налаштуйте профіль запису (режим виводу, папка, формат)",
+  "about_step_press_start": "Натисніть Старт або скористайтесь глобальною клавішею",
+  "about_step_files_saved": "Записи зберігаються у папку профілю"
 }

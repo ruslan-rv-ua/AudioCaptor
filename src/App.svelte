@@ -44,6 +44,7 @@
   import SettingsDialog from "./lib/components/SettingsDialog.svelte";
   import ConfirmExitDialog from "./lib/components/ConfirmExitDialog.svelte";
   import ConfirmDeleteDialog from "./lib/components/ConfirmDeleteDialog.svelte";
+  import AboutDialog from "./lib/components/AboutDialog.svelte";
 
   const devices = getDevices();
   const recording = getRecording();
@@ -58,6 +59,7 @@
   let settingsOpen = $state(false);
   let confirmExitOpen = $state(false);
   let deleteConfirmOpen = $state(false);
+  let aboutOpen = $state(false);
   let deletingProfileId = $state<string | null>(null);
   let deletingProfileName = $derived(
     deletingProfileId
@@ -107,7 +109,8 @@
   }
 
   function handleMnemonic(e: KeyboardEvent) {
-    if (e.key === "Escape" && !settingsOpen && !dialogOpen && !confirmExitOpen && !deleteConfirmOpen) {
+    if (e.key === "F1") { e.preventDefault(); aboutOpen = true; return; }
+    if (e.key === "Escape" && !settingsOpen && !dialogOpen && !confirmExitOpen && !deleteConfirmOpen && !aboutOpen) {
       e.preventDefault();
       void appWindow.hide();
       return;
@@ -259,10 +262,12 @@
       unlistenFocus = await appWindow.onFocusChanged(({ payload: focused }) => {
         if (!focused
             && appSettings.minimizeToTrayOnFocusLoss
-            && !settingsOpen && !dialogOpen && !confirmExitOpen && !deleteConfirmOpen) {
+            && !settingsOpen && !dialogOpen && !confirmExitOpen && !deleteConfirmOpen && !aboutOpen) {
           void appWindow.hide();
         }
       });
+
+      await listen("tray-about-requested", () => { aboutOpen = true; });
 
       unlistenTrayQuit = await listen("tray-quit-requested", async () => {
         if (isRecording) {
@@ -301,6 +306,12 @@
         aria-label={m.btn_minimize_to_tray_aria()}
         onclick={() => appWindow.hide()}
       >⊟</button>
+      <button
+        type="button"
+        class="btn-about"
+        aria-label={m.about_btn_aria()}
+        onclick={() => aboutOpen = true}
+      >ⓘ</button>
       <button
         type="button"
         class="btn-settings"
@@ -383,6 +394,12 @@
 
   <div role="status" aria-atomic="true" class="visually-hidden">{liveRegionText}</div>
 
+  <AboutDialog
+    open={aboutOpen}
+    hotkey={appSettings.hotkey}
+    onclose={() => { aboutOpen = false; }}
+  />
+
   <SettingsDialog
     open={settingsOpen}
     hotkey={appSettings.hotkey}
@@ -444,6 +461,7 @@
   }
 
   .btn-tray,
+  .btn-about,
   .btn-settings {
     width: 36px;
     height: 36px;
@@ -461,6 +479,7 @@
   }
 
   .btn-tray:hover,
+  .btn-about:hover,
   .btn-settings:hover {
     background: var(--surface-hover);
   }

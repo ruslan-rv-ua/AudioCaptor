@@ -90,5 +90,21 @@
   "live_recording_stopped": "Recording stopped",
   "live_status_info": "{state}, {duration}",
   "btn_minimize_to_tray_aria": "Minimize to tray",
-  "settings_minimize_on_focus_loss": "Minimize to tray when window loses focus"
+  "settings_minimize_on_focus_loss": "Minimize to tray when window loses focus",
+  "about_btn_aria": "About AudioCaptor",
+  "about_title": "About AudioCaptor",
+  "about_hotkeys": "Keyboard Shortcuts",
+  "about_hotkey_global": "Global hotkey (configurable)",
+  "about_hotkey_short_press": "Short press",
+  "about_hotkey_long_press": "Hold \u2265 0.5s",
+  "about_hotkey_start_pause": "Start / Pause / Resume",
+  "about_hotkey_stop": "Stop recording",
+  "about_in_app_shortcuts": "In-app shortcuts",
+  "about_shortcut_status": "Status info",
+  "about_shortcut_minimize": "Minimize to tray",
+  "about_quick_start": "Quick Start",
+  "about_step_select_devices": "Select audio devices (microphone and/or system audio)",
+  "about_step_configure_profile": "Configure a recording profile (output mode, folder, format)",
+  "about_step_press_start": "Press Start or use the global hotkey",
+  "about_step_files_saved": "Recordings are saved to the profile output folder"
 }

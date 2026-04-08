@@ -16,6 +16,7 @@
     "global-shortcut:default",
     "dialog:allow-open",
     "core:window:allow-hide",
-    "core:tray:default"
+    "core:tray:default",
+    "core:app:default"
   ]
 }

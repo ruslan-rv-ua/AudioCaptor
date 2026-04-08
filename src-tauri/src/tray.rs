@@ -7,9 +7,11 @@ use tauri::{
 use crate::{audio::types::RecordingState, state::SharedState};
 
 pub fn setup_tray(app: &tauri::AppHandle, language: &str) -> tauri::Result<()> {
-    let quit_label = if language == "uk" { "Вийти" } else { "Quit" };
-    let quit_item = MenuItem::with_id(app, "quit", quit_label, true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&quit_item])?;
+    let quit_label  = if language == "uk" { "Вийти" }         else { "Quit" };
+    let about_label = if language == "uk" { "Про програму" } else { "About" };
+    let about_item = MenuItem::with_id(app, "about", about_label, true, None::<&str>)?;
+    let quit_item  = MenuItem::with_id(app, "quit",  quit_label,  true, None::<&str>)?;
+    let menu = Menu::with_items(app, &[&about_item, &quit_item])?;
 
     let Some(icon) = app.default_window_icon() else {
         log::warn!("No default window icon configured; tray icon not created");
@@ -21,6 +23,14 @@ pub fn setup_tray(app: &tauri::AppHandle, language: &str) -> tauri::Result<()> {
         .menu(&menu)
         .tooltip("AudioCaptor")
         .on_menu_event(|app, event| {
+            if event.id() == "about" {
+                if let Some(w) = app.get_webview_window("main") {
+                    let _ = w.show();
+                    let _ = w.set_focus();
+                }
+                let _ = app.emit("tray-about-requested", ());
+                return;
+            }
             if event.id() == "quit" {
                 let state = app.state::<SharedState>();
                 let is_recording = state

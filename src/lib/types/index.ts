@@ -6,7 +6,7 @@ export interface AudioDevice {
 
 export type RecordingState = "Idle" | "Recording" | "Paused";
 
-export type OutputMode = "Microphone" | "Loopback" | "Mix" | "MixPlusMicrophone" | "MixPlusLoopback";
+export type OutputMode = "Microphone" | "Loopback" | "Mix" | "MixPlusMicrophone" | "MixPlusLoopback" | "SeparateFiles";
 
 export type Theme = "auto" | "light" | "dark";
 

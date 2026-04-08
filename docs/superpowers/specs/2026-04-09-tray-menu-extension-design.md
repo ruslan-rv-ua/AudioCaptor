@@ -19,7 +19,7 @@ Extend the system tray context menu from its current 2-item state (About + Quit)
 
 **Current menu:**
 ```
-About AudioCaptor
+About          ← label is "About" / "Про програму" (not "About AudioCaptor")
 Quit
 ```
 
@@ -40,7 +40,7 @@ Quit
 │   Stop               (gray)  │  disabled when Idle
 ├──────────────────────────────┤
 │ Open Recordings Folder       │  active profile's output folder
-│ About AudioCaptor            │  unchanged
+│ About                        │  unchanged (label stays "About"/"Про програму")
 ├──────────────────────────────┤
 │ Quit                         │  unchanged
 └──────────────────────────────┘
@@ -59,8 +59,13 @@ Store references to dynamically-updated `MenuItem`s in Tauri managed state (`app
 
 ### `TrayMenuRefs`
 
+`MenuItem<tauri::Wry>` may not implement `Sync` (it depends on the underlying `muda` platform implementation). To guarantee `app.manage()` compiles (which requires `Send + Sync + 'static`), wrap `TrayMenuRefs` in a `std::sync::Mutex`:
+
 ```rust
+use std::sync::Mutex;
+
 /// References to tray menu items that need dynamic updates.
+/// Wrapped in Mutex because MenuItem<Wry> may not be Sync on its own.
 /// Registered once via app.manage() in setup_tray().
 pub struct TrayMenuRefs {
     pub toggle_item: MenuItem<tauri::Wry>,
@@ -68,7 +73,9 @@ pub struct TrayMenuRefs {
 }
 ```
 
-Accessible anywhere via `app.try_state::<TrayMenuRefs>()`.
+Registered as: `app.manage(Mutex::new(TrayMenuRefs { toggle_item, stop_item }));`
+
+Accessed via: `app.try_state::<Mutex<TrayMenuRefs>>()`
 
 ### Files Changed
 
@@ -91,7 +98,7 @@ After any `RecordingState` change in `lib.rs`, the relevant `do_*` function call
 tray::update_tray_recording_state(app, RecordingState::Recording); // or Paused / Idle
 ```
 
-`update_tray_recording_state` reads language internally via `settings::read_settings().language`, then updates `TrayMenuRefs` via `app.try_state()`.
+`update_tray_recording_state` reads language internally via `settings::read_settings().language`, then locks `Mutex<TrayMenuRefs>` and calls `set_text()`/`set_enabled()` — both return `tauri::Result<()>`, errors are silently ignored with `let _ =`.
 
 ### Toggle item state machine
 
@@ -100,6 +107,11 @@ tray::update_tray_recording_state(app, RecordingState::Recording); // or Paused 
 | Idle | Start / Старт | true | **false** |
 | Recording | Pause / Пауза | true | true |
 | Paused | Resume / Продовжити | true | true |
+
+### Language behaviour
+
+- **Static items** (Show/Hide, Open Recordings Folder, About, Quit): labels are set once at startup and do **not** update when user changes language in settings — requires app restart.
+- **Dynamic items** (Toggle, Stop): text is set on every `update_tray_recording_state` call via fresh `settings::read_settings().language`. This means their labels **will** reflect a language change on the next recording state transition. This is an acceptable partial-update; no action needed.
 
 ---
 
@@ -123,10 +135,12 @@ Read `SharedState.recording_state`, dispatch:
 - Recording → `do_pause_recording(app)`
 - Paused → `do_resume_recording(app)`
 
-Log errors; no UI notification for MVP (consistent with hotkey behaviour).
+Log errors via `log::error!`; no UI notification for MVP (consistent with hotkey behaviour).
 
 ### `stop-recording`
 Call `do_stop_recording(app)`. Log errors.
+
+`do_stop_recording` calls `stop_recording_inner` which returns `Err("Not recording")` when `RecordingState == Idle`. This error is safely logged and ignored — no crash, no state corruption.
 
 ### `open-recordings`
 ```rust
@@ -135,11 +149,13 @@ let profile = settings.profiles.iter()
     .find(|p| p.id == settings.active_profile_id)
     .cloned()
     .unwrap_or_default();
-let dir = portable::exe_dir()?.join(&profile.output_folder);
-std::fs::create_dir_all(&dir)?;
-std::process::Command::new("explorer.exe").arg(&dir).spawn()?;
+if let Ok(base) = portable::exe_dir() {
+    let dir = base.join(&profile.output_folder);
+    let _ = std::fs::create_dir_all(&dir);
+    let _ = std::process::Command::new("explorer.exe").arg(&dir).spawn();
+}
 ```
-Opens the **active profile's** output folder (defaults to `Recordings/`, but respects per-profile customisation). Windows-only; no cross-platform shim needed.
+Opens the **active profile's** output folder (defaults to `Recordings/`, but respects per-profile customisation). All errors are silently ignored (best-effort). Windows-only; no cross-platform shim needed.
 
 ### `about` and `quit`
 Unchanged from current implementation.
@@ -161,9 +177,7 @@ New strings:
 | stop | Stop | Зупинити |
 | open_recordings | Open Recordings Folder | Відкрити папку записів |
 
-`About AudioCaptor` / `Про AudioCaptor` and `Quit` / `Вийти` already exist.
-
-Language is read fresh from `settings::read_settings()` each time `update_tray_recording_state` is called — no caching, no rebuild needed.
+Existing strings `About`/`Про програму` and `Quit`/`Вийти` remain unchanged.
 
 ---
 
@@ -171,10 +185,11 @@ Language is read fresh from `settings::read_settings()` each time `update_tray_r
 
 - **No tooltip status** — tooltip remains `"AudioCaptor"` permanently.
 - **No dynamic Show/Hide label** — fixed `"Show / Hide Window"` text regardless of window visibility.
-- **No language-change rebuild** — tray is built once at startup with the current language. Changing language in settings does not update tray labels until app restart (existing limitation).
+- **No full language-change rebuild** — static item labels do not update until app restart. Dynamic item labels (Toggle/Stop) update on the next state transition. See Language behaviour section above.
 - **No device validation** in tray toggle-recording — `do_start_recording` returns `Err` on missing device; error is logged only.
 - **No profile submenu** — out of scope.
 - **Windows-only** `explorer.exe` for opening folder — app is Windows-only.
+- **About label unchanged** — remains `"About"` / `"Про програму"`, not changed to `"About AudioCaptor"`.
 
 ---
 
@@ -182,7 +197,9 @@ Language is read fresh from `settings::read_settings()` each time `update_tray_r
 
 All tray event handlers are fire-and-forget. Errors are logged via `log::error!`. No user-facing error dialogs from tray actions in MVP.
 
-`update_tray_recording_state` silently does nothing if `TrayMenuRefs` is not yet registered (i.e., tray failed to initialise).
+`update_tray_recording_state` silently does nothing if `TrayMenuRefs` is not yet registered (tray failed to initialise) or if the mutex is poisoned.
+
+`set_text()` and `set_enabled()` return `tauri::Result<()>` — all call sites use `let _ =` to explicitly discard errors.
 
 ---
 
@@ -190,12 +207,13 @@ All tray event handlers are fire-and-forget. Errors are logged via `log::error!`
 
 Manual verification checklist:
 - [ ] Menu opens with correct items in both en and uk
-- [ ] Show/Hide toggles window visibility
+- [ ] Show/Hide toggles window visibility; clicking again restores it
 - [ ] Start → recording starts; toggle label becomes "Pause"; Stop becomes enabled
 - [ ] Pause → recording pauses; toggle label becomes "Resume"
 - [ ] Resume → recording resumes; toggle label becomes "Pause"
 - [ ] Stop → recording stops; toggle label becomes "Start"; Stop becomes disabled
-- [ ] Open Recordings Folder opens correct profile folder in Explorer
+- [ ] Stop item click during Idle does nothing and does not crash (Err is logged)
+- [ ] Open Recordings Folder opens correct active-profile folder in Explorer
 - [ ] About opens About dialog
 - [ ] Quit during recording shows confirm dialog; Quit when idle exits app
-- [ ] Stop item click during Idle does nothing (and does not crash)
+- [ ] `cargo build` compiles without errors (validates Send+Sync for TrayMenuRefs)

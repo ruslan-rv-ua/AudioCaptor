@@ -111,6 +111,11 @@
     });
   }
 
+  function handleFormSubmit(e: SubmitEvent) {
+    e.preventDefault();
+    handleSubmit();
+  }
+
   function handleKeydown(e: KeyboardEvent) {
     if (e.key === "Escape") { onclose(); return; }
     if (e.key === "Tab") {
@@ -141,6 +146,7 @@
       tabindex="-1"
       onkeydown={handleKeydown}
     >
+      <form onsubmit={handleFormSubmit} novalidate>
       <h2>{title}</h2>
 
       <!-- BASIC -->
@@ -244,10 +250,11 @@
 
       <div class="actions">
         <button type="button" class="btn-secondary" onclick={onclose}>{m.btn_cancel()}</button>
-        <button type="button" class="btn-primary"   onclick={handleSubmit}>
+        <button type="submit" class="btn-primary">
           {isEdit ? m.btn_save() : m.btn_create()}
         </button>
       </div>
+      </form>
     </div>
   </div>
 {/if}

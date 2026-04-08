@@ -19,7 +19,7 @@ pub struct MixerConfig {
     pub mic_volume: f32,
     pub loopback_volume: f32,
     pub writer: Box<dyn OutputWriter>,
-    /// Secondary writer for parallel modes (MixPlusMicrophone, MixPlusLoopback).
+    /// Secondary writer for parallel modes (MixPlusMicrophone, MixPlusLoopback, SeparateFiles).
     pub secondary_writer: Option<Box<dyn OutputWriter>>,
     pub command_rx: Receiver<AudioCommand>,
     /// Discard this many milliseconds of audio at startup to avoid capturing
@@ -333,7 +333,7 @@ fn mixer_loop(mut config: MixerConfig, running: Arc<AtomicBool>) {
 
         // In Mix mode: only process when both sources have staged data.
         // Without this, single-source batches alternate and double the output duration.
-        if matches!(config.output_mode, OutputMode::Mix | OutputMode::MixPlusMicrophone | OutputMode::MixPlusLoopback) {
+        if matches!(config.output_mode, OutputMode::Mix | OutputMode::MixPlusMicrophone | OutputMode::MixPlusLoopback | OutputMode::SeparateFiles) {
             let mic_min = if mic_resampler.is_some() { chunk_frames * mic_channels } else { mic_channels };
             let loop_min = if loopback_resampler.is_some() { chunk_frames * loopback_channels } else { loopback_channels };
             if mic_staging.len() < mic_min || loopback_staging.len() < loop_min {
@@ -341,9 +341,9 @@ fn mixer_loop(mut config: MixerConfig, running: Arc<AtomicBool>) {
             }
         }
 
-        // In Mix mode: drain equal frame counts from both sources to keep them in sync.
+        // In Mix / SeparateFiles mode: drain equal frame counts from both sources to keep them in sync.
         // In single-source modes: drain all available (usize::MAX as sentinel).
-        let (mic_drain_frames, loop_drain_frames) = if matches!(config.output_mode, OutputMode::Mix | OutputMode::MixPlusMicrophone | OutputMode::MixPlusLoopback) {
+        let (mic_drain_frames, loop_drain_frames) = if matches!(config.output_mode, OutputMode::Mix | OutputMode::MixPlusMicrophone | OutputMode::MixPlusLoopback | OutputMode::SeparateFiles) {
             let mic_avail = mic_staging.len() / mic_channels;
             let loop_avail = loopback_staging.len() / loopback_channels;
             let min_avail = mic_avail.min(loop_avail);
@@ -435,6 +435,23 @@ fn mixer_loop(mut config: MixerConfig, running: Arc<AtomicBool>) {
                     }
                 }
                 mix
+            }
+            OutputMode::SeparateFiles => {
+                // Write loopback to secondary writer
+                let loop_only: Vec<f32> = loop_processed.iter()
+                    .map(|&s| (s * loopback_volume).clamp(-1.0, 1.0))
+                    .collect();
+                if !loop_only.is_empty() {
+                    if let Some(ref mut sw) = config.secondary_writer {
+                        if let Err(e) = sw.write_samples(&loop_only) {
+                            log::error!("Secondary WAV write error: {}", e);
+                        }
+                    }
+                }
+                // Return mic samples for primary writer
+                mic_processed.iter()
+                    .map(|&s| (s * mic_volume).clamp(-1.0, 1.0))
+                    .collect()
             }
         };
 

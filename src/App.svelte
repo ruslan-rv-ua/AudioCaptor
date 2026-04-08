@@ -397,7 +397,12 @@
   <AboutDialog
     open={aboutOpen}
     hotkey={appSettings.hotkey}
-    onclose={() => { aboutOpen = false; }}
+    onclose={() => {
+      aboutOpen = false;
+      requestAnimationFrame(() =>
+        document.querySelector<HTMLElement>(".btn-about")?.focus()
+      );
+    }}
   />
 
   <SettingsDialog

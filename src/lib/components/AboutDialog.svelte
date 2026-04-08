@@ -11,14 +11,15 @@
   let { open, hotkey, onclose }: Props = $props();
 
   let appVersion = $state("…");
-  let dialogEl = $state<HTMLDivElement | undefined>();
+  let dialogEl   = $state<HTMLDivElement | undefined>();
+  let headingEl  = $state<HTMLHeadingElement | undefined>();
 
   $effect(() => {
     if (open) {
       getVersion().then(v => { appVersion = v; });
-      requestAnimationFrame(() =>
-        dialogEl?.querySelector<HTMLElement>(".btn-close")?.focus()
-      );
+      // APG: for dialogs with semantic structure (dl, ol), focus a static
+      // element at content start so screen readers can navigate naturally.
+      requestAnimationFrame(() => headingEl?.focus());
     }
   });
 
@@ -26,8 +27,9 @@
     if (e.key === "Escape") { e.preventDefault(); onclose(); return; }
     if (e.key === "Enter")  { e.preventDefault(); onclose(); return; }
     if (e.key === "Tab") {
+      // Tab cycle only over tabbable elements (not tabindex="-1" heading)
       const focusable = dialogEl?.querySelectorAll<HTMLElement>(
-        'button, [tabindex]:not([tabindex="-1"])'
+        'button:not([disabled]), [tabindex="0"]'
       );
       if (!focusable?.length) return;
       const first = focusable[0];
@@ -49,7 +51,9 @@
       tabindex="-1"
       bind:this={dialogEl}
     >
-      <h2 id="about-dialog-title">{m.about_title()}</h2>
+      <!-- tabindex="-1": programmatically focusable but not in Tab cycle -->
+      <!-- APG: focus static heading so screen readers announce dialog context first -->
+      <h2 id="about-dialog-title" tabindex="-1" bind:this={headingEl}>{m.about_title()}</h2>
 
       <div class="version-row">
         <span class="app-name">AudioCaptor</span>
@@ -63,34 +67,26 @@
         <h3 class="section-label">{m.about_hotkeys()}</h3>
 
         <p class="subsection-label">{m.about_hotkey_global()}</p>
-        <table class="hotkey-table">
-          <tbody>
-            <tr>
-              <td class="key-cell">{hotkey ?? m.settings_hotkey_none()}</td>
-              <td></td>
-            </tr>
-            <tr>
-              <td class="key-cell indent">{m.about_hotkey_short_press()}</td>
-              <td>{m.about_hotkey_start_pause()}</td>
-            </tr>
-            <tr>
-              <td class="key-cell indent">{m.about_hotkey_long_press()}</td>
-              <td>{m.about_hotkey_stop()}</td>
-            </tr>
-          </tbody>
-        </table>
+        {#if hotkey}
+          <dl class="hotkey-dl">
+            <dt><kbd>{hotkey}</kbd> &ndash; {m.about_hotkey_short_press()}</dt>
+            <dd>{m.about_hotkey_start_pause()}</dd>
+            <dt><kbd>{hotkey}</kbd> &ndash; {m.about_hotkey_long_press()}</dt>
+            <dd>{m.about_hotkey_stop()}</dd>
+          </dl>
+        {:else}
+          <p class="hotkey-unset">{m.settings_hotkey_none()}</p>
+        {/if}
 
         <p class="subsection-label">{m.about_in_app_shortcuts()}</p>
-        <table class="hotkey-table">
-          <tbody>
-            <tr><td class="key-cell"><kbd>Alt+S</kbd></td><td>{m.btn_start()}</td></tr>
-            <tr><td class="key-cell"><kbd>Alt+P</kbd></td><td>{m.btn_pause()}</td></tr>
-            <tr><td class="key-cell"><kbd>Alt+R</kbd></td><td>{m.btn_resume()}</td></tr>
-            <tr><td class="key-cell"><kbd>Alt+T</kbd></td><td>{m.btn_stop()}</td></tr>
-            <tr><td class="key-cell"><kbd>Alt+I</kbd></td><td>{m.about_shortcut_status()}</td></tr>
-            <tr><td class="key-cell"><kbd>Escape</kbd></td><td>{m.about_shortcut_minimize()}</td></tr>
-          </tbody>
-        </table>
+        <dl class="hotkey-dl">
+          <dt><kbd>Alt+S</kbd></dt><dd>{m.btn_start()}</dd>
+          <dt><kbd>Alt+P</kbd></dt><dd>{m.btn_pause()}</dd>
+          <dt><kbd>Alt+R</kbd></dt><dd>{m.btn_resume()}</dd>
+          <dt><kbd>Alt+T</kbd></dt><dd>{m.btn_stop()}</dd>
+          <dt><kbd>Alt+I</kbd></dt><dd>{m.about_shortcut_status()}</dd>
+          <dt><kbd>Escape</kbd></dt><dd>{m.about_shortcut_minimize()}</dd>
+        </dl>
       </section>
 
       <div class="divider"></div>
@@ -188,26 +184,31 @@
     color: var(--text-muted);
   }
 
-  .hotkey-table {
-    width: 100%;
-    border-collapse: collapse;
+  .hotkey-dl {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    column-gap: 12px;
+    row-gap: 3px;
+    margin: 0 0 4px;
     font-size: 0.825rem;
-    margin-bottom: 4px;
   }
 
-  .hotkey-table tr + tr td {
-    padding-top: 3px;
-  }
-
-  .key-cell {
-    width: 44%;
-    padding-right: 8px;
+  .hotkey-dl dt {
+    margin: 0;
     color: var(--text-secondary);
-    vertical-align: top;
+    white-space: nowrap;
   }
 
-  .key-cell.indent {
-    padding-left: 12px;
+  .hotkey-dl dd {
+    margin: 0;
+    color: var(--text-primary);
+  }
+
+  .hotkey-unset {
+    margin: 0 0 4px;
+    font-size: 0.825rem;
+    color: var(--text-muted);
+    font-style: italic;
   }
 
   kbd {

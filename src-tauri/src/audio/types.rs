@@ -56,6 +56,20 @@ mod tests {
         let deserialized: OutputMode = serde_json::from_str(&json).unwrap();
         assert_eq!(deserialized, OutputMode::MixPlusLoopback);
     }
+
+    #[test]
+    fn output_mode_separate_files_serializes() {
+        let json = serde_json::to_string(&OutputMode::SeparateFiles).unwrap();
+        assert_eq!(json, "\"SeparateFiles\"");
+    }
+
+    #[test]
+    fn output_mode_separate_files_roundtrip() {
+        let mode = OutputMode::SeparateFiles;
+        let json = serde_json::to_string(&mode).unwrap();
+        let deserialized: OutputMode = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized, OutputMode::SeparateFiles);
+    }
 }
 
 #[derive(Debug, Clone)]

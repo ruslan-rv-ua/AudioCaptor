@@ -58,7 +58,9 @@ fn start_recording(
     mode: OutputMode,
     sample_rate: u32,
 ) -> Result<(), String> {
-    start_recording_inner(&app, &state, mic_id, loopback_id, mode, sample_rate)
+    start_recording_inner(&app, &state, mic_id, loopback_id, mode, sample_rate)?;
+    tray::update_tray_recording_state(&app, RecordingState::Recording);
+    Ok(())
 }
 
 fn start_recording_inner(
@@ -258,8 +260,10 @@ fn start_recording_inner(
 }
 
 #[tauri::command]
-fn pause_recording(state: tauri::State<'_, SharedState>) -> Result<(), String> {
-    pause_recording_inner(&state)
+fn pause_recording(state: tauri::State<'_, SharedState>, app: tauri::AppHandle) -> Result<(), String> {
+    pause_recording_inner(&state)?;
+    tray::update_tray_recording_state(&app, RecordingState::Paused);
+    Ok(())
 }
 
 fn pause_recording_inner(state: &SharedState) -> Result<(), String> {
@@ -278,8 +282,10 @@ fn pause_recording_inner(state: &SharedState) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn resume_recording(state: tauri::State<'_, SharedState>) -> Result<(), String> {
-    resume_recording_inner(&state)
+fn resume_recording(state: tauri::State<'_, SharedState>, app: tauri::AppHandle) -> Result<(), String> {
+    resume_recording_inner(&state)?;
+    tray::update_tray_recording_state(&app, RecordingState::Recording);
+    Ok(())
 }
 
 fn resume_recording_inner(state: &SharedState) -> Result<(), String> {
@@ -310,6 +316,7 @@ fn stop_recording(state: tauri::State<'_, SharedState>, app: tauri::AppHandle) -
         "state": "Idle",
         "durationMs": 0,
     }));
+    tray::update_tray_recording_state(&app, RecordingState::Idle);
     Ok(())
 }
 

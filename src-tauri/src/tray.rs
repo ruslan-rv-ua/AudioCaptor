@@ -140,6 +140,13 @@ fn handle_menu_event(app: &AppHandle, id: &str) {
             };
             if let Err(e) = result {
                 log::error!("Tray toggle-recording failed: {e}");
+                if let Ok(s) = app.state::<SharedState>().lock() {
+                    crate::play_sound(&s, crate::sounds::SoundKind::Warning);
+                }
+                if let Some(w) = app.get_webview_window("main") {
+                    let _ = w.show();
+                    let _ = w.set_focus();
+                }
             }
         }
         "stop-recording" => {

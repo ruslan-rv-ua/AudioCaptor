@@ -155,15 +155,18 @@ fn handle_menu_event(app: &AppHandle, id: &str) {
                 .find(|p| p.id == settings.active_profile_id)
                 .cloned()
                 .unwrap_or_default();
-            if let Ok(base) = crate::portable::exe_dir() {
-                let dir = base.join(&profile.output_folder);
-                let _ = std::fs::create_dir_all(&dir);
-                if let Err(e) = std::process::Command::new("explorer.exe")
-                    .arg(&dir)
-                    .spawn()
-                {
-                    log::error!("Failed to open recordings folder in Explorer: {e}");
+            match crate::portable::exe_dir() {
+                Ok(base) => {
+                    let dir = base.join(&profile.output_folder);
+                    let _ = std::fs::create_dir_all(&dir);
+                    if let Err(e) = std::process::Command::new("explorer.exe")
+                        .arg(&dir)
+                        .spawn()
+                    {
+                        log::error!("Failed to open recordings folder in Explorer: {e}");
+                    }
                 }
+                Err(e) => log::error!("open-recordings: failed to resolve exe dir: {e}"),
             }
         }
         "about" => {
@@ -193,8 +196,8 @@ fn handle_menu_event(app: &AppHandle, id: &str) {
     }
 }
 
-/// Update tray recording-control labels and enabled states after any
-/// `RecordingState` change. Call this from `lib.rs` `do_*` functions.
+/// Update tray recording-control toggle label and both items' enabled states
+/// after any `RecordingState` change. Call this from `lib.rs` recording functions.
 ///
 /// Reads language from `settings.json` on each call so it stays in sync
 /// with runtime language changes (acceptable partial-update behaviour).

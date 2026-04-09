@@ -388,15 +388,21 @@ pub fn do_start_recording(app: &tauri::AppHandle) -> Result<(), String> {
         loopback_id,
         profile.output_mode,
         profile.sample_rate,
-    )
+    )?;
+    tray::update_tray_recording_state(app, RecordingState::Recording);
+    Ok(())
 }
 
 pub fn do_pause_recording(app: &tauri::AppHandle) -> Result<(), String> {
-    pause_recording_inner(&app.state::<SharedState>())
+    pause_recording_inner(&app.state::<SharedState>())?;
+    tray::update_tray_recording_state(app, RecordingState::Paused);
+    Ok(())
 }
 
 pub fn do_resume_recording(app: &tauri::AppHandle) -> Result<(), String> {
-    resume_recording_inner(&app.state::<SharedState>())
+    resume_recording_inner(&app.state::<SharedState>())?;
+    tray::update_tray_recording_state(app, RecordingState::Recording);
+    Ok(())
 }
 
 pub fn do_stop_recording(app: &tauri::AppHandle) -> Result<(), String> {
@@ -405,6 +411,7 @@ pub fn do_stop_recording(app: &tauri::AppHandle) -> Result<(), String> {
         "state": "Idle",
         "durationMs": 0,
     }));
+    tray::update_tray_recording_state(app, RecordingState::Idle);
     Ok(())
 }
 

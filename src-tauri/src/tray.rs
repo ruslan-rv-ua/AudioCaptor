@@ -158,9 +158,12 @@ fn handle_menu_event(app: &AppHandle, id: &str) {
             if let Ok(base) = crate::portable::exe_dir() {
                 let dir = base.join(&profile.output_folder);
                 let _ = std::fs::create_dir_all(&dir);
-                let _ = std::process::Command::new("explorer.exe")
+                if let Err(e) = std::process::Command::new("explorer.exe")
                     .arg(&dir)
-                    .spawn();
+                    .spawn()
+                {
+                    log::error!("Failed to open recordings folder in Explorer: {e}");
+                }
             }
         }
         "about" => {

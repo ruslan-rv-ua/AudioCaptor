@@ -598,7 +598,7 @@ pub fn run() {
 
             // Register global hotkey (only if one is configured)
             if let Some(ref hk) = settings.hotkey {
-                if let Err(e) = hotkey::register(&app.handle(), hk) {
+                if let Err(e) = hotkey::register(app.handle(), hk) {
                     log::error!("Failed to register hotkey: {e}");
                 }
             }

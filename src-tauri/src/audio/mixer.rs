@@ -356,14 +356,14 @@ fn mixer_loop(mut config: MixerConfig, running: Arc<AtomicBool>) {
         };
 
         // Process mic — only resample when we have a full chunk; otherwise pass through directly
-        let mic_processed = if mic_resampler.is_some() {
+        let mic_processed = if let Some(ref mut resampler) = mic_resampler {
             let required = chunk_frames * mic_channels;
             let max_drain = mic_drain_frames.saturating_mul(mic_channels);
             let mut output = Vec::new();
             let mut drained = 0;
             while mic_staging.len() >= required && drained + required <= max_drain {
                 let chunk: Vec<f32> = mic_staging.drain(..required).collect();
-                let resampled = resample_chunk(&chunk, mic_channels, mic_resampler.as_mut().expect("mic_resampler is Some when mic sample rate differs from target rate"));
+                let resampled = resample_chunk(&chunk, mic_channels, resampler);
                 output.extend(resampled);
                 drained += required;
             }
@@ -378,14 +378,14 @@ fn mixer_loop(mut config: MixerConfig, running: Arc<AtomicBool>) {
         };
 
         // Process loopback — same pattern
-        let loop_processed = if loopback_resampler.is_some() {
+        let loop_processed = if let Some(ref mut resampler) = loopback_resampler {
             let required = chunk_frames * loopback_channels;
             let max_drain = loop_drain_frames.saturating_mul(loopback_channels);
             let mut output = Vec::new();
             let mut drained = 0;
             while loopback_staging.len() >= required && drained + required <= max_drain {
                 let chunk: Vec<f32> = loopback_staging.drain(..required).collect();
-                let resampled = resample_chunk(&chunk, loopback_channels, loopback_resampler.as_mut().expect("loopback_resampler is Some when loopback sample rate differs from target rate"));
+                let resampled = resample_chunk(&chunk, loopback_channels, resampler);
                 output.extend(resampled);
                 drained += required;
             }

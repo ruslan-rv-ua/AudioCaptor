@@ -76,7 +76,6 @@ AudioCaptor/
 │   ├── tauri.conf.json         # Tauri configuration
 │   └── Cargo.toml              # Rust dependencies
 ├── messages/                   # i18n message files (en, uk)
-├── bucket/                     # Scoop package manifest
 ├── docs/                       # Design specs & research
 ├── public/                     # Static assets (favicon)
 ├── index.html                  # HTML entry point
@@ -204,3 +203,26 @@ Accessibility (a11y) is a **highest-priority requirement**:
 - `decorations: true` in Tauri config (required for screen reader compatibility)
 - Svelte compile-time a11y checks are enabled
 - Sound notifications duplicate visual state changes
+
+## CI/CD
+
+### GitHub Actions Workflows
+
+| Workflow | Trigger | Description |
+|----------|---------|-------------|
+| **CI** (`ci.yml`) | push / PR → `develop` | Frontend checks (`pnpm check`) + Rust checks (`cargo check`, `cargo clippy`) |
+| **Release** (`release.yml`) | manual (`workflow_dispatch`) | Builds `AudioCaptor.exe`, creates GitHub Release |
+| **Update Scoop** (`update-scoop.yml`) | manual (`workflow_dispatch`) | Downloads release, computes SHA256, dispatches update to `scoop-bucket` |
+
+### Release Process
+
+1. Запустити **Release** workflow з версією (наприклад `0.2.0`) та прапорцем pre-release
+2. Дочекатись успішного створення GitHub Release
+3. Запустити **Update Scoop** workflow з тією ж версією
+4. `scoop-bucket` автоматично оновить маніфест і провалідує його
+
+### Required Secrets
+
+| Secret | Description |
+|--------|-------------|
+| `SCOOP_BUCKET_TOKEN` | GitHub PAT (classic) з правом `repo` на `ruslan-rv-ua/scoop-bucket` |

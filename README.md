@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/requirements/resources/logo_audiocaptor.png" alt="AudioCaptor" width="128" height="128">
+  <img src="src-tauri/icons/128x128.png" alt="AudioCaptor" width="128" height="128">
 </p>
 
 <h1 align="center">AudioCaptor</h1>

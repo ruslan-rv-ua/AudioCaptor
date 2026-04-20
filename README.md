@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="src-tauri/icons/128x128.png" alt="AudioCaptor" width="128" height="128">
+  <img src="src-tauri/icons/128x128.png" alt="AudioCaptor logo" width="128" height="128">
 </p>
 
 <h1 align="center">AudioCaptor</h1>
@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  Record your microphone, system audio, or both — mixed into a single file.<br>
+  Record your microphone, system audio, or both — with flexible output modes.<br>
   No installation required. Just run the exe.
 </p>
 
@@ -19,42 +19,45 @@
 
 - **System audio capture (loopback)** — record what you hear through your speakers
 - **Microphone recording** — capture from any connected mic
-- **Real-time mixing** — combine mic and system audio into one file with adjustable volume levels
-- **Multiple output modes** — Microphone only, System audio only, or Mix
+- **Real-time mixing** — combine mic and system audio with adjustable volume levels
+- **Multiple output modes** — Microphone, System audio, Mix, Mix + Mic, Mix + Loopback, Separate Files
+- **Recording profiles** — save per-profile output folder, mode, sample rate, volume, and filenames
 - **Global hotkey** — start, pause, and stop recording from any window (default: `Pause/Break` key)
   - Short press: start / pause / resume
   - Long press (≥500ms): stop and save
+- **System tray** — minimize to tray, control recording from tray menu
 - **Sound notifications** — audible feedback for start, pause, and stop events
-- **Portable** — single `.exe` file, all data stored next to it
-- **Accessible** — full screen reader support, keyboard navigation, and ARIA labels
+- **Themes** — Auto, Light, and Dark mode
+- **Internationalization** — English and Ukrainian
+- **Portable** — single `.exe` file, all data stored in `AudioCaptor-data/` folder
+- **Accessible** — full screen reader support, keyboard navigation, ARIA labels
 - **WAV output** — lossless recording at 8, 16, 44.1, or 48 kHz
 
 ## Quick Start
 
-1. Download `audio-captor.exe`
+1. Download `AudioCaptor.exe`
 2. Place it in any folder (e.g., `C:\Tools\AudioCaptor\`)
 3. Run it
 
 On first launch, AudioCaptor creates the following alongside the exe:
 
 ```
-audio-captor.exe
+AudioCaptor.exe
+AudioCaptor-data/
 ├── settings.json      # Your preferences (auto-saved)
 ├── logs/              # Diagnostic logs
-└── Recordings/        # Your recorded audio files
+└── Recordings/        # Default recordings folder
 ```
 
 ## Usage
 
 1. **Select devices** — choose your microphone and/or system audio device from the dropdowns
-2. **Choose output mode** — Microphone only, System audio only, or Mix
-3. **Adjust volume** — set mic and system audio levels (0–400%)
-4. **Hit Record** — or use the global hotkey (`Pause/Break` by default)
-5. **Pause / Resume** — short press the hotkey or use the UI buttons
-6. **Stop** — long press the hotkey (≥500ms) or click Stop
+2. **Configure a profile** — choose output mode, sample rate, volume levels, and output folder
+3. **Hit Record** — or use the global hotkey (`Pause/Break` by default)
+4. **Pause / Resume** — short press the hotkey or use the UI buttons
+5. **Stop** — long press the hotkey (≥500ms) or click Stop
 
-Recordings are saved as WAV files in the `Recordings/` folder with automatic timestamps:
-`recording_2026-03-31_14-30-00.wav`
+Recordings are saved as WAV files with automatic timestamps (e.g., `mix_2026-03-31_14-30-00.wav`).
 
 ## Keyboard Shortcuts
 
@@ -67,24 +70,9 @@ Recordings are saved as WAV files in the `Recordings/` folder with automatic tim
 | `Alt+T` | Stop recording |
 | `Alt+I` | Announce current status (for screen readers) |
 | `Tab` | Navigate between UI elements |
-| `Escape` | Close dialogs |
+| `Escape` | Close dialogs / minimize to tray |
 
-The global hotkey works even when AudioCaptor is not focused. You can change it in the settings.
-
-## Settings
-
-All settings are saved automatically to `settings.json` next to the executable:
-
-| Setting | Default |
-|---------|---------|
-| Microphone device | (none) |
-| System audio device | (none) |
-| Mic volume | 100% |
-| System audio volume | 50% |
-| Output mode | Mix |
-| Sample rate | 48000 Hz |
-| Global hotkey | Pause/Break |
-| Sound notifications | Enabled |
+The global hotkey works even when AudioCaptor is not focused. You can change it in Settings.
 
 ## System Requirements
 
@@ -95,7 +83,14 @@ All settings are saved automatically to `settings.json` next to the executable:
 
 ## Scoop Installation
 
-AudioCaptor is designed to work with [Scoop](https://scoop.sh/), a Windows package manager. When installed via Scoop, your `settings.json`, `Recordings/`, and `logs/` folders are automatically persisted across updates.
+AudioCaptor is designed to work with [Scoop](https://scoop.sh/), a Windows package manager:
+
+```powershell
+scoop bucket add audiocaptor https://github.com/ruslan-rv-ua/AudioCaptor
+scoop install audiocaptor
+```
+
+When installed via Scoop, the `AudioCaptor-data/` folder is automatically persisted across updates.
 
 ## Accessibility
 
@@ -106,6 +101,7 @@ AudioCaptor is built with accessibility as a top priority:
 - Sound notifications mirror visual state changes
 - Global hotkey works from any application
 - `Alt+I` announces current recording status
+- About dialog with hotkeys reference and quick start guide
 
 ## License
 
@@ -113,4 +109,4 @@ AudioCaptor is built with accessibility as a top priority:
 
 ## Development
 
-See [DEVELOPMENT.md](DEVELOPMENT.md) for build instructions, architecture overview, and contribution guidelines.
+See [DEVELOPMENT.md](DEVELOPMENT.md) for build instructions and architecture overview.

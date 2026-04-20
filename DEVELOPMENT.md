@@ -45,8 +45,9 @@ AudioCaptor/
 ├── src/                        # Frontend (Svelte 5 + TypeScript)
 │   ├── App.svelte              # Main application component
 │   ├── main.ts                 # Entry point
-│   ├── app.css                 # Global styles
+│   ├── app.css                 # Global styles & CSS tokens
 │   └── lib/
+│       ├── i18n.ts             # Paraglide i18n initialization
 │       ├── components/         # UI components
 │       ├── stores/             # Svelte state stores
 │       ├── types/              # TypeScript type definitions
@@ -61,19 +62,22 @@ AudioCaptor/
 │   │   │   ├── mixer.rs        # Real-time audio mixer
 │   │   │   ├── writer.rs       # WAV file writer
 │   │   │   └── types.rs        # Audio types & enums
+│   │   ├── device_monitor.rs   # IMMNotificationClient hot-plug detection
 │   │   ├── hotkey.rs           # Global hotkey FSM (short/long press)
-│   │   ├── settings.rs         # Settings persistence (settings.json)
+│   │   ├── profiles.rs         # Recording profiles CRUD
+│   │   ├── settings.rs         # Settings persistence & migration
 │   │   ├── portable.rs         # Portable mode (paths relative to exe)
 │   │   ├── sounds.rs           # Notification sounds (start/pause/stop)
-│   │   └── state.rs            # Shared application state
+│   │   ├── state.rs            # Shared application state
+│   │   └── tray.rs             # System tray icon & menu
 │   ├── sounds/                 # OGG notification sound files
 │   ├── icons/                  # App icons (all platforms)
 │   ├── capabilities/           # Tauri permission capabilities
 │   ├── tauri.conf.json         # Tauri configuration
 │   └── Cargo.toml              # Rust dependencies
-├── docs/                       # Project documentation
-│   ├── requirements/           # PRD, glossary, user flows
-│   └── phases/                 # Development phase specs
+├── messages/                   # i18n message files (en, uk)
+├── bucket/                     # Scoop package manifest
+├── docs/                       # Design specs & research
 ├── public/                     # Static assets (favicon)
 ├── index.html                  # HTML entry point
 ├── package.json                # Node.js config & scripts
@@ -113,18 +117,19 @@ pnpm vite dev --port 1420                            # vite-dev
 | `release-fast` | `lto=false`, `codegen-units=16`, `opt-level=1`, `panic="unwind"` | Quick iteration during development |
 
 The output binary is located at:
-- **release**: `src-tauri/target/release/audio-captor.exe`
-- **release-fast**: `src-tauri/target/release-fast/audio-captor.exe`
+- **release**: `src-tauri/target/release/AudioCaptor.exe`
+- **release-fast**: `src-tauri/target/release-fast/AudioCaptor.exe`
 
 ## Portable Mode
 
-AudioCaptor runs as a **single portable executable** — no installation required. All data is stored relative to the exe location:
+AudioCaptor runs as a **single portable executable** — no installation required. All data is stored in `AudioCaptor-data/` next to the exe:
 
 ```
-audio-captor.exe
+AudioCaptor.exe
+AudioCaptor-data/
 ├── settings.json     # User preferences
 ├── logs/             # Application logs
-└── Recordings/       # Recorded audio files
+└── Recordings/       # Default recordings folder
 ```
 
 These directories are created automatically on first launch (see `portable.rs`).

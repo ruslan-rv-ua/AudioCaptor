@@ -13,6 +13,10 @@
   No installation required. Just run the exe.
 </p>
 
+<p align="center">
+  English · <a href="README_UK.md">Українська</a>
+</p>
+
 ---
 
 ## Features
@@ -83,10 +87,10 @@ The global hotkey works even when AudioCaptor is not focused. You can change it 
 
 ## Scoop Installation
 
-AudioCaptor is designed to work with [Scoop](https://scoop.sh/), a Windows package manager:
+AudioCaptor is available via [Scoop](https://scoop.sh/), a Windows package manager:
 
 ```powershell
-scoop bucket add audiocaptor https://github.com/ruslan-rv-ua/AudioCaptor
+scoop bucket add ruslan-rv-ua https://github.com/ruslan-rv-ua/scoop-bucket
 scoop install audiocaptor
 ```
 

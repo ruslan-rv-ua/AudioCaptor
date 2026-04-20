@@ -206,20 +206,22 @@ fn handle_menu_event(app: &AppHandle, id: &str) {
 /// Update tray recording-control toggle label and both items' enabled states
 /// after any `RecordingState` change. Call this from `lib.rs` recording functions.
 ///
-/// Reads language from `settings.json` on each call so it stays in sync
-/// with runtime language changes (acceptable partial-update behaviour).
+/// Reads the cached language from `AppState` instead of hitting disk.
 ///
 /// Silently does nothing if `TrayMenuRefs` is not yet registered or if
 /// the mutex is poisoned.
-pub fn update_tray_recording_state(app: &AppHandle, state: RecordingState) {
+pub fn update_tray_recording_state(app: &AppHandle, shared: &crate::state::SharedState, rec_state: RecordingState) {
     let Some(refs) = app.try_state::<Mutex<TrayMenuRefs>>() else {
         return;
     };
     let Ok(refs) = refs.lock() else {
         return;
     };
-    let uk = crate::settings::read_settings().language == "uk";
-    match state {
+    let uk = shared
+        .lock()
+        .map(|s| s.language == "uk")
+        .unwrap_or(false);
+    match rec_state {
         RecordingState::Idle => {
             let _ = refs.toggle_item.set_text(if uk { "Старт" } else { "Start" });
             let _ = refs.toggle_item.set_enabled(true);

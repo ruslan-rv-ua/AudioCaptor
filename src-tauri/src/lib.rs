@@ -23,7 +23,10 @@ fn load_settings() -> settings::Settings {
 }
 
 #[tauri::command]
-fn save_settings(settings: settings::Settings) -> Result<(), String> {
+fn save_settings(state: tauri::State<'_, SharedState>, settings: settings::Settings) -> Result<(), String> {
+    if let Ok(mut s) = state.lock() {
+        s.language = settings.language.clone();
+    }
     settings::write_settings(&settings).map_err(|e| e.to_string())
 }
 
@@ -53,7 +56,7 @@ fn start_recording(
     sample_rate: u32,
 ) -> Result<(), String> {
     start_recording_inner(&app, &state, mic_id, loopback_id, mode, sample_rate)?;
-    tray::update_tray_recording_state(&app, RecordingState::Recording);
+    tray::update_tray_recording_state(&app, &state, RecordingState::Recording);
     Ok(())
 }
 
@@ -236,7 +239,7 @@ fn start_recording_inner(
 #[tauri::command]
 fn pause_recording(state: tauri::State<'_, SharedState>, app: tauri::AppHandle) -> Result<(), String> {
     pause_recording_inner(&state)?;
-    tray::update_tray_recording_state(&app, RecordingState::Paused);
+    tray::update_tray_recording_state(&app, &state, RecordingState::Paused);
     Ok(())
 }
 
@@ -258,7 +261,7 @@ fn pause_recording_inner(state: &SharedState) -> Result<(), String> {
 #[tauri::command]
 fn resume_recording(state: tauri::State<'_, SharedState>, app: tauri::AppHandle) -> Result<(), String> {
     resume_recording_inner(&state)?;
-    tray::update_tray_recording_state(&app, RecordingState::Recording);
+    tray::update_tray_recording_state(&app, &state, RecordingState::Recording);
     Ok(())
 }
 
@@ -290,7 +293,7 @@ fn stop_recording(state: tauri::State<'_, SharedState>, app: tauri::AppHandle) -
         "state": "Idle",
         "durationMs": 0,
     }));
-    tray::update_tray_recording_state(&app, RecordingState::Idle);
+    tray::update_tray_recording_state(&app, &state, RecordingState::Idle);
     Ok(())
 }
 
@@ -370,29 +373,32 @@ pub fn do_start_recording(app: &tauri::AppHandle) -> Result<(), String> {
         profile.output_mode,
         profile.sample_rate,
     )?;
-    tray::update_tray_recording_state(app, RecordingState::Recording);
+    tray::update_tray_recording_state(app, &state, RecordingState::Recording);
     Ok(())
 }
 
 pub fn do_pause_recording(app: &tauri::AppHandle) -> Result<(), String> {
-    pause_recording_inner(&app.state::<SharedState>())?;
-    tray::update_tray_recording_state(app, RecordingState::Paused);
+    let state = app.state::<SharedState>();
+    pause_recording_inner(&state)?;
+    tray::update_tray_recording_state(app, &state, RecordingState::Paused);
     Ok(())
 }
 
 pub fn do_resume_recording(app: &tauri::AppHandle) -> Result<(), String> {
-    resume_recording_inner(&app.state::<SharedState>())?;
-    tray::update_tray_recording_state(app, RecordingState::Recording);
+    let state = app.state::<SharedState>();
+    resume_recording_inner(&state)?;
+    tray::update_tray_recording_state(app, &state, RecordingState::Recording);
     Ok(())
 }
 
 pub fn do_stop_recording(app: &tauri::AppHandle) -> Result<(), String> {
-    stop_recording_inner(&app.state::<SharedState>())?;
+    let state = app.state::<SharedState>();
+    stop_recording_inner(&state)?;
     let _ = app.emit("recording-state-changed", serde_json::json!({
         "state": "Idle",
         "durationMs": 0,
     }));
-    tray::update_tray_recording_state(app, RecordingState::Idle);
+    tray::update_tray_recording_state(app, &state, RecordingState::Idle);
     Ok(())
 }
 
@@ -587,6 +593,7 @@ pub fn run() {
                     s.loopback_volume = profile.loopback_volume;
                 }
                 s.active_profile_id = settings.active_profile_id.clone();
+                s.language = settings.language.clone();
             }
 
             // Register global hotkey (only if one is configured)

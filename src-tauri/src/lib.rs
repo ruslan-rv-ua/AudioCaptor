@@ -107,7 +107,7 @@ fn start_recording_inner(
         .unwrap_or_default();
 
     let timestamp = chrono::Local::now().format("%Y-%m-%d_%H-%M-%S");
-    let base_dir = portable::exe_dir().map_err(|e| e.to_string())?;
+    let base_dir = portable::data_dir().map_err(|e| e.to_string())?;
     let output_dir = base_dir.join(&profile.output_folder);
     std::fs::create_dir_all(&output_dir).map_err(|e| e.to_string())?;
 
@@ -523,7 +523,7 @@ fn cmd_get_active_profile() -> Result<profiles::RecordingProfile, String> {
 
 #[tauri::command]
 fn get_recordings_dir() -> String {
-    portable::exe_dir()
+    portable::data_dir()
         .map(|p| p.join("Recordings").to_string_lossy().into_owned())
         .unwrap_or_else(|_| "Recordings".to_string())
 }
@@ -593,7 +593,7 @@ pub fn run() {
             tauri_plugin_log::Builder::new()
                 .target(tauri_plugin_log::Target::new(
                     tauri_plugin_log::TargetKind::Folder {
-                        path: portable::exe_dir().unwrap_or_default().join("logs"),
+                        path: portable::data_dir().unwrap_or_default().join("logs"),
                         file_name: Some("audiocaptor".into()),
                     },
                 ))

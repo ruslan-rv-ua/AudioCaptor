@@ -61,7 +61,7 @@ impl Default for Settings {
 }
 
 fn settings_path() -> anyhow::Result<PathBuf> {
-    Ok(crate::portable::exe_dir()?.join("settings.json"))
+    Ok(crate::portable::data_dir()?.join("settings.json"))
 }
 
 pub(crate) fn migrate_settings(mut settings: Settings) -> Settings {

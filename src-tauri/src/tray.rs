@@ -162,7 +162,7 @@ fn handle_menu_event(app: &AppHandle, id: &str) {
                 .find(|p| p.id == settings.active_profile_id)
                 .cloned()
                 .unwrap_or_default();
-            match crate::portable::exe_dir() {
+            match crate::portable::data_dir() {
                 Ok(base) => {
                     let dir = base.join(&profile.output_folder);
                     let _ = std::fs::create_dir_all(&dir);

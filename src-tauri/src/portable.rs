@@ -9,6 +9,11 @@ pub fn exe_dir() -> anyhow::Result<PathBuf> {
         .ok_or_else(|| anyhow::anyhow!("Cannot determine exe directory"))
 }
 
+/// Returns the portable data directory (`<exe_dir>/AudioCaptor-data/`).
+pub fn data_dir() -> anyhow::Result<PathBuf> {
+    Ok(exe_dir()?.join("AudioCaptor-data"))
+}
+
 /// Returns the best-matching supported app language code for the current
 /// Windows UI locale. Falls back to `"en"` on any error or unsupported locale.
 #[cfg(target_os = "windows")]
@@ -38,7 +43,7 @@ fn detect_language() -> &'static str {
 /// Creates required directories and default files on first run.
 /// Called during Tauri setup.
 pub fn ensure_dirs() -> anyhow::Result<()> {
-    let base = exe_dir()?;
+    let base = data_dir()?;
 
     let dirs = ["logs", "Recordings"];
     for dir in &dirs {

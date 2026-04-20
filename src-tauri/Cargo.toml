@@ -2,7 +2,7 @@
 name = "audio-captor"
 version = "0.1.0"
 description = "AudioCaptor — system audio recorder"
-authors = ["AudioCaptor contributors"]
+authors = ["Ruslan Iskov"]
 license = "MIT"
 edition = "2021"
 

@@ -527,7 +527,7 @@ fn state_event_loop(app: tauri::AppHandle, state: SharedState, running: Arc<Atom
             break;
         }
 
-        let (payload, should_stop) = {
+        let payload = {
             let s = match state.lock() {
                 Ok(s) => s,
                 Err(_) => break,
@@ -537,17 +537,11 @@ fn state_event_loop(app: tauri::AppHandle, state: SharedState, running: Arc<Atom
                 break;
             }
 
-            let payload = serde_json::json!({
+            serde_json::json!({
                 "state": format!("{:?}", s.recording_state),
                 "durationMs": s.duration_ms(),
-            });
-            let should_stop = false;
-            (payload, should_stop)
+            })
         }; // lock released before emit
-
-        if should_stop {
-            break;
-        }
 
         let _ = app.emit("recording-state-changed", payload);
     }

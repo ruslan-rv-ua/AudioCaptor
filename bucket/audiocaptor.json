@@ -1,14 +1,14 @@
 {
   "version": "0.1.0",
   "description": "AudioCaptor — portable audio recording application",
-  "homepage": "https://github.com/USERNAME/AudioCaptor",
+  "homepage": "https://github.com/ruslan-rv-ua/AudioCaptor",
   "license": "MIT",
-  "url": "https://github.com/USERNAME/AudioCaptor/releases/download/v0.1.0/AudioCaptor.exe",
+  "url": "https://github.com/ruslan-rv-ua/AudioCaptor/releases/download/v0.1.0/AudioCaptor.exe",
   "hash": "PLACEHOLDER_SHA256_FILL_ON_RELEASE",
   "bin": "AudioCaptor.exe",
   "persist": "AudioCaptor-data",
-  "checkver": { "github": "https://github.com/USERNAME/AudioCaptor" },
+  "checkver": { "github": "https://github.com/ruslan-rv-ua/AudioCaptor" },
   "autoupdate": {
-    "url": "https://github.com/USERNAME/AudioCaptor/releases/download/v$version/AudioCaptor.exe"
+    "url": "https://github.com/ruslan-rv-ua/AudioCaptor/releases/download/v$version/AudioCaptor.exe"
   }
 }

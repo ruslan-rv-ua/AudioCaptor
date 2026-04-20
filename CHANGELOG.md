@@ -9,4 +9,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial release.
 
-[Unreleased]: https://github.com/USERNAME/AudioCaptor/commits/HEAD
+[Unreleased]: https://github.com/ruslan-rv-ua/AudioCaptor/commits/HEAD

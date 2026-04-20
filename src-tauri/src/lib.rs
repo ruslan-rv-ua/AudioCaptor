@@ -40,13 +40,7 @@ fn get_audio_devices() -> Vec<AudioDevice> {
 
 #[tauri::command]
 fn refresh_devices() -> Vec<AudioDevice> {
-    match audio::devices::list_all_devices() {
-        Ok(devices) => devices,
-        Err(e) => {
-            log::error!("Failed to refresh audio devices: {}", e);
-            vec![]
-        }
-    }
+    get_audio_devices()
 }
 
 #[tauri::command]

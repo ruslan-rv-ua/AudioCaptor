@@ -10,6 +10,30 @@ pub enum OutputMode {
     SeparateFiles,
 }
 
+impl OutputMode {
+    pub fn needs_mic(&self) -> bool {
+        matches!(
+            self,
+            OutputMode::Microphone
+                | OutputMode::Mix
+                | OutputMode::MixPlusMicrophone
+                | OutputMode::MixPlusLoopback
+                | OutputMode::SeparateFiles
+        )
+    }
+
+    pub fn needs_loopback(&self) -> bool {
+        matches!(
+            self,
+            OutputMode::Loopback
+                | OutputMode::Mix
+                | OutputMode::MixPlusMicrophone
+                | OutputMode::MixPlusLoopback
+                | OutputMode::SeparateFiles
+        )
+    }
+}
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AudioDevice {

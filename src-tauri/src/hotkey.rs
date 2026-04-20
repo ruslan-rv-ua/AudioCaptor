@@ -1,4 +1,4 @@
-use crate::audio::types::{OutputMode, RecordingState};
+use crate::audio::types::RecordingState;
 use crate::state::SharedState;
 use crate::{do_pause_recording, do_resume_recording, do_start_recording, do_stop_recording};
 use crate::{play_sound, settings, sounds};
@@ -122,22 +122,8 @@ fn handle_shortcut_event(app: &AppHandle, event: ShortcutEvent) {
                         .find(|p| p.id == settings.active_profile_id)
                         .cloned()
                         .unwrap_or_default();
-                    let needs_mic = matches!(
-                        profile.output_mode,
-                        OutputMode::Microphone
-                            | OutputMode::Mix
-                            | OutputMode::MixPlusMicrophone
-                            | OutputMode::MixPlusLoopback
-                            | OutputMode::SeparateFiles
-                    );
-                    let needs_loopback = matches!(
-                        profile.output_mode,
-                        OutputMode::Loopback
-                            | OutputMode::Mix
-                            | OutputMode::MixPlusMicrophone
-                            | OutputMode::MixPlusLoopback
-                            | OutputMode::SeparateFiles
-                    );
+                    let needs_mic = profile.output_mode.needs_mic();
+                    let needs_loopback = profile.output_mode.needs_loopback();
                     let mic_missing = needs_mic && settings.selected_mic.is_none();
                     let loopback_missing = needs_loopback && settings.selected_loopback.is_none();
 

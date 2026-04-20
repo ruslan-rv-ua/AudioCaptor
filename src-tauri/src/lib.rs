@@ -72,25 +72,11 @@ fn start_recording_inner(
     }
 
     // Validate devices for the selected mode (FR3.13)
-    match mode {
-        OutputMode::Microphone | OutputMode::Mix
-        | OutputMode::MixPlusMicrophone | OutputMode::MixPlusLoopback
-        | OutputMode::SeparateFiles => {
-            if mic_id.is_none() {
-                return Err("DEVICE_NOT_FOUND: Microphone device required for this mode".into());
-            }
-        }
-        _ => {}
+    if mode.needs_mic() && mic_id.is_none() {
+        return Err("DEVICE_NOT_FOUND: Microphone device required for this mode".into());
     }
-    match mode {
-        OutputMode::Loopback | OutputMode::Mix
-        | OutputMode::MixPlusMicrophone | OutputMode::MixPlusLoopback
-        | OutputMode::SeparateFiles => {
-            if loopback_id.is_none() {
-                return Err("DEVICE_NOT_FOUND: Loopback device required for this mode".into());
-            }
-        }
-        _ => {}
+    if mode.needs_loopback() && loopback_id.is_none() {
+        return Err("DEVICE_NOT_FOUND: Loopback device required for this mode".into());
     }
 
     // Get active profile for output path and filenames
@@ -112,30 +98,24 @@ fn start_recording_inner(
 
     // Start capture threads as needed
     let (mic_handle, mic_consumer) = if let Some(ref id) = mic_id {
-        match mode {
-            OutputMode::Microphone | OutputMode::Mix
-            | OutputMode::MixPlusMicrophone | OutputMode::MixPlusLoopback
-            | OutputMode::SeparateFiles => {
-                let (handle, consumer) =
-                    capture::start_mic_capture(id).map_err(|e| e.to_string())?;
-                (Some(handle), Some(consumer))
-            }
-            _ => (None, None),
+        if mode.needs_mic() {
+            let (handle, consumer) =
+                capture::start_mic_capture(id).map_err(|e| e.to_string())?;
+            (Some(handle), Some(consumer))
+        } else {
+            (None, None)
         }
     } else {
         (None, None)
     };
 
     let (loopback_handle, loopback_consumer) = if let Some(ref id) = loopback_id {
-        match mode {
-            OutputMode::Loopback | OutputMode::Mix
-            | OutputMode::MixPlusMicrophone | OutputMode::MixPlusLoopback
-            | OutputMode::SeparateFiles => {
-                let (handle, consumer) =
-                    capture::start_loopback_capture(id).map_err(|e| e.to_string())?;
-                (Some(handle), Some(consumer))
-            }
-            _ => (None, None),
+        if mode.needs_loopback() {
+            let (handle, consumer) =
+                capture::start_loopback_capture(id).map_err(|e| e.to_string())?;
+            (Some(handle), Some(consumer))
+        } else {
+            (None, None)
         }
     } else {
         (None, None)

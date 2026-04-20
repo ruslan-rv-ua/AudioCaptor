@@ -5,4 +5,5 @@ import { setLocale } from "../paraglide/runtime";
  */
 export function initLanguage(lang: "en" | "uk") {
   setLocale(lang, { reload: false });
+  document.documentElement.lang = lang;
 }

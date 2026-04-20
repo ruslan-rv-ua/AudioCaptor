@@ -139,10 +139,10 @@ These directories are created automatically on first launch (see `portable.rs`).
 Icons are generated from a single 1024×1024 source PNG using the Tauri CLI:
 
 ```bash
-pnpm tauri icon docs/requirements/resources/logo_audiocaptor.png
+pnpm tauri icon src-tauri/icons/128x128.png
 ```
 
-This generates all required variants in `src-tauri/icons/` (ICO for Windows, ICNS for macOS, PNGs for Linux, plus mobile icons). The Windows Store Square logos and the webview favicon are generated separately with ImageMagick — see the source file at `docs/requirements/resources/logo_audiocaptor.png`.
+This generates all required variants in `src-tauri/icons/` (ICO for Windows, ICNS for macOS, PNGs for Linux, plus mobile icons). The Windows Store Square logos and the webview favicon are generated separately with ImageMagick.
 
 Icon integration points:
 - `src-tauri/icons/` — all platform icon variants
@@ -204,9 +204,3 @@ Accessibility (a11y) is a **highest-priority requirement**:
 - `decorations: true` in Tauri config (required for screen reader compatibility)
 - Svelte compile-time a11y checks are enabled
 - Sound notifications duplicate visual state changes
-
-## Documentation
-
-- [PRD (Product Requirements)](docs/requirements/PRD.md) — full functional requirements
-- [Development Phases](docs/phases/index.md) — phased implementation plan
-- [Tech Stack Research](docs/stack-tauri-v2.md) — technology decisions and rationale

@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { RecordingState } from "../types";
   import * as m from "../../paraglide/messages";
+  import { formatDuration } from "../utils/format";
 
   interface Props {
     state: RecordingState;
@@ -10,15 +11,6 @@
   let { state, durationMs }: Props = $props();
 
   let formattedDuration = $derived(formatDuration(durationMs));
-
-  function formatDuration(ms: number): string {
-    const totalSeconds = Math.floor(ms / 1000);
-    const hours = Math.floor(totalSeconds / 3600);
-    const minutes = Math.floor((totalSeconds % 3600) / 60);
-    const seconds = totalSeconds % 60;
-    const pad = (n: number) => n.toString().padStart(2, "0");
-    return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
-  }
 
   let stateLabel = $derived(
     state === "Idle"      ? m.status_ready()     :

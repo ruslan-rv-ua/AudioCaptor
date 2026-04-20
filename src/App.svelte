@@ -35,6 +35,7 @@
   import { setThemePreference } from "./lib/stores/settings.svelte";
   import type { Theme } from "./lib/types";
   import * as m from "./paraglide/messages";
+  import { formatDuration } from "./lib/utils/format";
   import DeviceSelect from "./lib/components/DeviceSelect.svelte";
   import VolumeSlider from "./lib/components/VolumeSlider.svelte";
   import RecordControls from "./lib/components/RecordControls.svelte";
@@ -98,15 +99,6 @@
     else if (state === "Paused") liveRegionText = m.live_recording_paused();
     else if (state === "Idle") liveRegionText = m.live_recording_stopped();
   });
-
-  function formatDuration(ms: number): string {
-    const totalSeconds = Math.floor(ms / 1000);
-    const hours = Math.floor(totalSeconds / 3600);
-    const minutes = Math.floor((totalSeconds % 3600) / 60);
-    const seconds = totalSeconds % 60;
-    const pad = (n: number) => n.toString().padStart(2, "0");
-    return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
-  }
 
   function handleMnemonic(e: KeyboardEvent) {
     if (e.key === "F1") { e.preventDefault(); aboutOpen = true; return; }

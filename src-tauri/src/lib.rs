@@ -23,7 +23,10 @@ fn load_settings() -> settings::Settings {
 }
 
 #[tauri::command]
-fn save_settings(settings: settings::Settings) -> Result<(), String> {
+fn save_settings(state: tauri::State<'_, SharedState>, settings: settings::Settings) -> Result<(), String> {
+    if let Ok(mut s) = state.lock() {
+        s.language = settings.language.clone();
+    }
     settings::write_settings(&settings).map_err(|e| e.to_string())
 }
 
@@ -40,13 +43,7 @@ fn get_audio_devices() -> Vec<AudioDevice> {
 
 #[tauri::command]
 fn refresh_devices() -> Vec<AudioDevice> {
-    match audio::devices::list_all_devices() {
-        Ok(devices) => devices,
-        Err(e) => {
-            log::error!("Failed to refresh audio devices: {}", e);
-            vec![]
-        }
-    }
+    get_audio_devices()
 }
 
 #[tauri::command]
@@ -59,7 +56,7 @@ fn start_recording(
     sample_rate: u32,
 ) -> Result<(), String> {
     start_recording_inner(&app, &state, mic_id, loopback_id, mode, sample_rate)?;
-    tray::update_tray_recording_state(&app, RecordingState::Recording);
+    tray::update_tray_recording_state(&app, &state, RecordingState::Recording);
     Ok(())
 }
 
@@ -78,25 +75,11 @@ fn start_recording_inner(
     }
 
     // Validate devices for the selected mode (FR3.13)
-    match mode {
-        OutputMode::Microphone | OutputMode::Mix
-        | OutputMode::MixPlusMicrophone | OutputMode::MixPlusLoopback
-        | OutputMode::SeparateFiles => {
-            if mic_id.is_none() {
-                return Err("DEVICE_NOT_FOUND: Microphone device required for this mode".into());
-            }
-        }
-        _ => {}
+    if mode.needs_mic() && mic_id.is_none() {
+        return Err("DEVICE_NOT_FOUND: Microphone device required for this mode".into());
     }
-    match mode {
-        OutputMode::Loopback | OutputMode::Mix
-        | OutputMode::MixPlusMicrophone | OutputMode::MixPlusLoopback
-        | OutputMode::SeparateFiles => {
-            if loopback_id.is_none() {
-                return Err("DEVICE_NOT_FOUND: Loopback device required for this mode".into());
-            }
-        }
-        _ => {}
+    if mode.needs_loopback() && loopback_id.is_none() {
+        return Err("DEVICE_NOT_FOUND: Loopback device required for this mode".into());
     }
 
     // Get active profile for output path and filenames
@@ -118,30 +101,24 @@ fn start_recording_inner(
 
     // Start capture threads as needed
     let (mic_handle, mic_consumer) = if let Some(ref id) = mic_id {
-        match mode {
-            OutputMode::Microphone | OutputMode::Mix
-            | OutputMode::MixPlusMicrophone | OutputMode::MixPlusLoopback
-            | OutputMode::SeparateFiles => {
-                let (handle, consumer) =
-                    capture::start_mic_capture(id).map_err(|e| e.to_string())?;
-                (Some(handle), Some(consumer))
-            }
-            _ => (None, None),
+        if mode.needs_mic() {
+            let (handle, consumer) =
+                capture::start_mic_capture(id).map_err(|e| e.to_string())?;
+            (Some(handle), Some(consumer))
+        } else {
+            (None, None)
         }
     } else {
         (None, None)
     };
 
     let (loopback_handle, loopback_consumer) = if let Some(ref id) = loopback_id {
-        match mode {
-            OutputMode::Loopback | OutputMode::Mix
-            | OutputMode::MixPlusMicrophone | OutputMode::MixPlusLoopback
-            | OutputMode::SeparateFiles => {
-                let (handle, consumer) =
-                    capture::start_loopback_capture(id).map_err(|e| e.to_string())?;
-                (Some(handle), Some(consumer))
-            }
-            _ => (None, None),
+        if mode.needs_loopback() {
+            let (handle, consumer) =
+                capture::start_loopback_capture(id).map_err(|e| e.to_string())?;
+            (Some(handle), Some(consumer))
+        } else {
+            (None, None)
         }
     } else {
         (None, None)
@@ -262,7 +239,7 @@ fn start_recording_inner(
 #[tauri::command]
 fn pause_recording(state: tauri::State<'_, SharedState>, app: tauri::AppHandle) -> Result<(), String> {
     pause_recording_inner(&state)?;
-    tray::update_tray_recording_state(&app, RecordingState::Paused);
+    tray::update_tray_recording_state(&app, &state, RecordingState::Paused);
     Ok(())
 }
 
@@ -284,7 +261,7 @@ fn pause_recording_inner(state: &SharedState) -> Result<(), String> {
 #[tauri::command]
 fn resume_recording(state: tauri::State<'_, SharedState>, app: tauri::AppHandle) -> Result<(), String> {
     resume_recording_inner(&state)?;
-    tray::update_tray_recording_state(&app, RecordingState::Recording);
+    tray::update_tray_recording_state(&app, &state, RecordingState::Recording);
     Ok(())
 }
 
@@ -316,7 +293,7 @@ fn stop_recording(state: tauri::State<'_, SharedState>, app: tauri::AppHandle) -
         "state": "Idle",
         "durationMs": 0,
     }));
-    tray::update_tray_recording_state(&app, RecordingState::Idle);
+    tray::update_tray_recording_state(&app, &state, RecordingState::Idle);
     Ok(())
 }
 
@@ -396,29 +373,32 @@ pub fn do_start_recording(app: &tauri::AppHandle) -> Result<(), String> {
         profile.output_mode,
         profile.sample_rate,
     )?;
-    tray::update_tray_recording_state(app, RecordingState::Recording);
+    tray::update_tray_recording_state(app, &state, RecordingState::Recording);
     Ok(())
 }
 
 pub fn do_pause_recording(app: &tauri::AppHandle) -> Result<(), String> {
-    pause_recording_inner(&app.state::<SharedState>())?;
-    tray::update_tray_recording_state(app, RecordingState::Paused);
+    let state = app.state::<SharedState>();
+    pause_recording_inner(&state)?;
+    tray::update_tray_recording_state(app, &state, RecordingState::Paused);
     Ok(())
 }
 
 pub fn do_resume_recording(app: &tauri::AppHandle) -> Result<(), String> {
-    resume_recording_inner(&app.state::<SharedState>())?;
-    tray::update_tray_recording_state(app, RecordingState::Recording);
+    let state = app.state::<SharedState>();
+    resume_recording_inner(&state)?;
+    tray::update_tray_recording_state(app, &state, RecordingState::Recording);
     Ok(())
 }
 
 pub fn do_stop_recording(app: &tauri::AppHandle) -> Result<(), String> {
-    stop_recording_inner(&app.state::<SharedState>())?;
+    let state = app.state::<SharedState>();
+    stop_recording_inner(&state)?;
     let _ = app.emit("recording-state-changed", serde_json::json!({
         "state": "Idle",
         "durationMs": 0,
     }));
-    tray::update_tray_recording_state(app, RecordingState::Idle);
+    tray::update_tray_recording_state(app, &state, RecordingState::Idle);
     Ok(())
 }
 
@@ -553,7 +533,7 @@ fn state_event_loop(app: tauri::AppHandle, state: SharedState, running: Arc<Atom
             break;
         }
 
-        let (payload, should_stop) = {
+        let payload = {
             let s = match state.lock() {
                 Ok(s) => s,
                 Err(_) => break,
@@ -563,17 +543,11 @@ fn state_event_loop(app: tauri::AppHandle, state: SharedState, running: Arc<Atom
                 break;
             }
 
-            let payload = serde_json::json!({
+            serde_json::json!({
                 "state": format!("{:?}", s.recording_state),
                 "durationMs": s.duration_ms(),
-            });
-            let should_stop = false;
-            (payload, should_stop)
+            })
         }; // lock released before emit
-
-        if should_stop {
-            break;
-        }
 
         let _ = app.emit("recording-state-changed", payload);
     }
@@ -619,6 +593,7 @@ pub fn run() {
                     s.loopback_volume = profile.loopback_volume;
                 }
                 s.active_profile_id = settings.active_profile_id.clone();
+                s.language = settings.language.clone();
             }
 
             // Register global hotkey (only if one is configured)

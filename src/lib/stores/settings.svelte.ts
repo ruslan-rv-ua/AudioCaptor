@@ -5,7 +5,7 @@ let language = $state<"en" | "uk">("en");
 let confirmExitDuringRecording = $state(true);
 let hotkey = $state<string | null>("Pause");
 let soundEnabled = $state(true);
-let settingsVersion = $state(4);
+let settingsVersion = $state(5);
 let theme = $state<Theme>("auto");
 let minimizeToTrayOnFocusLoss = $state(false);
 

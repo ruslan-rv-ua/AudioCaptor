@@ -268,7 +268,9 @@ fn bytes_to_f32(data: &[u8], bits_per_sample: u16) -> Vec<f32> {
         24 => data
             .chunks_exact(3)
             .map(|c| {
-                let sample = i32::from_le_bytes([c[0], c[1], c[2], 0]) >> 8;
+                // Place 24-bit LE bytes in upper 3 bytes of i32, then arithmetic
+                // right-shift by 8 to sign-extend into a proper i32 value.
+                let sample = i32::from_le_bytes([0, c[0], c[1], c[2]]) >> 8;
                 sample as f32 / (1 << 23) as f32
             })
             .collect(),

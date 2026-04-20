@@ -95,6 +95,7 @@ pub fn start_device_monitor(app: AppHandle) -> anyhow::Result<DeviceMonitorHandl
                         Ok(e) => e,
                         Err(e) => {
                             log::error!("Failed to create device enumerator: {e}");
+                            CoUninitialize();
                             return;
                         }
                     };
@@ -104,6 +105,7 @@ pub fn start_device_monitor(app: AppHandle) -> anyhow::Result<DeviceMonitorHandl
 
                 if let Err(e) = enumerator.RegisterEndpointNotificationCallback(&client) {
                     log::error!("Failed to register notification callback: {e}");
+                    CoUninitialize();
                     return;
                 }
 

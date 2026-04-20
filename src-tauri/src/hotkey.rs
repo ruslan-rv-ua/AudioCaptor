@@ -128,6 +128,7 @@ fn handle_shortcut_event(app: &AppHandle, event: ShortcutEvent) {
                             | OutputMode::Mix
                             | OutputMode::MixPlusMicrophone
                             | OutputMode::MixPlusLoopback
+                            | OutputMode::SeparateFiles
                     );
                     let needs_loopback = matches!(
                         profile.output_mode,
@@ -135,6 +136,7 @@ fn handle_shortcut_event(app: &AppHandle, event: ShortcutEvent) {
                             | OutputMode::Mix
                             | OutputMode::MixPlusMicrophone
                             | OutputMode::MixPlusLoopback
+                            | OutputMode::SeparateFiles
                     );
                     let mic_missing = needs_mic && settings.selected_mic.is_none();
                     let loopback_missing = needs_loopback && settings.selected_loopback.is_none();

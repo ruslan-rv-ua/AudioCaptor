@@ -212,17 +212,30 @@ Accessibility (a11y) is a **highest-priority requirement**:
 |----------|---------|-------------|
 | **CI** (`ci.yml`) | push / PR → `develop` | Frontend checks (`pnpm check`) + Rust checks (`cargo check`, `cargo clippy`) |
 | **Release** (`release.yml`) | manual (`workflow_dispatch`) | Builds `AudioCaptor.exe`, creates GitHub Release |
-| **Update Scoop** (`update-scoop.yml`) | manual (`workflow_dispatch`) | Downloads release, computes SHA256, dispatches update to `scoop-bucket` |
 
 ### Release Process
 
 1. Запустити **Release** workflow з версією (наприклад `0.2.0`) та прапорцем pre-release
 2. Дочекатись успішного створення GitHub Release
-3. Запустити **Update Scoop** workflow з тією ж версією
-4. `scoop-bucket` автоматично оновить маніфест і провалідує його
+3. Оновити Scoop-маніфест — див. нижче
+
+### Оновлення Scoop-маніфесту
+
+Цей репозиторій **нічого не надсилає** до `scoop-bucket`. Оновлення робить сам bucket:
+його workflow **Excavator** читає поля `checkver` і `autoupdate` у `bucket/audiocaptor.json`,
+знаходить новий реліз, збирає URL і бере хеш — і комітить оновлений маніфест.
+
+Запускається він **вручну** з вкладки Actions репозиторію
+[scoop-bucket](https://github.com/ruslan-rv-ua/scoop-bucket/actions), плюс раз на добу
+о 04:20 UTC як підстраховка. Натискати безпечно будь-коли: якщо оновлювати нема чого,
+він нічого не змінює.
+
+Раніше тут був workflow `update-scoop.yml`, який слав `repository_dispatch` до bucket
+і для цього тримав секрет `SCOOP_BUCKET_TOKEN`. Обидва прибрано: PAT із правом запису
+в чужий репозиторій треба ротувати, і він відмовляє мовчки — реліз проходить, а bucket
+тихо лишається позаду.
 
 ### Required Secrets
 
-| Secret | Description |
-|--------|-------------|
-| `SCOOP_BUCKET_TOKEN` | GitHub PAT (classic) з правом `repo` на `ruslan-rv-ua/scoop-bucket` |
+Жодного. Workflow цього репозиторію користуються тільки тимчасовим `GITHUB_TOKEN`,
+який GitHub видає кожному запуску й забирає після нього.

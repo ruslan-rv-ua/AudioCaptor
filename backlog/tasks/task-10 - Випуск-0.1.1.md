@@ -4,6 +4,7 @@ title: Випуск 0.1.1
 status: To Do
 assignee: []
 created_date: '2026-11-23T11:31:35Z'
+updated_date: '2026-11-23T15:31:20Z'
 labels:
   - release
   - model-sonnet
@@ -52,3 +53,9 @@ ordinal: 10000
 - [ ] #5 Документацію оновлено там, де змінилася поведінка чи порядок роботи (README.md, README_UK.md, DEVELOPMENT.md)
 - [ ] #6 CHANGELOG.md оновлено: лише зміни, помітні користувачам (без подробиць про інструменти, тести, CI чи збірку)
 <!-- DOD:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Зауваження головної сесії, 2026-11-23: розділ 0.1.0 у `CHANGELOG.md` містить рядок «CI/CD: GitHub Actions workflows for CI, Release, and Scoop manifest update». Це подробиця для розробників, а не для користувачів, і вона застаріла: workflow оновлення Scoop прибрано. Під час підготовки 0.1.1 вирішити з власником, чи прибрати рядок із розділу 0.1.0. Опис релізу тепер береться з `CHANGELOG.md`, тож такі рядки потрапляють і на сторінку релізу.
+<!-- SECTION:NOTES:END -->

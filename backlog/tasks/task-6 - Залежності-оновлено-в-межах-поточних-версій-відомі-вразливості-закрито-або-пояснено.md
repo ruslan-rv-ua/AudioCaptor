@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-23T11:30:58Z'
+updated_date: '2026-11-23T15:32:03Z'
 labels:
   - backend
   - frontend
@@ -15,6 +16,7 @@ labels:
 milestone: m-0
 dependencies:
   - TASK-1
+  - TASK-14
 references:
   - src-tauri/Cargo.toml
   - src-tauri/Cargo.lock

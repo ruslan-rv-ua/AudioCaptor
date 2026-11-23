@@ -4,6 +4,7 @@ title: Повторний запуск показує вікно програм�
 status: To Do
 assignee: []
 created_date: '2026-11-23T11:31:32Z'
+updated_date: '2026-11-23T15:32:03Z'
 labels:
   - backend
   - a11y
@@ -12,6 +13,7 @@ labels:
 milestone: m-1
 dependencies:
   - TASK-3
+  - TASK-14
 references:
   - src-tauri/src/lib.rs
   - src-tauri/src/tray.rs

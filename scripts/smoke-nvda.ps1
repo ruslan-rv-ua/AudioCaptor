@@ -17,7 +17,6 @@
       dialogs  About (F1), Settings, New Profile and the delete confirmation: focus enters the
                dialog, Escape closes it and focus returns to where the dialog was opened.
       tray     Escape hides the window; starting the exe again shows it and NVDA announces it.
-               Until TASK-9 is fixed this scenario fails on the second start.
 
     Exit code: 0 everything passed; 1 a step or an NVDA check failed; 2 the test could not run
     or stopped early (no exe, NVDA not running, wrong logging level, your AudioCaptor would not
@@ -930,7 +929,7 @@ function Invoke-TrayScenario {
         try { $null = Wait-Until 'the window on screen and in the foreground' { Test-AppForeground } 6; $shown = $true } catch { }
         if (-not $shown) {
             if (Test-AppShown) { throw 'the window came back on screen but not to the foreground' }
-            throw 'the window stayed hidden after the second start (the defect TASK-9 fixes)'
+            throw 'the window stayed hidden after the second start'
         }
         $script:StepInfo.Add("window in the foreground $($clock.ElapsedMilliseconds) ms after the second start")
         $copies = @(Get-Process $AppTitle -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $TestExe })

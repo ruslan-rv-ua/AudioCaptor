@@ -258,15 +258,21 @@ fn capture_loop(
 fn bytes_to_f32(data: &[u8], bits_per_sample: u16) -> Vec<f32> {
     match bits_per_sample {
         16 => data
-            .chunks_exact(2)
-            .map(|c| i16::from_le_bytes([c[0], c[1]]) as f32 / i16::MAX as f32)
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .map(|&c| i16::from_le_bytes(c) as f32 / i16::MAX as f32)
             .collect(),
         32 => data
-            .chunks_exact(4)
-            .map(|c| f32::from_le_bytes([c[0], c[1], c[2], c[3]]))
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .map(|&c| f32::from_le_bytes(c))
             .collect(),
         24 => data
-            .chunks_exact(3)
+            .as_chunks::<3>()
+            .0
+            .iter()
             .map(|c| {
                 // Place 24-bit LE bytes in upper 3 bytes of i32, then arithmetic
                 // right-shift by 8 to sign-extend into a proper i32 value.

@@ -148,8 +148,10 @@ mod tests {
 
     #[test]
     fn settings_serialization_roundtrip() {
-        let mut settings = Settings::default();
-        settings.version = 2;
+        let settings = Settings {
+            version: 2,
+            ..Settings::default()
+        };
         let json = serde_json::to_string_pretty(&settings).unwrap();
         let deserialized: Settings = serde_json::from_str(&json).unwrap();
         assert_eq!(deserialized.version, 2);
@@ -186,8 +188,10 @@ mod tests {
 
     #[test]
     fn migrate_settings_upgrades_v0_to_v5() {
-        let mut settings = Settings::default();
-        settings.version = 0;
+        let settings = Settings {
+            version: 0,
+            ..Settings::default()
+        };
         let migrated = migrate_settings(settings);
         assert_eq!(migrated.version, 5);
         assert_eq!(migrated.profiles.len(), 1);
@@ -195,8 +199,10 @@ mod tests {
 
     #[test]
     fn migrate_settings_upgrades_v1_to_v5() {
-        let mut settings = Settings::default();
-        settings.version = 1;
+        let settings = Settings {
+            version: 1,
+            ..Settings::default()
+        };
         let migrated = migrate_settings(settings);
         assert_eq!(migrated.version, 5);
         assert_eq!(migrated.profiles.len(), 1);
@@ -272,17 +278,19 @@ mod tests {
 
     #[test]
     fn settings_v2_roundtrip_preserves_profiles() {
-        let mut settings = Settings::default();
-        settings.version = 2;
-        settings.profiles = vec![
-            RecordingProfile::default(),
-            RecordingProfile {
-                id: "custom".into(),
-                name: "Podcast".into(),
-                ..RecordingProfile::default()
-            },
-        ];
-        settings.active_profile_id = "custom".into();
+        let settings = Settings {
+            version: 2,
+            profiles: vec![
+                RecordingProfile::default(),
+                RecordingProfile {
+                    id: "custom".into(),
+                    name: "Podcast".into(),
+                    ..RecordingProfile::default()
+                },
+            ],
+            active_profile_id: "custom".into(),
+            ..Settings::default()
+        };
         let json = serde_json::to_string_pretty(&settings).unwrap();
         let deserialized: Settings = serde_json::from_str(&json).unwrap();
         assert_eq!(deserialized.profiles.len(), 2);

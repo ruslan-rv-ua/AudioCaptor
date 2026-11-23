@@ -1,0 +1,5 @@
+# Pin the Rust version so a new Rust release (and its new clippy lints) cannot
+# turn the checks red on its own. Updating this version is a deliberate change.
+[toolchain]
+channel = "1.99.1"
+components = ["clippy", "rustfmt"]

@@ -95,6 +95,7 @@ AudioCaptor/
 | `just clean` | Clean Rust build artifacts |
 | `just install` | Install JS dependencies |
 | `just vite-dev` | Frontend-only dev server (no Rust) |
+| `just check` | All local checks: frontend build and type check, clippy, tests, `cargo fmt --check`; stops at the first failure |
 
 <details>
 <summary>Equivalent pnpm commands</summary>

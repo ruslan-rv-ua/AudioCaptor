@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-23T11:29:00Z'
-updated_date: '2026-11-23T11:29:13Z'
+updated_date: '2026-11-23T12:29:01Z'
 labels:
   - ci
   - model-sonnet
@@ -38,6 +38,8 @@ ordinal: 4000
 - дії `actions/checkout@v4`, `actions/setup-node@v4` і `pnpm/action-setup@v4` розраховані на Node 20, який GitHub виводить з ужитку: кожен запуск із серпня має попередження «Node.js 20 is deprecated».
 
 Розділ CI/CD у `DEVELOPMENT.md` каже «push / PR → develop», що не відповідає ні теперішньому стану, ні новому.
+
+Обмеження GitHub: ручний запуск (`workflow_dispatch`) можливий лише для workflow, у якого цей тригер уже є у версії на типовій гілці (`develop`). Поки новий `ci.yml` не злито, `gh workflow run ci.yml --ref <гілка>` для гілки задачі, найімовірніше, не спрацює. Побачити зелений запуск до злиття можна через pull request у `develop`: тригер `pull_request` бере файл із гілки. Інакше CI запускають вручну на `develop` одразу після злиття.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
@@ -46,7 +48,7 @@ ordinal: 4000
 - [ ] #2 CI виконує ті самі перевірки, що `just check`, зокрема `cargo test`, clippy з `--all-targets` і `cargo fmt --check`; кроку `cargo check` немає
 - [ ] #3 CI збирає версією Rust із `rust-toolchain.toml` і не встановлює іншої
 - [ ] #4 У журналі запуску немає попередження про застарілий Node 20
-- [ ] #5 Запуск вручну на гілці задачі зелений, і його номер записано в нотатках (push і запуск — з дозволу власника)
+- [ ] #5 Запуск CI на GitHub із новим `ci.yml` зелений — через pull request з гілки задачі або вручну на `develop` одразу після злиття, — і його номер записано в нотатках (push, pull request і запуск — з дозволу власника)
 - [ ] #6 Розділ CI/CD у `DEVELOPMENT.md` і розділ «Checks» у `CLAUDE.md` кажуть, коли запускається CI і як запустити його вручну
 <!-- AC:END -->
 

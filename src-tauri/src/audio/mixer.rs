@@ -75,7 +75,14 @@ fn maybe_resampler(
     if source_rate == target_rate {
         return None;
     }
-    FftFixedIn::new(source_rate as usize, target_rate as usize, chunk_frames, 1, channels).ok()
+    FftFixedIn::new(
+        source_rate as usize,
+        target_rate as usize,
+        chunk_frames,
+        1,
+        channels,
+    )
+    .ok()
 }
 
 /// Convert mono samples to stereo by duplicating each sample.
@@ -120,11 +127,7 @@ fn interleave(channels: &[Vec<f32>]) -> Vec<f32> {
 
 /// Resample exactly `chunk_frames` frames from the front of `buf` (interleaved).
 /// Returns the resampled interleaved output.
-fn resample_chunk(
-    buf: &[f32],
-    channels: usize,
-    resampler: &mut FftFixedIn<f32>,
-) -> Vec<f32> {
+fn resample_chunk(buf: &[f32], channels: usize, resampler: &mut FftFixedIn<f32>) -> Vec<f32> {
     let deint = deinterleave(buf, channels);
     match resampler.process(&deint, None) {
         Ok(resampled) => interleave(&resampled),
@@ -150,8 +153,11 @@ fn convert_channels(samples: Vec<f32>, source_ch: usize, target_ch: usize) -> Ve
 }
 
 fn mix_samples(
-    mic: &[f32], loopback: &[f32],
-    mic_vol: f32, loop_vol: f32, channels: usize,
+    mic: &[f32],
+    loopback: &[f32],
+    mic_vol: f32,
+    loop_vol: f32,
+    channels: usize,
 ) -> Vec<f32> {
     let mic_frames = mic.len() / channels;
     let loop_frames = loopback.len() / channels;
@@ -180,8 +186,8 @@ fn mixer_loop(mut config: MixerConfig, running: Arc<AtomicBool>) {
     // Discard the first warmup_discard_ms of audio at startup so that any
     // residual notification sound left in the WASAPI render pipeline is flushed
     // before we write to the WAV file.
-    let warmup_end = std::time::Instant::now()
-        + std::time::Duration::from_millis(config.warmup_discard_ms);
+    let warmup_end =
+        std::time::Instant::now() + std::time::Duration::from_millis(config.warmup_discard_ms);
 
     let mut mic_volume = config.mic_volume;
     let mut loopback_volume = config.loopback_volume;
@@ -220,9 +226,12 @@ fn mixer_loop(mut config: MixerConfig, running: Arc<AtomicBool>) {
     log::info!(
         "Mixer thread started, mode={:?}, target={}Hz/{}ch, mic={}Hz/{}ch, loop={}Hz/{}ch",
         config.output_mode,
-        config.target_sample_rate, target_channels,
-        config.mic_sample_rate, config.mic_channels,
-        config.loopback_sample_rate, config.loopback_channels,
+        config.target_sample_rate,
+        target_channels,
+        config.mic_sample_rate,
+        config.mic_channels,
+        config.loopback_sample_rate,
+        config.loopback_channels,
     );
 
     while running.load(Ordering::Relaxed) {
@@ -238,10 +247,8 @@ fn mixer_loop(mut config: MixerConfig, running: Arc<AtomicBool>) {
                     // to drain so residual notification-sound data is discarded.
                     pending_resume = true;
                     resume_quiet_since = None;
-                    resume_deadline = Some(
-                        std::time::Instant::now()
-                            + std::time::Duration::from_millis(500),
-                    );
+                    resume_deadline =
+                        Some(std::time::Instant::now() + std::time::Duration::from_millis(500));
                     log::info!("Mixer: pending resume, waiting for pipeline drain");
                 }
                 AudioCommand::Stop => {
@@ -312,7 +319,11 @@ fn mixer_loop(mut config: MixerConfig, running: Arc<AtomicBool>) {
                 loopback_staging.clear();
                 log::info!(
                     "Mixer resumed ({})",
-                    if drained { "pipeline drained" } else { "timeout" }
+                    if drained {
+                        "pipeline drained"
+                    } else {
+                        "timeout"
+                    }
                 );
             }
         }
@@ -333,9 +344,23 @@ fn mixer_loop(mut config: MixerConfig, running: Arc<AtomicBool>) {
 
         // In Mix mode: only process when both sources have staged data.
         // Without this, single-source batches alternate and double the output duration.
-        if matches!(config.output_mode, OutputMode::Mix | OutputMode::MixPlusMicrophone | OutputMode::MixPlusLoopback | OutputMode::SeparateFiles) {
-            let mic_min = if mic_resampler.is_some() { chunk_frames * mic_channels } else { mic_channels };
-            let loop_min = if loopback_resampler.is_some() { chunk_frames * loopback_channels } else { loopback_channels };
+        if matches!(
+            config.output_mode,
+            OutputMode::Mix
+                | OutputMode::MixPlusMicrophone
+                | OutputMode::MixPlusLoopback
+                | OutputMode::SeparateFiles
+        ) {
+            let mic_min = if mic_resampler.is_some() {
+                chunk_frames * mic_channels
+            } else {
+                mic_channels
+            };
+            let loop_min = if loopback_resampler.is_some() {
+                chunk_frames * loopback_channels
+            } else {
+                loopback_channels
+            };
             if mic_staging.len() < mic_min || loopback_staging.len() < loop_min {
                 continue;
             }
@@ -343,13 +368,27 @@ fn mixer_loop(mut config: MixerConfig, running: Arc<AtomicBool>) {
 
         // In Mix / SeparateFiles mode: drain equal frame counts from both sources to keep them in sync.
         // In single-source modes: drain all available (usize::MAX as sentinel).
-        let (mic_drain_frames, loop_drain_frames) = if matches!(config.output_mode, OutputMode::Mix | OutputMode::MixPlusMicrophone | OutputMode::MixPlusLoopback | OutputMode::SeparateFiles) {
+        let (mic_drain_frames, loop_drain_frames) = if matches!(
+            config.output_mode,
+            OutputMode::Mix
+                | OutputMode::MixPlusMicrophone
+                | OutputMode::MixPlusLoopback
+                | OutputMode::SeparateFiles
+        ) {
             let mic_avail = mic_staging.len() / mic_channels;
             let loop_avail = loopback_staging.len() / loopback_channels;
             let min_avail = mic_avail.min(loop_avail);
             (
-                if mic_resampler.is_some() { (min_avail / chunk_frames) * chunk_frames } else { min_avail },
-                if loopback_resampler.is_some() { (min_avail / chunk_frames) * chunk_frames } else { min_avail },
+                if mic_resampler.is_some() {
+                    (min_avail / chunk_frames) * chunk_frames
+                } else {
+                    min_avail
+                },
+                if loopback_resampler.is_some() {
+                    (min_avail / chunk_frames) * chunk_frames
+                } else {
+                    min_avail
+                },
             )
         } else {
             (usize::MAX, usize::MAX)
@@ -393,7 +432,9 @@ fn mixer_loop(mut config: MixerConfig, running: Arc<AtomicBool>) {
         } else if !loopback_staging.is_empty() {
             // No resampler — drain up to loop_drain_frames frames
             let frames = loop_drain_frames.min(loopback_staging.len() / loopback_channels);
-            let available: Vec<f32> = loopback_staging.drain(..frames * loopback_channels).collect();
+            let available: Vec<f32> = loopback_staging
+                .drain(..frames * loopback_channels)
+                .collect();
             convert_channels(available, loopback_channels, target_channels)
         } else {
             vec![]
@@ -401,19 +442,33 @@ fn mixer_loop(mut config: MixerConfig, running: Arc<AtomicBool>) {
 
         // Apply volume, mix, clip, and write based on mode
         let output = match config.output_mode {
-            OutputMode::Microphone => {
-                mic_processed.iter().map(|&s| (s * mic_volume).clamp(-1.0, 1.0)).collect::<Vec<_>>()
-            }
-            OutputMode::Loopback => {
-                loop_processed.iter().map(|&s| (s * loopback_volume).clamp(-1.0, 1.0)).collect::<Vec<_>>()
-            }
-            OutputMode::Mix => {
-                mix_samples(&mic_processed, &loop_processed, mic_volume, loopback_volume, target_channels)
-            }
+            OutputMode::Microphone => mic_processed
+                .iter()
+                .map(|&s| (s * mic_volume).clamp(-1.0, 1.0))
+                .collect::<Vec<_>>(),
+            OutputMode::Loopback => loop_processed
+                .iter()
+                .map(|&s| (s * loopback_volume).clamp(-1.0, 1.0))
+                .collect::<Vec<_>>(),
+            OutputMode::Mix => mix_samples(
+                &mic_processed,
+                &loop_processed,
+                mic_volume,
+                loopback_volume,
+                target_channels,
+            ),
             OutputMode::MixPlusMicrophone => {
-                let mix = mix_samples(&mic_processed, &loop_processed, mic_volume, loopback_volume, target_channels);
-                let mic_only: Vec<f32> = mic_processed.iter()
-                    .map(|&s| (s * mic_volume).clamp(-1.0, 1.0)).collect();
+                let mix = mix_samples(
+                    &mic_processed,
+                    &loop_processed,
+                    mic_volume,
+                    loopback_volume,
+                    target_channels,
+                );
+                let mic_only: Vec<f32> = mic_processed
+                    .iter()
+                    .map(|&s| (s * mic_volume).clamp(-1.0, 1.0))
+                    .collect();
                 if !mic_only.is_empty() {
                     if let Some(ref mut sw) = config.secondary_writer {
                         if let Err(e) = sw.write_samples(&mic_only) {
@@ -424,9 +479,17 @@ fn mixer_loop(mut config: MixerConfig, running: Arc<AtomicBool>) {
                 mix
             }
             OutputMode::MixPlusLoopback => {
-                let mix = mix_samples(&mic_processed, &loop_processed, mic_volume, loopback_volume, target_channels);
-                let loop_only: Vec<f32> = loop_processed.iter()
-                    .map(|&s| (s * loopback_volume).clamp(-1.0, 1.0)).collect();
+                let mix = mix_samples(
+                    &mic_processed,
+                    &loop_processed,
+                    mic_volume,
+                    loopback_volume,
+                    target_channels,
+                );
+                let loop_only: Vec<f32> = loop_processed
+                    .iter()
+                    .map(|&s| (s * loopback_volume).clamp(-1.0, 1.0))
+                    .collect();
                 if !loop_only.is_empty() {
                     if let Some(ref mut sw) = config.secondary_writer {
                         if let Err(e) = sw.write_samples(&loop_only) {
@@ -438,7 +501,8 @@ fn mixer_loop(mut config: MixerConfig, running: Arc<AtomicBool>) {
             }
             OutputMode::SeparateFiles => {
                 // Write loopback to secondary writer
-                let loop_only: Vec<f32> = loop_processed.iter()
+                let loop_only: Vec<f32> = loop_processed
+                    .iter()
                     .map(|&s| (s * loopback_volume).clamp(-1.0, 1.0))
                     .collect();
                 if !loop_only.is_empty() {
@@ -449,7 +513,8 @@ fn mixer_loop(mut config: MixerConfig, running: Arc<AtomicBool>) {
                     }
                 }
                 // Return mic samples for primary writer
-                mic_processed.iter()
+                mic_processed
+                    .iter()
                     .map(|&s| (s * mic_volume).clamp(-1.0, 1.0))
                     .collect()
             }

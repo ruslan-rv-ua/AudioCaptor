@@ -58,16 +58,20 @@ mod tests {
     fn temp_wav_path() -> PathBuf {
         let dir = std::env::temp_dir().join("audiocaptor_tests");
         std::fs::create_dir_all(&dir).unwrap();
-        dir.join(format!("test_{}.wav", std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()))
+        dir.join(format!(
+            "test_{}.wav",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ))
     }
 
     #[test]
     fn write_and_finalize_creates_valid_wav() {
         let path = temp_wav_path();
-        let mut writer: Box<dyn OutputWriter> = Box::new(
-            WavOutputWriter::new(path.clone(), 44100, 1).unwrap()
-        );
+        let mut writer: Box<dyn OutputWriter> =
+            Box::new(WavOutputWriter::new(path.clone(), 44100, 1).unwrap());
 
         // Write 1 second of silence
         let samples = vec![0.0f32; 44100];
@@ -87,9 +91,8 @@ mod tests {
     #[test]
     fn write_samples_clips_to_range() {
         let path = temp_wav_path();
-        let mut writer: Box<dyn OutputWriter> = Box::new(
-            WavOutputWriter::new(path.clone(), 44100, 1).unwrap()
-        );
+        let mut writer: Box<dyn OutputWriter> =
+            Box::new(WavOutputWriter::new(path.clone(), 44100, 1).unwrap());
 
         // Values beyond [-1, 1] should be clamped
         let samples = vec![2.0, -2.0, 0.5, -0.5];

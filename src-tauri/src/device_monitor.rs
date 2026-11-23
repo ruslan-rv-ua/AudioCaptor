@@ -1,9 +1,9 @@
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use tauri::{AppHandle, Emitter, Manager};
 use windows::core::*;
-use windows::Win32::Media::Audio::*;
 use windows::Win32::Foundation::PROPERTYKEY;
+use windows::Win32::Media::Audio::*;
 use windows::Win32::System::Com::*;
 
 #[windows::core::implement(IMMNotificationClient)]
@@ -12,7 +12,11 @@ struct DeviceNotificationClient {
 }
 
 impl IMMNotificationClient_Impl for DeviceNotificationClient_Impl {
-    fn OnDeviceStateChanged(&self, _device_id: &PCWSTR, _new_state: DEVICE_STATE) -> windows_core::Result<()> {
+    fn OnDeviceStateChanged(
+        &self,
+        _device_id: &PCWSTR,
+        _new_state: DEVICE_STATE,
+    ) -> windows_core::Result<()> {
         let _ = self.app.emit("audio-devices-changed", ());
         Ok(())
     }
@@ -37,7 +41,10 @@ impl IMMNotificationClient_Impl for DeviceNotificationClient_Impl {
                 let is_active = s.recording_mic_id.as_deref() == Some(&id_str)
                     || s.recording_loopback_id.as_deref() == Some(&id_str);
                 if is_active && s.recording_state != crate::audio::types::RecordingState::Idle {
-                    let _ = self.app.emit("recording-error", "DEVICE_LOST: Active audio device was disconnected");
+                    let _ = self.app.emit(
+                        "recording-error",
+                        "DEVICE_LOST: Active audio device was disconnected",
+                    );
                     // Stop recording from a separate thread to avoid deadlock
                     let app = self.app.clone();
                     std::thread::spawn(move || {
@@ -50,12 +57,19 @@ impl IMMNotificationClient_Impl for DeviceNotificationClient_Impl {
     }
 
     fn OnDefaultDeviceChanged(
-        &self, _flow: EDataFlow, _role: ERole, _default_device_id: &PCWSTR,
+        &self,
+        _flow: EDataFlow,
+        _role: ERole,
+        _default_device_id: &PCWSTR,
     ) -> windows_core::Result<()> {
         Ok(())
     }
 
-    fn OnPropertyValueChanged(&self, _device_id: &PCWSTR, _key: &PROPERTYKEY) -> windows_core::Result<()> {
+    fn OnPropertyValueChanged(
+        &self,
+        _device_id: &PCWSTR,
+        _key: &PROPERTYKEY,
+    ) -> windows_core::Result<()> {
         Ok(())
     }
 }
@@ -86,39 +100,36 @@ pub fn start_device_monitor(app: AppHandle) -> anyhow::Result<DeviceMonitorHandl
 
     let thread = std::thread::Builder::new()
         .name("device-monitor".into())
-        .spawn(move || {
-            unsafe {
-                let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
+        .spawn(move || unsafe {
+            let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
 
-                let enumerator: IMMDeviceEnumerator =
-                    match CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL) {
-                        Ok(e) => e,
-                        Err(e) => {
-                            log::error!("Failed to create device enumerator: {e}");
-                            CoUninitialize();
-                            return;
-                        }
-                    };
+            let enumerator: IMMDeviceEnumerator =
+                match CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL) {
+                    Ok(e) => e,
+                    Err(e) => {
+                        log::error!("Failed to create device enumerator: {e}");
+                        CoUninitialize();
+                        return;
+                    }
+                };
 
-                let client: IMMNotificationClient =
-                    DeviceNotificationClient { app }.into();
+            let client: IMMNotificationClient = DeviceNotificationClient { app }.into();
 
-                if let Err(e) = enumerator.RegisterEndpointNotificationCallback(&client) {
-                    log::error!("Failed to register notification callback: {e}");
-                    CoUninitialize();
-                    return;
-                }
-
-                log::info!("Device monitor started");
-
-                while running_clone.load(Ordering::Relaxed) {
-                    std::thread::sleep(std::time::Duration::from_millis(500));
-                }
-
-                let _ = enumerator.UnregisterEndpointNotificationCallback(&client);
+            if let Err(e) = enumerator.RegisterEndpointNotificationCallback(&client) {
+                log::error!("Failed to register notification callback: {e}");
                 CoUninitialize();
-                log::info!("Device monitor stopped");
+                return;
             }
+
+            log::info!("Device monitor started");
+
+            while running_clone.load(Ordering::Relaxed) {
+                std::thread::sleep(std::time::Duration::from_millis(500));
+            }
+
+            let _ = enumerator.UnregisterEndpointNotificationCallback(&client);
+            CoUninitialize();
+            log::info!("Device monitor stopped");
         })?;
 
     Ok(DeviceMonitorHandle {

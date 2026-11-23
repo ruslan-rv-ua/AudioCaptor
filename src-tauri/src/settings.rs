@@ -13,12 +13,12 @@ pub struct Settings {
     pub sound_enabled: bool,
     pub profiles: Vec<RecordingProfile>,
     pub active_profile_id: String,
-    pub language: String,                        // NEW in v3
-    pub confirm_exit_during_recording: bool,     // NEW in v3
+    pub language: String,                    // NEW in v3
+    pub confirm_exit_during_recording: bool, // NEW in v3
     #[serde(default = "default_theme")]
-    pub theme: String,              // NEW in v4 — "auto" | "light" | "dark"
+    pub theme: String, // NEW in v4 — "auto" | "light" | "dark"
     #[serde(default)]
-    pub minimize_to_tray_on_focus_loss: bool,  // NEW in v5
+    pub minimize_to_tray_on_focus_loss: bool, // NEW in v5
     // Legacy fields — used only during migration from v1
     #[serde(default, skip_serializing)]
     mic_volume: f32,

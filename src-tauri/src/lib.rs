@@ -13,8 +13,8 @@ use audio::mixer::{self, MixerConfig};
 use audio::types::{AudioCommand, AudioDevice, OutputMode, RecordingState};
 use audio::writer::WavOutputWriter;
 use state::SharedState;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use tauri::{Emitter, Manager};
 
 #[tauri::command]
@@ -23,7 +23,10 @@ fn load_settings() -> settings::Settings {
 }
 
 #[tauri::command]
-fn save_settings(state: tauri::State<'_, SharedState>, settings: settings::Settings) -> Result<(), String> {
+fn save_settings(
+    state: tauri::State<'_, SharedState>,
+    settings: settings::Settings,
+) -> Result<(), String> {
     if let Ok(mut s) = state.lock() {
         s.language = settings.language.clone();
     }
@@ -84,7 +87,9 @@ fn start_recording_inner(
 
     // Get active profile for output path and filenames
     let settings = settings::read_settings();
-    let profile = settings.profiles.iter()
+    let profile = settings
+        .profiles
+        .iter()
         .find(|p| p.id == settings.active_profile_id)
         .cloned()
         .unwrap_or_default();
@@ -102,8 +107,7 @@ fn start_recording_inner(
     // Start capture threads as needed
     let (mic_handle, mic_consumer) = if let Some(ref id) = mic_id {
         if mode.needs_mic() {
-            let (handle, consumer) =
-                capture::start_mic_capture(id).map_err(|e| e.to_string())?;
+            let (handle, consumer) = capture::start_mic_capture(id).map_err(|e| e.to_string())?;
             (Some(handle), Some(consumer))
         } else {
             (None, None)
@@ -128,38 +132,72 @@ fn start_recording_inner(
     let channels = 2u16;
 
     // Create WAV writer(s) based on mode
-    let (writer, secondary_writer): (Box<dyn audio::writer::OutputWriter>, Option<Box<dyn audio::writer::OutputWriter>>) = match mode {
+    let (writer, secondary_writer): (
+        Box<dyn audio::writer::OutputWriter>,
+        Option<Box<dyn audio::writer::OutputWriter>>,
+    ) = match mode {
         OutputMode::MixPlusMicrophone => {
             let mix_path = output_dir.join(format!("{}_{}.wav", profile.mix_filename, timestamp));
             let mic_path = output_dir.join(format!("{}_{}.wav", profile.mic_filename, timestamp));
-            let w1 = Box::new(WavOutputWriter::new(mix_path, sample_rate, channels).map_err(|e| e.to_string())?);
-            let w2 = Box::new(WavOutputWriter::new(mic_path, sample_rate, channels).map_err(|e| e.to_string())?);
+            let w1 = Box::new(
+                WavOutputWriter::new(mix_path, sample_rate, channels).map_err(|e| e.to_string())?,
+            );
+            let w2 = Box::new(
+                WavOutputWriter::new(mic_path, sample_rate, channels).map_err(|e| e.to_string())?,
+            );
             (w1, Some(w2))
         }
         OutputMode::MixPlusLoopback => {
             let mix_path = output_dir.join(format!("{}_{}.wav", profile.mix_filename, timestamp));
-            let loop_path = output_dir.join(format!("{}_{}.wav", profile.loopback_filename, timestamp));
-            let w1 = Box::new(WavOutputWriter::new(mix_path, sample_rate, channels).map_err(|e| e.to_string())?);
-            let w2 = Box::new(WavOutputWriter::new(loop_path, sample_rate, channels).map_err(|e| e.to_string())?);
+            let loop_path =
+                output_dir.join(format!("{}_{}.wav", profile.loopback_filename, timestamp));
+            let w1 = Box::new(
+                WavOutputWriter::new(mix_path, sample_rate, channels).map_err(|e| e.to_string())?,
+            );
+            let w2 = Box::new(
+                WavOutputWriter::new(loop_path, sample_rate, channels)
+                    .map_err(|e| e.to_string())?,
+            );
             (w1, Some(w2))
         }
         OutputMode::Microphone => {
             let path = output_dir.join(format!("{}_{}.wav", profile.mic_filename, timestamp));
-            (Box::new(WavOutputWriter::new(path, sample_rate, channels).map_err(|e| e.to_string())?), None)
+            (
+                Box::new(
+                    WavOutputWriter::new(path, sample_rate, channels).map_err(|e| e.to_string())?,
+                ),
+                None,
+            )
         }
         OutputMode::Loopback => {
             let path = output_dir.join(format!("{}_{}.wav", profile.loopback_filename, timestamp));
-            (Box::new(WavOutputWriter::new(path, sample_rate, channels).map_err(|e| e.to_string())?), None)
+            (
+                Box::new(
+                    WavOutputWriter::new(path, sample_rate, channels).map_err(|e| e.to_string())?,
+                ),
+                None,
+            )
         }
         OutputMode::Mix => {
             let path = output_dir.join(format!("{}_{}.wav", profile.mix_filename, timestamp));
-            (Box::new(WavOutputWriter::new(path, sample_rate, channels).map_err(|e| e.to_string())?), None)
+            (
+                Box::new(
+                    WavOutputWriter::new(path, sample_rate, channels).map_err(|e| e.to_string())?,
+                ),
+                None,
+            )
         }
         OutputMode::SeparateFiles => {
             let mic_path = output_dir.join(format!("{}_{}.wav", profile.mic_filename, timestamp));
-            let loop_path = output_dir.join(format!("{}_{}.wav", profile.loopback_filename, timestamp));
-            let w1 = Box::new(WavOutputWriter::new(mic_path, sample_rate, channels).map_err(|e| e.to_string())?);
-            let w2 = Box::new(WavOutputWriter::new(loop_path, sample_rate, channels).map_err(|e| e.to_string())?);
+            let loop_path =
+                output_dir.join(format!("{}_{}.wav", profile.loopback_filename, timestamp));
+            let w1 = Box::new(
+                WavOutputWriter::new(mic_path, sample_rate, channels).map_err(|e| e.to_string())?,
+            );
+            let w2 = Box::new(
+                WavOutputWriter::new(loop_path, sample_rate, channels)
+                    .map_err(|e| e.to_string())?,
+            );
             (w1, Some(w2))
         }
     };
@@ -168,7 +206,10 @@ fn start_recording_inner(
     let (tx, rx) = crossbeam_channel::bounded::<AudioCommand>(32);
 
     // Determine sample rates from capture handles
-    let mic_sr = mic_handle.as_ref().map(|h| h.sample_rate).unwrap_or(sample_rate);
+    let mic_sr = mic_handle
+        .as_ref()
+        .map(|h| h.sample_rate)
+        .unwrap_or(sample_rate);
     let loop_sr = loopback_handle
         .as_ref()
         .map(|h| h.sample_rate)
@@ -237,7 +278,10 @@ fn start_recording_inner(
 }
 
 #[tauri::command]
-fn pause_recording(state: tauri::State<'_, SharedState>, app: tauri::AppHandle) -> Result<(), String> {
+fn pause_recording(
+    state: tauri::State<'_, SharedState>,
+    app: tauri::AppHandle,
+) -> Result<(), String> {
     pause_recording_inner(&state)?;
     tray::update_tray_recording_state(&app, &state, RecordingState::Paused);
     Ok(())
@@ -259,7 +303,10 @@ fn pause_recording_inner(state: &SharedState) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn resume_recording(state: tauri::State<'_, SharedState>, app: tauri::AppHandle) -> Result<(), String> {
+fn resume_recording(
+    state: tauri::State<'_, SharedState>,
+    app: tauri::AppHandle,
+) -> Result<(), String> {
     resume_recording_inner(&state)?;
     tray::update_tray_recording_state(&app, &state, RecordingState::Recording);
     Ok(())
@@ -287,12 +334,18 @@ fn resume_recording_inner(state: &SharedState) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn stop_recording(state: tauri::State<'_, SharedState>, app: tauri::AppHandle) -> Result<(), String> {
+fn stop_recording(
+    state: tauri::State<'_, SharedState>,
+    app: tauri::AppHandle,
+) -> Result<(), String> {
     stop_recording_inner(&state)?;
-    let _ = app.emit("recording-state-changed", serde_json::json!({
-        "state": "Idle",
-        "durationMs": 0,
-    }));
+    let _ = app.emit(
+        "recording-state-changed",
+        serde_json::json!({
+            "state": "Idle",
+            "durationMs": 0,
+        }),
+    );
     tray::update_tray_recording_state(&app, &state, RecordingState::Idle);
     Ok(())
 }
@@ -394,10 +447,13 @@ pub fn do_resume_recording(app: &tauri::AppHandle) -> Result<(), String> {
 pub fn do_stop_recording(app: &tauri::AppHandle) -> Result<(), String> {
     let state = app.state::<SharedState>();
     stop_recording_inner(&state)?;
-    let _ = app.emit("recording-state-changed", serde_json::json!({
-        "state": "Idle",
-        "durationMs": 0,
-    }));
+    let _ = app.emit(
+        "recording-state-changed",
+        serde_json::json!({
+            "state": "Idle",
+            "durationMs": 0,
+        }),
+    );
     tray::update_tray_recording_state(app, &state, RecordingState::Idle);
     Ok(())
 }
@@ -495,7 +551,9 @@ fn cmd_select_profile(state: tauri::State<'_, SharedState>, id: String) -> Resul
 #[tauri::command]
 fn cmd_get_active_profile() -> Result<profiles::RecordingProfile, String> {
     let settings = settings::read_settings();
-    settings.profiles.iter()
+    settings
+        .profiles
+        .iter()
         .find(|p| p.id == settings.active_profile_id)
         .cloned()
         .ok_or_else(|| "Active profile not found".into())
@@ -588,7 +646,11 @@ pub fn run() {
                     Err(e) => log::warn!("Sound engine init failed: {e}"),
                 }
                 s.sounds_enabled = settings.sound_enabled;
-                if let Some(profile) = settings.profiles.iter().find(|p| p.id == settings.active_profile_id) {
+                if let Some(profile) = settings
+                    .profiles
+                    .iter()
+                    .find(|p| p.id == settings.active_profile_id)
+                {
                     s.mic_volume = profile.mic_volume;
                     s.loopback_volume = profile.loopback_volume;
                 }

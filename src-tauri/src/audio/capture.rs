@@ -61,8 +61,7 @@ fn start_capture(
     device_id: String,
     loopback: bool,
 ) -> anyhow::Result<(CaptureHandle, ringbuf::HeapCons<f32>)> {
-    let (sample_rate, channels, bits_per_sample, block_align) =
-        probe_format(&device_id, loopback)?;
+    let (sample_rate, channels, bits_per_sample, block_align) = probe_format(&device_id, loopback)?;
 
     log::info!(
         "Capture format: {}Hz, {}ch, {}bit, loopback={}",

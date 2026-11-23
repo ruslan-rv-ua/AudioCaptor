@@ -25,7 +25,11 @@ pub fn setup_tray(app: &AppHandle, language: &str) -> tauri::Result<()> {
     let show_hide = MenuItem::with_id(
         app,
         "show-hide",
-        if uk { "Показати / Сховати вікно" } else { "Show / Hide Window" },
+        if uk {
+            "Показати / Сховати вікно"
+        } else {
+            "Show / Hide Window"
+        },
         true,
         None::<&str>,
     )?;
@@ -50,11 +54,19 @@ pub fn setup_tray(app: &AppHandle, language: &str) -> tauri::Result<()> {
     let open_folder = MenuItem::with_id(
         app,
         "open-recordings",
-        if uk { "Відкрити папку записів" } else { "Open Recordings Folder" },
+        if uk {
+            "Відкрити папку записів"
+        } else {
+            "Open Recordings Folder"
+        },
         true,
         None::<&str>,
     )?;
-    let about_label = if uk { "Про програму" } else { "About" };
+    let about_label = if uk {
+        "Про програму"
+    } else {
+        "About"
+    };
     let about_item = MenuItem::with_id(app, "about", about_label, true, None::<&str>)?;
     let quit_label = if uk { "Вийти" } else { "Quit" };
     let quit_item = MenuItem::with_id(app, "quit", quit_label, true, None::<&str>)?;
@@ -110,7 +122,10 @@ pub fn setup_tray(app: &AppHandle, language: &str) -> tauri::Result<()> {
     // Store refs for dynamic updates. Must be called after build() so the
     // tray icon exists. app.manage() panics if called twice for the same type,
     // but setup_tray() is only called once during app setup.
-    app.manage(Mutex::new(TrayMenuRefs { toggle_item, stop_item }));
+    app.manage(Mutex::new(TrayMenuRefs {
+        toggle_item,
+        stop_item,
+    }));
 
     Ok(())
 }
@@ -166,10 +181,7 @@ fn handle_menu_event(app: &AppHandle, id: &str) {
                 Ok(base) => {
                     let dir = base.join(&profile.output_folder);
                     let _ = std::fs::create_dir_all(&dir);
-                    if let Err(e) = std::process::Command::new("explorer.exe")
-                        .arg(&dir)
-                        .spawn()
-                    {
+                    if let Err(e) = std::process::Command::new("explorer.exe").arg(&dir).spawn() {
                         log::error!("Failed to open recordings folder in Explorer: {e}");
                     }
                 }
@@ -210,30 +222,37 @@ fn handle_menu_event(app: &AppHandle, id: &str) {
 ///
 /// Silently does nothing if `TrayMenuRefs` is not yet registered or if
 /// the mutex is poisoned.
-pub fn update_tray_recording_state(app: &AppHandle, shared: &crate::state::SharedState, rec_state: RecordingState) {
+pub fn update_tray_recording_state(
+    app: &AppHandle,
+    shared: &crate::state::SharedState,
+    rec_state: RecordingState,
+) {
     let Some(refs) = app.try_state::<Mutex<TrayMenuRefs>>() else {
         return;
     };
     let Ok(refs) = refs.lock() else {
         return;
     };
-    let uk = shared
-        .lock()
-        .map(|s| s.language == "uk")
-        .unwrap_or(false);
+    let uk = shared.lock().map(|s| s.language == "uk").unwrap_or(false);
     match rec_state {
         RecordingState::Idle => {
-            let _ = refs.toggle_item.set_text(if uk { "Старт" } else { "Start" });
+            let _ = refs
+                .toggle_item
+                .set_text(if uk { "Старт" } else { "Start" });
             let _ = refs.toggle_item.set_enabled(true);
             let _ = refs.stop_item.set_enabled(false);
         }
         RecordingState::Recording => {
-            let _ = refs.toggle_item.set_text(if uk { "Пауза" } else { "Pause" });
+            let _ = refs
+                .toggle_item
+                .set_text(if uk { "Пауза" } else { "Pause" });
             let _ = refs.toggle_item.set_enabled(true);
             let _ = refs.stop_item.set_enabled(true);
         }
         RecordingState::Paused => {
-            let _ = refs.toggle_item.set_text(if uk { "Продовжити" } else { "Resume" });
+            let _ = refs
+                .toggle_item
+                .set_text(if uk { "Продовжити" } else { "Resume" });
             let _ = refs.toggle_item.set_enabled(true);
             let _ = refs.stop_item.set_enabled(true);
         }

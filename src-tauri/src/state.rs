@@ -2,8 +2,8 @@ use crate::audio::capture::CaptureHandle;
 use crate::audio::mixer::MixerHandle;
 use crate::audio::types::{AudioCommand, OutputMode, RecordingState};
 use crossbeam_channel::Sender;
-use std::sync::{Arc, Mutex};
 use std::sync::atomic::AtomicBool;
+use std::sync::{Arc, Mutex};
 
 pub struct AppState {
     pub recording_state: RecordingState,

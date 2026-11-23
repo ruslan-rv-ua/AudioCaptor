@@ -21,7 +21,7 @@ fn detect_language() -> &'static str {
     use windows::Win32::Globalization::GetUserDefaultLocaleName;
 
     let mut buf = [0u16; 85]; // LOCALE_NAME_MAX_LENGTH = 85
-    // SAFETY: buf is valid and its full length is passed as the slice.
+                              // SAFETY: buf is valid and its full length is passed as the slice.
     let len = unsafe { GetUserDefaultLocaleName(&mut buf) };
     if len > 1 {
         // len includes the null terminator
@@ -60,7 +60,10 @@ pub fn ensure_dirs() -> anyhow::Result<()> {
         defaults.language = detect_language().to_string();
         let json = serde_json::to_string_pretty(&defaults)?;
         fs::write(&settings_path, json)?;
-        log::info!("Created default settings.json with language={}", defaults.language);
+        log::info!(
+            "Created default settings.json with language={}",
+            defaults.language
+        );
     }
 
     Ok(())

@@ -40,7 +40,7 @@
       that NVDA reads during the run do end up in it: turn on "Do not disturb" to keep them out.
     - Only the part of nvda.log written during the run is read.
 
-    Do not touch the keyboard or mouse while the test runs (about two minutes).
+    Do not touch the keyboard or mouse while the test runs (one to two minutes).
 
 .PARAMETER Scenario
     One or more of launch, record, dialogs, tray. All of them when omitted.
@@ -1056,6 +1056,7 @@ function Initialize-TestFolder {
         try { Remove-Item -LiteralPath $Root -Recurse -Force } catch { Start-Sleep -Milliseconds 500 }
     }
     if (Test-Path -LiteralPath $Root) { Stop-Run "Cannot clear $Root, left by an earlier run: a program still uses it. Close it and run the test again." }
+    Remove-Item -LiteralPath $AppLogCopy -Force -ErrorAction SilentlyContinue  # the log of an earlier run
     $script:FolderReady = $true
     $null = New-Item -ItemType Directory -Force -Path $DataDir, $WebviewDir
     Copy-Item -LiteralPath $Exe -Destination $TestExe
@@ -1067,6 +1068,7 @@ $userBefore = $null
 $userAfter = $null
 $script:RunClock = $null
 $script:FolderReady = $false
+$script:AppLogCopied = $false
 $script:PlaybackDeviceId = $null
 try {
     if (-not (Test-Path -LiteralPath $Exe)) { Stop-Run "AudioCaptor.exe not found: $Exe. Build it first: just build" }
@@ -1082,7 +1084,7 @@ try {
     try { $script:PlaybackDeviceId = [AcSmokeNative]::DefaultPlaybackDeviceId() } catch { }
 
     Write-Host "AudioCaptor NVDA smoke test: $($Selected -join ', ')."
-    Write-Host 'It takes about two minutes. Do not touch the keyboard or mouse until the report appears.'
+    Write-Host 'It takes one to two minutes. Do not touch the keyboard or mouse until the report appears.'
     if (Get-Process $AppTitle -ErrorAction SilentlyContinue) { Write-Host 'Your running AudioCaptor will be closed and not started again.' }
     Start-Sleep -Seconds 5
 
@@ -1114,7 +1116,10 @@ try {
     Stop-HomeWindow
     if ($script:FolderReady) {
         $appLog = Join-Path $DataDir 'logs\audiocaptor.log'
-        if (Test-Path -LiteralPath $appLog) { Copy-Item -LiteralPath $appLog -Destination $AppLogCopy -Force }
+        if (Test-Path -LiteralPath $appLog) {
+            Copy-Item -LiteralPath $appLog -Destination $AppLogCopy -Force
+            $script:AppLogCopied = $true
+        }
         for ($i = 0; $i -lt 20 -and (Test-Path -LiteralPath $Root); $i++) {
             try { Remove-Item -LiteralPath $Root -Recurse -Force } catch { Start-Sleep -Milliseconds 500 }
         }
@@ -1200,7 +1205,7 @@ if ($failures.Count) {
     foreach ($f in $failures) { $lines.Add("  $f") }
 }
 if ($NvdaErrors.Count) { $lines.Add("Errors in the NVDA log during the run: $($NvdaErrors.Count). First: $($NvdaErrors[0])") }
-if (Test-Path -LiteralPath $AppLogCopy) { $lines.Add("Log of the test copy: $AppLogCopy") }
+if ($script:AppLogCopied) { $lines.Add("Log of the test copy: $AppLogCopy") }
 
 [IO.File]::WriteAllLines($ReportPath, $lines, (New-Object Text.UTF8Encoding $true))
 Write-Host ''

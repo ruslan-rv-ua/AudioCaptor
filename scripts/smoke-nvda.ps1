@@ -26,16 +26,18 @@
     What it protects:
     - Your data. The test runs a copy of the exe from %TEMP%\audiocaptor-smoke with its own
       AudioCaptor-data (English interface, two test profiles). WebView2 keeps the browser data of
-      the copy there too: WEBVIEW2_USER_DATA_FOLDER is set for the test copy only. The folder
-      where every other copy keeps its browser data, %LOCALAPPDATA%\com.audiocaptor.app, must stay
-      as it was; there the test reads only the number of files and folders and the time of the
-      newest change. The test folder is deleted at the end; the copy's own log is kept as
-      %TEMP%\audiocaptor-smoke-app.log.
+      the copy there too: WEBVIEW2_USER_DATA_FOLDER is set for the test copy only. The browser
+      data of every other copy, %LOCALAPPDATA%\com.audiocaptor.app\EBWebView, must stay as it was;
+      anything else that changes in %LOCALAPPDATA%\com.audiocaptor.app was written by the app
+      itself and is reported as a note. There the test reads only the names of the top entries,
+      the number of files and folders in each and the time of the newest change. The test folder
+      is deleted at the end; the copy's own log is kept as %TEMP%\audiocaptor-smoke-app.log.
     - Your AudioCaptor. The app allows one copy and holds the Pause key, so a running AudioCaptor
       is asked to quit, as its close button does, and is not started again. If it does not quit
       (for example, it is recording and asks to confirm), the test stops and leaves it alone.
     - Your other programs. While the test copy is hidden or closed, focus stays in a small window
-      of this script, so NVDA does not read your other programs into the report.
+      of this script, so NVDA does not read your other programs into the report. Notifications
+      that NVDA reads during the run do end up in it: turn on "Do not disturb" to keep them out.
     - Only the part of nvda.log written during the run is read.
 
     Do not touch the keyboard or mouse while the test runs (about two minutes).
@@ -97,8 +99,11 @@ $TestExe = Join-Path $Root 'AudioCaptor.exe'
 $DataDir = Join-Path $Root 'AudioCaptor-data'
 $SettingsFile = Join-Path $DataDir 'settings.json'
 $WebviewDir = Join-Path $Root 'webview'
-# Every copy of AudioCaptor keeps its browser data here (Tauri's app_local_data_dir).
-$UserWebviewDir = Join-Path $env:LOCALAPPDATA 'com.audiocaptor.app'
+# Every other copy of AudioCaptor keeps its browser data in EBWebView here (Tauri's
+# app_local_data_dir); the test copy must not touch it. Anything else the app writes here is
+# reported as a note: the test cannot redirect it.
+$UserAppDir = Join-Path $env:LOCALAPPDATA 'com.audiocaptor.app'
+$BrowserEntry = 'EBWebView'
 $WebviewVar = 'WEBVIEW2_USER_DATA_FOLDER'
 
 # English interface strings from messages/en.json (keys in the comments). The test copy runs
@@ -988,17 +993,30 @@ function Get-FolderState([string]$Path) {
     return [pscustomobject]@{ Key = "$($items.Count)|$newest"; Text = ('{0} files and folders, newest change {1:yyyy-MM-dd HH:mm:ss}' -f $items.Count, $when) }
 }
 
+# The state of every entry directly in the folder: name -> state (see Get-FolderState).
+function Get-EntryStates([string]$Path) {
+    $states = @{}
+    if (Test-Path -LiteralPath $Path) {
+        foreach ($e in @(Get-ChildItem -LiteralPath $Path -Force)) { $states[$e.Name] = Get-FolderState $e.FullName }
+    }
+    return $states
+}
+
+function Get-StatesKey($States) {
+    return (($States.Keys | Sort-Object | ForEach-Object { "$_=$($States[$_].Key)" }) -join ';')
+}
+
 # A copy that has just quit may still be writing for a moment: read until two reads half a second
 # apart agree.
-function Get-SettledFolderState([string]$Path) {
-    $state = Get-FolderState $Path
+function Get-SettledEntryStates([string]$Path) {
+    $states = Get-EntryStates $Path
     for ($i = 0; $i -lt 10; $i++) {
         Start-Sleep -Milliseconds 500
-        $again = Get-FolderState $Path
-        if ($again.Key -eq $state.Key) { break }
-        $state = $again
+        $again = Get-EntryStates $Path
+        if ((Get-StatesKey $again) -eq (Get-StatesKey $states)) { break }
+        $states = $again
     }
-    return $state
+    return $states
 }
 
 # Asks every running AudioCaptor to quit, as its close button does. Test copies left by an earlier
@@ -1045,8 +1063,9 @@ function Initialize-TestFolder {
 
 # --- Run ---------------------------------------------------------------------------------------
 $exeTime = $null
-$userWebviewBefore = $null
-$userWebviewAfter = $null
+$userBefore = $null
+$userAfter = $null
+$script:RunClock = $null
 $script:FolderReady = $false
 $script:PlaybackDeviceId = $null
 try {
@@ -1067,6 +1086,7 @@ try {
     if (Get-Process $AppTitle -ErrorAction SilentlyContinue) { Write-Host 'Your running AudioCaptor will be closed and not started again.' }
     Start-Sleep -Seconds 5
 
+    $script:RunClock = [Diagnostics.Stopwatch]::StartNew()
     $script:LogStart = Get-LogLength
     try { Start-HomeWindow } catch { Stop-Run "The test could not open its own window: $($_.Exception.Message)" }
     switch (Test-NvdaLogging) {
@@ -1082,7 +1102,7 @@ try {
     }
     Close-UserAudioCaptor
     Initialize-TestFolder
-    $userWebviewBefore = Get-SettledFolderState $UserWebviewDir
+    $userBefore = Get-SettledEntryStates $UserAppDir
     foreach ($name in $Selected) { Invoke-Scenario $name }
 } catch {
     if (-not $script:StopReason) {
@@ -1090,7 +1110,7 @@ try {
     }
 } finally {
     Stop-App
-    if ($userWebviewBefore) { $userWebviewAfter = Get-SettledFolderState $UserWebviewDir }
+    if ($null -ne $userBefore) { $userAfter = Get-SettledEntryStates $UserAppDir }
     Stop-HomeWindow
     if ($script:FolderReady) {
         $appLog = Join-Path $DataDir 'logs\audiocaptor.log'
@@ -1108,13 +1128,28 @@ $lines.Add(('AudioCaptor NVDA smoke test, {0:yyyy-MM-dd HH:mm}' -f (Get-Date)))
 $lines.Add("Scenarios: $($Selected -join ', ')")
 if ($exeTime) { $lines.Add(('Exe: {0}, built {1:yyyy-MM-dd HH:mm}' -f $Exe, $exeTime)) } else { $lines.Add("Exe: $Exe") }
 if ($script:LogPath) { $lines.Add(('NVDA log: {0}, read from byte {1} on (only what NVDA wrote during this run)' -f $script:LogPath, $script:LogStart)) }
-$userDataChanged = $false
-if ($userWebviewBefore -and $userWebviewAfter) {
-    if ($userWebviewAfter.Key -eq $userWebviewBefore.Key) {
-        $lines.Add("Browser data of your AudioCaptor ($UserWebviewDir): unchanged ($($userWebviewAfter.Text)).")
-    } else {
-        $userDataChanged = $true
-        $lines.Add("FAILED: the test changed the browser data of your AudioCaptor ($UserWebviewDir): before $($userWebviewBefore.Text); after $($userWebviewAfter.Text).")
+$browserChanged = $false
+if ($null -ne $userBefore -and $null -ne $userAfter) {
+    $names = @(@($userBefore.Keys) + @($userAfter.Keys) | Sort-Object -Unique)
+    if ($names -notcontains $BrowserEntry) {
+        $lines.Add("Browser data of your AudioCaptor ($(Join-Path $UserAppDir $BrowserEntry)): none, before or after the run.")
+    }
+    foreach ($n in $names) {
+        $b = $userBefore[$n]
+        $a = $userAfter[$n]
+        $bText = if ($b) { $b.Text } else { 'did not exist' }
+        $aText = if ($a) { $a.Text } else { 'does not exist' }
+        $same = ($b -and $a -and $b.Key -eq $a.Key)
+        $path = Join-Path $UserAppDir $n
+        if ($n -eq $BrowserEntry) {
+            if ($same) { $lines.Add("Browser data of your AudioCaptor ($path): unchanged ($aText).") }
+            else {
+                $browserChanged = $true
+                $lines.Add("FAILED: the test copy changed the browser data of your AudioCaptor ($path): before $bText; after $aText.")
+            }
+        } elseif (-not $same) {
+            $lines.Add("Note: AudioCaptor itself wrote to $path, outside its AudioCaptor-data folder; the test cannot prevent that. Before: $bText; after: $aText.")
+        }
     }
 }
 foreach ($n in $Notes) { $lines.Add("Note: $n") }
@@ -1156,9 +1191,10 @@ foreach ($r in $Results) {
 }
 
 $lines.Add('')
-$passed = -not $script:StopReason -and $stepsFailed -eq 0 -and -not $userDataChanged
+$passed = -not $script:StopReason -and $stepsFailed -eq 0 -and -not $browserChanged
 $verdict = if ($script:StopReason) { 'STOPPED' } elseif ($passed) { 'PASSED' } else { 'FAILED' }
 $lines.Add(('Result: {0}. Steps: {1} OK, {2} failed, {3} skipped. NVDA checks: {4} of {5} OK.' -f $verdict, $stepsOk, $stepsFailed, $stepsSkipped, $checksOk, $checksAll))
+if ($script:RunClock) { $lines.Add(('The keyboard was busy for {0:0} s.' -f $script:RunClock.Elapsed.TotalSeconds)) }
 if ($failures.Count) {
     $lines.Add('Failed steps:')
     foreach ($f in $failures) { $lines.Add("  $f") }

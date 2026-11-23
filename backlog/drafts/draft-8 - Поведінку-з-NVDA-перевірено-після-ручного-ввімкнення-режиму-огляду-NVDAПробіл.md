@@ -6,11 +6,13 @@ title: >-
 status: Draft
 assignee: []
 created_date: '2026-11-23T22:05:12Z'
+updated_date: '2026-11-23T22:06:16Z'
 labels:
   - frontend
   - a11y
   - model-sonnet
   - effort-medium
+milestone: m-3
 dependencies: []
 references:
   - doc-3

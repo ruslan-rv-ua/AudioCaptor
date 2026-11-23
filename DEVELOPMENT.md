@@ -211,7 +211,7 @@ Accessibility (a11y) is a **highest-priority requirement**:
 
 | Workflow | Trigger | Description |
 |----------|---------|-------------|
-| **CI** (`ci.yml`) | push / PR → `develop` | Frontend checks (`pnpm check`) + Rust checks (`cargo check`, `cargo clippy`) |
+| **CI** (`ci.yml`) | pull request → `develop`, or manual (`workflow_dispatch`); a push starts nothing | The same checks as `just check`, with the Rust version from `rust-toolchain.toml` |
 | **Release** (`release.yml`) | manual (`workflow_dispatch`) | Builds `AudioCaptor.exe`, creates GitHub Release |
 
 ### Release Process

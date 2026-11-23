@@ -27,7 +27,7 @@ The repository runs on git-flow-next; `git-flow overview` shows the setup.
 
 - Run `just check`: it runs `pnpm vite:build` (which generates `src/paraglide/` for `pnpm check`), `pnpm check`, clippy with `--all-targets -- -D warnings`, `cargo test` and `cargo fmt --check`, and stops at the first failure.
 - Rust code uses the default rustfmt style; run `cargo fmt --manifest-path src-tauri/Cargo.toml` before committing.
-- Pushes to `develop` start no CI run, so these local checks decide whether a task is done.
+- Pushes start no CI run, so these local checks decide whether a task is done. CI (`.github/workflows/ci.yml`) runs the same checks only for pull requests into `develop` and by hand: `gh workflow run ci.yml --ref <branch>` or the "Run workflow" button in Actions (a branch can be run by hand only once `ci.yml` with `workflow_dispatch` is on `develop`).
 
 ## Sessions: main and working
 

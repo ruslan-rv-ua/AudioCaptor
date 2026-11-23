@@ -18,6 +18,20 @@ pub struct TrayMenuRefs {
     pub stop_item: MenuItem<tauri::Wry>,
 }
 
+/// Brings the main window to the front, whatever state it is in.
+///
+/// `set_focus()` alone does nothing on Windows while the window is hidden to the
+/// tray (`hide()`) or minimized to the taskbar, so the window is shown and
+/// restored first. Each call is a no-op when the window is already in that state.
+/// Only the window changes: the recording state is not touched.
+pub fn show_main_window(app: &AppHandle) {
+    if let Some(w) = app.get_webview_window("main") {
+        let _ = w.show();
+        let _ = w.unminimize();
+        let _ = w.set_focus();
+    }
+}
+
 pub fn setup_tray(app: &AppHandle, language: &str) -> tauri::Result<()> {
     let uk = language == "uk";
 
@@ -110,11 +124,7 @@ pub fn setup_tray(app: &AppHandle, language: &str) -> tauri::Result<()> {
                 ..
             } = event
             {
-                let app = tray.app_handle();
-                if let Some(w) = app.get_webview_window("main") {
-                    let _ = w.show();
-                    let _ = w.set_focus();
-                }
+                show_main_window(tray.app_handle());
             }
         })
         .build(app)?;
@@ -137,8 +147,7 @@ fn handle_menu_event(app: &AppHandle, id: &str) {
                 if w.is_visible().unwrap_or(false) {
                     let _ = w.hide();
                 } else {
-                    let _ = w.show();
-                    let _ = w.set_focus();
+                    show_main_window(app);
                 }
             }
         }
@@ -158,10 +167,7 @@ fn handle_menu_event(app: &AppHandle, id: &str) {
                 if let Ok(s) = app.state::<SharedState>().lock() {
                     crate::play_sound(&s, crate::sounds::SoundKind::Warning);
                 }
-                if let Some(w) = app.get_webview_window("main") {
-                    let _ = w.show();
-                    let _ = w.set_focus();
-                }
+                show_main_window(app);
             }
         }
         "stop-recording" => {
@@ -189,10 +195,7 @@ fn handle_menu_event(app: &AppHandle, id: &str) {
             }
         }
         "about" => {
-            if let Some(w) = app.get_webview_window("main") {
-                let _ = w.show();
-                let _ = w.set_focus();
-            }
+            show_main_window(app);
             let _ = app.emit("tray-about-requested", ());
         }
         "quit" => {
@@ -202,10 +205,7 @@ fn handle_menu_event(app: &AppHandle, id: &str) {
                 .map(|s| s.recording_state != RecordingState::Idle)
                 .unwrap_or(false);
             if is_recording {
-                if let Some(w) = app.get_webview_window("main") {
-                    let _ = w.show();
-                    let _ = w.set_focus();
-                }
+                show_main_window(app);
                 let _ = app.emit("tray-quit-requested", ());
             } else {
                 app.exit(0);

@@ -207,6 +207,7 @@ Accessibility (a11y) is a **highest-priority requirement**:
 - `decorations: true` in Tauri config (required for screen reader compatibility)
 - Svelte compile-time a11y checks are enabled
 - Sound notifications duplicate visual state changes
+- `<body role="application">` in `index.html` keeps NVDA out of browse mode, so keys reach the app; every text the user must hear has to be a label, a description or an announcement. Why, and how NVDA's browse and focus modes work in WebView2: backlog document doc-3 (`backlog doc view doc-3 --plain`)
 
 ## Перевірка з NVDA (`just smoke`)
 

@@ -4,6 +4,7 @@ title: Під час запуску NVDA називає вікно один ра
 status: To Do
 assignee: []
 created_date: '2026-11-23T18:19:57Z'
+updated_date: '2026-11-23T22:05:04Z'
 labels:
   - frontend
   - backend
@@ -12,6 +13,8 @@ labels:
   - effort-high
 milestone: m-1
 dependencies: []
+references:
+  - doc-3
 priority: medium
 type: bug
 ordinal: 9400
@@ -41,3 +44,9 @@ ordinal: 9400
 - [ ] #4 Документацію оновлено там, де змінилася поведінка чи порядок роботи (README.md, README_UK.md, DEVELOPMENT.md)
 - [ ] #5 CHANGELOG.md оновлено: лише зміни, помітні користувачам (без подробиць про інструменти, тести, CI чи збірку)
 <!-- DOD:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-24, гіпотеза з doc-3 (розділи 2.3, 5 і 6.2), не перевірена: назва «AudioCaptor» стоїть на чотирьох рівнях — заголовок вікна, `<title>` документа, `<body role="application" aria-label="AudioCaptor">` (`index.html`) і `<main aria-label="AudioCaptor">` (`App.svelte`), а ще `<h1>`. Коли фокус уперше заходить у вікно, NVDA каже назви предків, у які він зайшов (`event_focusEntered`): вікно, документ, «AudioCaptor додаток», орієнтир `main`. Додаткові повтори може давати документ режиму огляду кореня, який NVDA будує до входу в `application` (розділ 5, пункт 8), і повторні події фокуса під час показу вікна. Перше, що варто перевірити: прибрати `aria-label` з `main` (чи весь `main`-орієнтир) і подивитися в журналі NVDA, скільки повторів лишиться.
+<!-- SECTION:NOTES:END -->

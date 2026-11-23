@@ -4,6 +4,7 @@ title: Заголовок діалогу «About» звучить один ра�
 status: To Do
 assignee: []
 created_date: '2026-11-23T18:19:58Z'
+updated_date: '2026-11-23T22:05:04Z'
 labels:
   - frontend
   - a11y
@@ -11,6 +12,8 @@ labels:
   - effort-low
 milestone: m-1
 dependencies: []
+references:
+  - doc-3
 priority: low
 type: bug
 ordinal: 9500
@@ -39,3 +42,9 @@ ordinal: 9500
 - [ ] #4 Документацію оновлено там, де змінилася поведінка чи порядок роботи (README.md, README_UK.md, DEVELOPMENT.md)
 - [ ] #5 CHANGELOG.md оновлено: лише зміни, помітні користувачам (без подробиць про інструменти, тести, CI чи збірку)
 <!-- DOD:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-24, гіпотеза з doc-3 (розділ 5, пункт 8; розділ 6.2), не перевірена: `AboutDialog.svelte` має `<div role="document">`, тож усередині `application` NVDA будує для нього документ режиму огляду. Коли документ готовий, NVDA каже елемент із фокусом (заголовок `h2`), назву діалогу (той самий текст через `aria-labelledby`), потім рядок під курсором огляду — знову заголовок. Це рівно три рази. Інші діалоги `role="document"` не мають. Побічно: у режимі огляду Enter на заголовку NVDA перехоплює (клацає по елементу), тож закриття «About» клавішею Enter з NVDA, ймовірно, не працює; Escape доходить. Варіанти: фокус на кнопку Close замість заголовка, назва діалогу через `aria-label` без повтору тексту, або прибрати `role="document"` і дати текст описом — вибір залежить від того, чи потрібне читання «About» стрілками.
+<!-- SECTION:NOTES:END -->

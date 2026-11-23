@@ -4,6 +4,7 @@ title: Після закриття діалогу фокус повертаєт�
 status: To Do
 assignee: []
 created_date: '2026-11-23T18:19:56Z'
+updated_date: '2026-11-23T22:05:04Z'
 labels:
   - frontend
   - a11y
@@ -11,6 +12,8 @@ labels:
   - effort-medium
 milestone: m-1
 dependencies: []
+references:
+  - doc-3
 priority: high
 type: bug
 ordinal: 9100
@@ -42,3 +45,9 @@ ordinal: 9100
 - [ ] #4 Документацію оновлено там, де змінилася поведінка чи порядок роботи (README.md, README_UK.md, DEVELOPMENT.md)
 - [ ] #5 CHANGELOG.md оновлено: лише зміни, помітні користувачам (без подробиць про інструменти, тести, CI чи збірку)
 <!-- DOD:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-24, з doc-3 (дослідження режимів NVDA, розділи 2.3 і 5): шаблон APG вимагає повертати фокус туди, звідки діалог відкрили. Якщо елемент зник чи фокус не поставлено, фокус падає на `body`, і NVDA про документ нічого не каже. Фокус ставити один раз і одразу на кінцевий елемент, без проміжних обгорток (гонки подій фокуса, nvaccess/nvda#2039). Зараз `App.svelte` після «About» завжди фокусує `.btn-about`, а після інших діалогів — `#profile-select` (`focusProfileSelect`); F1 і меню трея відкривають «About» не з кнопки, тож треба запам'ятовувати `document.activeElement` перед відкриттям.
+<!-- SECTION:NOTES:END -->

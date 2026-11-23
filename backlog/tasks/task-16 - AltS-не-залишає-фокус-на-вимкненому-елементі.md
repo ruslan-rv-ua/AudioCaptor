@@ -4,6 +4,7 @@ title: Alt+S не залишає фокус на вимкненому елеме
 status: To Do
 assignee: []
 created_date: '2026-11-23T18:19:56Z'
+updated_date: '2026-11-23T22:05:04Z'
 labels:
   - frontend
   - a11y
@@ -11,6 +12,8 @@ labels:
   - effort-medium
 milestone: m-1
 dependencies: []
+references:
+  - doc-3
 priority: high
 type: bug
 ordinal: 9200
@@ -39,3 +42,9 @@ ordinal: 9200
 - [ ] #4 Документацію оновлено там, де змінилася поведінка чи порядок роботи (README.md, README_UK.md, DEVELOPMENT.md)
 - [ ] #5 CHANGELOG.md оновлено: лише зміни, помітні користувачам (без подробиць про інструменти, тести, CI чи збірку)
 <!-- DOD:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-24, з doc-3 (розділ 5, пункт 2): коли елемент із фокусом стає `disabled`, фокус лишається на ньому або падає на документ, і NVDA каже «недоступно» чи мовчить. Фокус треба переносити на доступний елемент до того, як елемент вимкнеться (або одразу після, але один раз). Вимикаються під час запису `select` профілів і обидва `DeviceSelect` (`disabled={isRecording}` у `App.svelte`).
+<!-- SECTION:NOTES:END -->

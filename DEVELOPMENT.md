@@ -212,13 +212,52 @@ Accessibility (a11y) is a **highest-priority requirement**:
 | Workflow | Trigger | Description |
 |----------|---------|-------------|
 | **CI** (`ci.yml`) | pull request → `develop`, or manual (`workflow_dispatch`); a push starts nothing | The same checks as `just check`, with the Rust version from `rust-toolchain.toml` |
-| **Release** (`release.yml`) | manual (`workflow_dispatch`) | Builds `AudioCaptor.exe`, creates GitHub Release |
+| **Release** (`release.yml`) | manual (`workflow_dispatch`) | Checks the version and CHANGELOG, runs the same checks as `just check`, builds `AudioCaptor.exe`; publishes a GitHub Release only when `dry_run` is off |
 
 ### Release Process
 
-1. Запустити **Release** workflow з версією (наприклад `0.2.0`) та прапорцем pre-release
-2. Дочекатись успішного створення GitHub Release
-3. Оновити Scoop-маніфест — див. нижче
+Release робить усе по черзі й зупиняється на першій помилці, ще до тегу й релізу:
+
+1. Звіряє введену версію з `package.json`, `src-tauri/Cargo.toml` і `src-tauri/tauri.conf.json`.
+2. Бере опис релізу — розділ `## [<версія>]` з `CHANGELOG.md`. Немає розділу — немає релізу.
+3. Ставить Rust із `rust-toolchain.toml` і виконує ті самі перевірки, що `just check`.
+4. Збирає `AudioCaptor.exe` і кладе його разом з описом релізу в артефакти запуску (зберігаються 7 днів).
+5. Лише коли `dry_run` вимкнено, окреме завдання `publish` створює тег `v<версія>` на зібраному коміті
+   й реліз з файлом `AudioCaptor.exe`. Тільки воно має право запису в репозиторій.
+
+Порядок справжнього релізу:
+
+1. Версію в трьох файлах і розділ у `CHANGELOG.md` вже оновлено, гілку релізу завершено, `main` запушено.
+2. Пробний запуск на `main` (див. нижче) — зелений.
+3. Запустити Release на `main` з вимкненим `dry_run`:
+   `gh workflow run release.yml --ref main -f version=0.2.0 -f dry_run=false`
+4. Дочекатись створення GitHub Release. Scoop оновиться сам — див. нижче.
+
+### Пробний запуск
+
+Пробний запуск (`dry_run`, увімкнено за замовчуванням) проходить усі кроки, крім публікації:
+звірку версії, CHANGELOG, перевірки й збірку. Завдання `publish` пропускається, а збірка працює
+з токеном лише для читання, тож тегу й релізу не буде навіть через помилку в workflow.
+Зібраний exe можна завантажити з артефактів запуску й перевірити вручну.
+
+Запуск на будь-якій запушеній гілці (версія має збігатися з версією в коді цієї гілки):
+
+```powershell
+gh workflow run release.yml --ref feature/task-5-release-checks -f version=0.1.0 -f dry_run=true
+```
+
+Те саме — кнопка «Run workflow» у вкладці Actions: вибрати гілку й лишити позначку `dry_run`.
+
+**Чому не можна створювати справжній реліз для перевірки.** Кожен опублікований реліз упродовж доби
+забирає Excavator у `scoop-bucket` і роздає користувачам Scoop як нову версію. Видалити реліз
+потім уже пізно: користувачі встигнуть його поставити, а маніфест посилатиметься на зниклий файл.
+Тому зміни в `release.yml` перевіряють лише пробним запуском, а тег `v*` створюють тільки для
+справжніх версій.
+
+**Не запускайте Release з версією, реліз якої вже є.** Якщо тег `v<версія>` уже існує,
+`softprops/action-gh-release` не зупиняється, а оновлює наявний реліз: замінює опис і файл
+`AudioCaptor.exe` новою збіркою. Хеш файлу зміниться, і маніфест Scoop із записаним старим хешем
+перестане встановлюватись. Пробний запуск з такою версією безпечний — він нічого не публікує.
 
 ### Оновлення Scoop-маніфесту
 

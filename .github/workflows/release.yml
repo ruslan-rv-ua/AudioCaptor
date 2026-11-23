@@ -1,5 +1,9 @@
 name: Release
 
+# Manual only. Dry run (checks + build, no tag, no release):
+#   gh workflow run release.yml --ref <branch> -f version=<version> -f dry_run=true
+# A real release is published only with dry_run=false. Every published release reaches
+# Scoop users within a day, so never publish a release just to test this workflow.
 on:
   workflow_dispatch:
     inputs:
@@ -12,48 +16,149 @@ on:
         required: false
         type: boolean
         default: false
+      dry_run:
+        description: 'Dry run: checks and build only, no tag and no release'
+        required: false
+        type: boolean
+        default: true
 
+# The build job gets a read-only token; only the publish job may write.
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  release:
+  build:
     runs-on: windows-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: pnpm/action-setup@v4
+      # Stops before the build when the entered version differs from the code.
+      - name: Check version
+        shell: pwsh
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          $version = $env:VERSION
+          if ($version -notmatch '^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$') {
+            Write-Output "::error::Version '$version' is not X.Y.Z (enter it without the v prefix)"
+            exit 1
+          }
+          $package = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          $tauri = (Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
+          $cargoMatch = Select-String -Path src-tauri/Cargo.toml -Pattern '^version\s*=\s*"([^"]+)"' | Select-Object -First 1
+          $cargo = $cargoMatch.Matches[0].Groups[1].Value
+          Write-Output "Entered:                   $version"
+          Write-Output "package.json:              $package"
+          Write-Output "src-tauri/Cargo.toml:      $cargo"
+          Write-Output "src-tauri/tauri.conf.json: $tauri"
+          $bad = @()
+          if ($package -ne $version) { $bad += "package.json ($package)" }
+          if ($cargo -ne $version) { $bad += "src-tauri/Cargo.toml ($cargo)" }
+          if ($tauri -ne $version) { $bad += "src-tauri/tauri.conf.json ($tauri)" }
+          if ($bad.Count -gt 0) {
+            Write-Output "::error::Version $version does not match: $($bad -join ', ')"
+            exit 1
+          }
 
-      - uses: actions/setup-node@v4
+      # The release notes are this version's section of CHANGELOG.md.
+      - name: Extract release notes from CHANGELOG.md
+        shell: pwsh
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          $heading = '^## \[' + [regex]::Escape($env:VERSION) + '\]'
+          $notes = @()
+          $inSection = $false
+          foreach ($line in Get-Content CHANGELOG.md) {
+            if ($line -match $heading) { $inSection = $true; continue }
+            if ($inSection -and $line -match '^## ') { break }
+            if ($inSection -and $line -match '^\[[^\]]+\]:\s') { continue }
+            if ($inSection) { $notes += $line }
+          }
+          $text = ($notes -join "`n").Trim()
+          if (-not $inSection -or $text -eq '') {
+            Write-Output "::error::CHANGELOG.md has no section '## [$env:VERSION]'"
+            exit 1
+          }
+          Set-Content -Path release-notes.md -Value $text -Encoding utf8NoBOM
+          Write-Output $text
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: pnpm
 
-      - run: pnpm install
-
-      - uses: dtolnay/rust-toolchain@stable
+      # Installs exactly the Rust version and components from rust-toolchain.toml.
+      - name: Install Rust from rust-toolchain.toml
+        run: rustup toolchain install
 
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
 
+      - run: pnpm install
+
+      # Same checks, in the same order, as `just check`. A failure stops the run
+      # before the build, so no tag and no release are created.
+      - name: Generate Paraglide i18n files
+        run: pnpm vite:build
+
+      - name: Frontend checks
+        run: pnpm check
+
+      - name: Clippy
+        run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
+
+      - name: Tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml
+
+      - name: Format check
+        run: cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
+
       - name: Build
         run: pnpm tauri build --no-bundle
 
       - name: Compute SHA256
-        id: hash
         shell: pwsh
         run: |
           $hash = (Get-FileHash "src-tauri\target\release\AudioCaptor.exe" -Algorithm SHA256).Hash.ToLower()
-          echo "sha256=$hash" >> $env:GITHUB_OUTPUT
-          echo "SHA256: $hash"
+          Write-Output "SHA256: $hash"
+          Write-Output "SHA256 of AudioCaptor.exe: ``$hash``" >> $env:GITHUB_STEP_SUMMARY
+
+      # Kept as a workflow artifact in both modes, so a dry run's exe can be tried by hand.
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release
+          path: |
+            src-tauri/target/release/AudioCaptor.exe
+            release-notes.md
+          if-no-files-found: error
+          retention-days: 7
+
+  # Skipped entirely in a dry run: no tag and no release can be created.
+  publish:
+    needs: build
+    if: ${{ !inputs.dry_run }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: release
 
       - name: Create Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: v${{ inputs.version }}
           name: v${{ inputs.version }}
+          target_commitish: ${{ github.sha }}
           prerelease: ${{ inputs.prerelease }}
-          generate_release_notes: true
+          body_path: release-notes.md
+          # The artifact keeps paths relative to the workspace; the asset name stays AudioCaptor.exe.
           files: src-tauri/target/release/AudioCaptor.exe
+          fail_on_unmatched_files: true

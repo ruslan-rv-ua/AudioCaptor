@@ -76,7 +76,7 @@ AudioCaptor/
 │   ├── tauri.conf.json         # Tauri configuration
 │   └── Cargo.toml              # Rust dependencies
 ├── messages/                   # i18n message files (en, uk)
-├── docs/                       # Design specs & research
+├── backlog/                    # Tasks, milestones, decisions & research (Backlog.md)
 ├── public/                     # Static assets (favicon)
 ├── index.html                  # HTML entry point
 ├── package.json                # Node.js config & scripts

@@ -1,0 +1,6 @@
+# Commits that only reformat code. git blame skips them when
+# blame.ignoreRevsFile points here (GitHub reads this file by default):
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+
+# style: format Rust code with cargo fmt
+c9616dbea35b40fa479d73a61b3a9048556a1f08

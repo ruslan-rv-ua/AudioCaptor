@@ -19,6 +19,14 @@ build-fast:
 vite-dev:
     pnpm vite dev --port 1420
 
+# All local checks; stops at the first failure
+check:
+    pnpm vite:build
+    pnpm check
+    cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
+    cargo test --manifest-path src-tauri/Cargo.toml
+    cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
+
 # Clean Rust build artifacts
 clean:
     cargo clean --manifest-path src-tauri/Cargo.toml

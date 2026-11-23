@@ -25,8 +25,8 @@ The repository runs on git-flow-next; `git-flow overview` shows the setup.
 
 ## Checks
 
-- Frontend: `pnpm vite:build` first (it generates `src/paraglide/`, which `pnpm check` needs), then `pnpm check`.
-- Rust: `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings` and `cargo test --manifest-path src-tauri/Cargo.toml`.
+- Run `just check`: it runs `pnpm vite:build` (which generates `src/paraglide/` for `pnpm check`), `pnpm check`, clippy with `--all-targets -- -D warnings`, `cargo test` and `cargo fmt --check`, and stops at the first failure.
+- Rust code uses the default rustfmt style; run `cargo fmt --manifest-path src-tauri/Cargo.toml` before committing.
 - Pushes to `develop` start no CI run, so these local checks decide whether a task is done.
 
 ## Sessions: main and working

@@ -1,0 +1,17 @@
+project_name: "AudioCaptor"
+default_status: "To Do"
+statuses: ["To Do", "In Progress", "Done"]
+labels: ["backend", "frontend", "audio", "a11y", "security", "docs", "ci", "testing", "release", "model-fable", "model-opus", "model-sonnet", "effort-low", "effort-medium", "effort-high"]
+definition_of_done: ["Перевірки фронтенду проходять: `pnpm vite:build`, `pnpm check`", "Перевірки Rust проходять: `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings`, `cargo test --manifest-path src-tauri/Cargo.toml`", "Новий або змінений текст інтерфейсу є англійською й українською: у `messages/en.json` і `messages/uk.json`, а підписи меню трея — у `src-tauri/src/tray.rs`", "Зміни в інтерфейсі, фокусі, діалогах чи оголошеннях перевірено з клавіатури і з NVDA (якщо задача їх містить)", "Документацію оновлено там, де змінилася поведінка чи порядок роботи (README.md, README_UK.md, DEVELOPMENT.md)", "CHANGELOG.md оновлено: лише зміни, помітні користувачам (без подробиць про інструменти, тести, CI чи збірку)"]
+date_format: "yyyy-mm-dd"
+max_column_width: 20
+auto_open_browser: true
+default_port: 6420
+browser_hostname: "127.0.0.1"
+remote_operations: false
+auto_commit: false
+filesystem_only: false
+bypass_git_hooks: false
+check_active_branches: true
+active_branch_days: 30
+task_prefix: "task"

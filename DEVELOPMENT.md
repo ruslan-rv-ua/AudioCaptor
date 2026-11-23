@@ -20,7 +20,7 @@
 ## Prerequisites
 
 - **Windows 10+** (the app is Windows-only by design)
-- [Rust](https://rustup.rs/) stable toolchain
+- [Rust](https://rustup.rs/) via rustup: the version is pinned in `rust-toolchain.toml`, and rustup installs it automatically
 - [Node.js](https://nodejs.org/) 18+
 - [pnpm](https://pnpm.io/) (`npm install -g pnpm`)
 - [just](https://github.com/casey/just) (optional, for task shortcuts)

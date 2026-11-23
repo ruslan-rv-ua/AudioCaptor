@@ -352,6 +352,30 @@ mod tests {
     }
 
     #[test]
+    fn bytes_to_f32_24bit_negative_half_scale() {
+        // -4194304 (-0x400000) as 24-bit LE: lower 3 bytes of the i32.
+        let bytes = (-4194304i32).to_le_bytes();
+        let data = [bytes[0], bytes[1], bytes[2]];
+        let result = bytes_to_f32(&data, 24);
+        assert_eq!(result.len(), 1);
+        assert!(result[0] < 0.0, "sign must be negative, got {}", result[0]);
+        assert!((result[0] + 0.5).abs() < 0.001, "got {}", result[0]);
+    }
+
+    #[test]
+    fn bytes_to_f32_24bit_minus_one_is_tiny_negative() {
+        // FF FF FF is -1 in 24-bit two's complement.
+        let result = bytes_to_f32(&[0xFF, 0xFF, 0xFF], 24);
+        assert_eq!(result.len(), 1);
+        assert!(result[0] < 0.0, "sign must be negative, got {}", result[0]);
+        assert!(
+            (result[0] + 1.0 / 8388608.0).abs() < 1e-9,
+            "got {}",
+            result[0]
+        );
+    }
+
+    #[test]
     fn bytes_to_f32_unsupported_returns_empty() {
         let data = [0u8; 4];
         let result = bytes_to_f32(&data, 8);

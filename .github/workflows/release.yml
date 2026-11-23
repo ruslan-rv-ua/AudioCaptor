@@ -61,6 +61,31 @@ jobs:
             exit 1
           }
 
+      # An existing tag would make the publish step update that release and overwrite its
+      # AudioCaptor.exe, breaking the hash in the Scoop manifest. A real run stops here;
+      # a dry run only warns, since it publishes nothing.
+      - name: Check that the tag does not exist yet
+        shell: pwsh
+        env:
+          TAG: v${{ inputs.version }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          $found = git ls-remote --tags origin "refs/tags/$env:TAG"
+          if ($LASTEXITCODE -ne 0) {
+            Write-Output "::error::Could not list tags on origin"
+            exit 1
+          }
+          if (-not $found) {
+            Write-Output "Tag $env:TAG does not exist yet."
+            exit 0
+          }
+          if ($env:DRY_RUN -eq 'true') {
+            Write-Output "::warning::Tag $env:TAG already exists. Fine for a dry run; a real release with this version would stop here."
+          } else {
+            Write-Output "::error::Tag $env:TAG already exists. Release $env:TAG is already published; bump the version."
+            exit 1
+          }
+
       # The release notes are this version's section of CHANGELOG.md.
       - name: Extract release notes from CHANGELOG.md
         shell: pwsh

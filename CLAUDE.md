@@ -4,7 +4,7 @@ Portable Windows audio recorder: Tauri v2, Rust backend, Svelte 5 + TypeScript f
 
 Accessibility for screen-reader users is the top requirement: every interface change keeps keyboard access, labels and spoken state changes (see "Accessibility" in DEVELOPMENT.md).
 
-Backlog records (tasks, drafts, milestones, decisions, documents) are written in Ukrainian. Code, code comments and commit messages are written in English.
+Backlog records (tasks, drafts, milestones, decisions, documents) and DEVELOPMENT.md are written in Ukrainian. Code, code comments and commit messages are written in English.
 
 ## Backlog first
 

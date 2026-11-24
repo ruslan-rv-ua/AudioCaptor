@@ -4,6 +4,7 @@ title: DEVELOPMENT.md описує, як проєкт ведеться зара�
 status: To Do
 assignee: []
 created_date: '2026-11-23T11:31:02Z'
+updated_date: '2026-11-24T12:07:12Z'
 labels:
   - docs
   - model-sonnet
@@ -56,3 +57,11 @@ ordinal: 8000
 - [ ] #5 Документацію оновлено там, де змінилася поведінка чи порядок роботи (README.md, README_UK.md, DEVELOPMENT.md)
 - [ ] #6 CHANGELOG.md оновлено: лише зміни, помітні користувачам (без подробиць про інструменти, тести, CI чи збірку)
 <!-- DOD:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+## Рішення власника (2026-11-24)
+
+Мова документа — українська: `DEVELOPMENT.md` пишеться українською, як у quick-snippets і в Backlog. Назви команд, файлів, параметрів і фрагменти коду лишаються як є. Правило записано в `CLAUDE.md`.
+<!-- SECTION:NOTES:END -->

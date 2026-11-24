@@ -4,15 +4,17 @@ title: «About», відкритий поверх налаштувань, вид
 status: To Do
 assignee: []
 created_date: '2026-11-24T13:29:40Z'
+updated_date: '2026-11-24T16:01:47Z'
 labels:
   - frontend
   - a11y
   - model-sonnet
   - effort-low
+milestone: m-1
 dependencies: []
 priority: low
 type: bug
-ordinal: 14000
+ordinal: 9800
 ---
 
 ## Description

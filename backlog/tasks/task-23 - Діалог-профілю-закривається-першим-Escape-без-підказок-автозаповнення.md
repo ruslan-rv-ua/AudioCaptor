@@ -4,15 +4,17 @@ title: Діалог профілю закривається першим Escape,
 status: To Do
 assignee: []
 created_date: '2026-11-24T14:09:40Z'
+updated_date: '2026-11-24T16:01:47Z'
 labels:
   - frontend
   - a11y
   - model-sonnet
   - effort-low
+milestone: m-1
 dependencies: []
 priority: medium
 type: bug
-ordinal: 15000
+ordinal: 9700
 ---
 
 ## Description

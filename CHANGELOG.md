@@ -18,6 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   names the active profile. Before, focus always jumped to the About button or the profile list, and after Cancel
   in the exit confirmation during a recording it was lost. When the place to go back to is no longer available,
   focus goes to the profile list, or to the recording buttons while recording.
+- Keyboard focus is no longer lost when recording starts, pauses, resumes or stops. When the control with focus
+  becomes unavailable during recording (the profile list and its buttons, the device lists) or a recording button
+  goes away, focus moves to the recording button of the new state (Start, Pause or Resume), and the screen reader
+  names it. Before, the screen reader said "unavailable" or only the app name, and you had to find your place
+  again. Focus on Stop now stays there when you pause or resume.
 
 ## [0.1.0] — 2026-04-20
 

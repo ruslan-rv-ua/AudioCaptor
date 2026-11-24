@@ -39,17 +39,19 @@
     {#if !canRecord}
       <p id="start-hint" class="hint" role="note">{readinessHint}</p>
     {/if}
-  {:else if recordingState === "Recording"}
-    <button type="button" onclick={onpause} aria-label={m.pause_recording_aria()} class="btn btn-pause">
-      {m.btn_pause()}
-    </button>
-    <button type="button" onclick={onstop} aria-label={m.stop_recording_aria()} class="btn btn-stop">
-      {m.btn_stop()}
-    </button>
-  {:else if recordingState === "Paused"}
-    <button type="button" onclick={onresume} aria-label={m.resume_recording_aria()} class="btn btn-resume">
-      {m.btn_resume()}
-    </button>
+  {:else}
+    <!-- Pause and Resume swap places, while Stop stays the same element from
+         Recording to Paused and back, so focus on Stop survives a pause or a
+         resume. App.svelte moves focus that a state change takes away. -->
+    {#if recordingState === "Recording"}
+      <button type="button" onclick={onpause} aria-label={m.pause_recording_aria()} class="btn btn-pause">
+        {m.btn_pause()}
+      </button>
+    {:else}
+      <button type="button" onclick={onresume} aria-label={m.resume_recording_aria()} class="btn btn-resume">
+        {m.btn_resume()}
+      </button>
+    {/if}
     <button type="button" onclick={onstop} aria-label={m.stop_recording_aria()} class="btn btn-stop">
       {m.btn_stop()}
     </button>

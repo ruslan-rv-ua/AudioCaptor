@@ -2,7 +2,7 @@
   import { onMount, tick } from "svelte";
   import { getCurrentWindow } from "@tauri-apps/api/window";
   import { listen } from "@tauri-apps/api/event";
-  import type { RecordingProfile } from "./lib/types";
+  import type { RecordingProfile, RecordingState } from "./lib/types";
   import { getDevices, refreshDevices, initDeviceListener } from "./lib/stores/devices.svelte";
   import {
     getRecording,
@@ -98,6 +98,26 @@
     if (state === "Recording") liveRegionText = m.live_recording_started();
     else if (state === "Paused") liveRegionText = m.live_recording_paused();
     else if (state === "Idle") liveRegionText = m.live_recording_stopped();
+  });
+
+  // Focus that a recording state change takes away (backlog doc-3): starting a
+  // recording disables the profile and device controls, and Start, Pause and
+  // Resume each exist in one state only. If the element with focus is now
+  // disabled or gone (focus on the page), focus goes to the first record
+  // button of the new state (Start, Pause or Resume), and NVDA names it instead
+  // of saying "unavailable" or nothing. This runs right after the DOM update,
+  // in the same task, so focus moves once and straight to the button. Focus
+  // anywhere else stays where it is, and nothing moves when the window loads.
+  let previousState: RecordingState | undefined;
+  $effect(() => {
+    const state = recording.state;
+    if (!initialized) return;
+    const changed = previousState !== undefined && previousState !== state;
+    previousState = state;
+    if (!changed) return;
+    const focused = document.activeElement;
+    if (focused instanceof HTMLElement && focused !== document.body && !focused.matches(":disabled")) return;
+    document.querySelector<HTMLElement>(".record-controls button")?.focus();
   });
 
   // Focus return (APG modal dialog pattern, backlog doc-3): when a dialog opens,

@@ -9,8 +9,8 @@
     and to %TEMP%\audiocaptor-smoke-report.txt.
 
     Scenarios; each one starts the app afresh and quits it at the end:
-      launch   NVDA announces the window; Tab goes round every control, each one has a name
-               and NVDA reads it.
+      launch   NVDA names the window once (AudioCaptor) and then the profile list; Tab goes
+               round every control, each one has a name and NVDA reads it.
       record   Alt+S, Alt+P, Alt+R and Alt+T announce the new state, Alt+I the current one.
                When the control with focus is disabled or goes away (Alt+S on the profile list,
                Alt+P on Pause, Alt+R on Resume, Alt+T on Stop), focus moves to the button of the
@@ -175,9 +175,16 @@ $Role = @{
 # What NVDA says when the control with focus becomes disabled.
 $Unavailable = 'unavailable|' + [regex]::Unescape('\u043d\u0435\u0434\u043e\u0441\u0442\u0443\u043f\u043d\u043e')
 
-# What NVDA says when it reads the web content through UI Automation instead of the usual way
-# (the address of the page): a sign of the broken first reading of a WebView2 window.
-$WebviewNoise = 'tauri.localhost'
+# What NVDA says when focus falls back onto the page: the app name, or the page's document and the
+# application around the controls. Neither has a name of its own (backlog TASK-18), so NVDA names
+# them by their roles.
+$PageNoise = $AppTitle + '|document|' + [regex]::Unescape('\u0434\u043e\u043a\u0443\u043c\u0435\u043d\u0442') +
+    '|application|' + [regex]::Unescape('\u0434\u043e\u0434\u0430\u0442\u043e\u043a')
+
+# What NVDA says when it reads the web content through UI Automation instead of the usual way (the
+# web content pane, the address of the page): a sign of the broken first reading of a WebView2
+# window.
+$WebviewNoise = 'tauri.localhost|web content|' + [regex]::Unescape('\u0432\u0435\u0431-\u0432\u043c\u0456\u0441\u0442')
 
 # --- Native helpers ----------------------------------------------------------------------------
 Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
@@ -778,6 +785,7 @@ function Add-Check([string]$Text, [bool]$Ok, [string]$Detail = '') {
 
 # Runs one step of the current scenario and records what NVDA said meanwhile.
 # Expect    - each must be said at least once
+# Once      - each must be said exactly once (a name NVDA must not repeat)
 # ExpectAny - for each entry, one of its '|'-separated variants must be said (role words, which
 #             depend on NVDA's language)
 # Forbid    - none of its '|'-separated variants may be said
@@ -788,6 +796,7 @@ function Invoke-Step {
         [string]$Title,
         [scriptblock]$Action,
         [string[]]$Expect = @(),
+        [string[]]$Once = @(),
         [string[]]$ExpectAny = @(),
         [string[]]$Forbid = @()
     )
@@ -810,13 +819,13 @@ function Invoke-Step {
     catch { $r.Status = 'FAILED'; $r.Detail = $_.Exception.Message; $script:Aborted = $true }
     if ($r.Status -eq 'OK' -and $script:SoftFail) { $r.Status = 'FAILED'; $r.Detail = $script:SoftFail }
 
-    if ($r.Status -eq 'OK' -and ($Expect.Count -or $ExpectAny.Count)) {
+    if ($r.Status -eq 'OK' -and ($Expect.Count -or $Once.Count -or $ExpectAny.Count)) {
         # NVDA can lag behind the app: wait until it has said what is expected.
         $deadline = (Get-Date).AddSeconds($SpeechWaitSec)
         do {
             $said = Get-SaidSince $from
             $done = $true
-            foreach ($p in $Expect) { if ((Get-Count $said $p) -lt 1) { $done = $false } }
+            foreach ($p in @($Expect + $Once)) { if ((Get-Count $said $p) -lt 1) { $done = $false } }
             foreach ($a in $ExpectAny) { if (-not (Test-SaidAny $said $a)) { $done = $false } }
             if ($done) { break }
             Start-Sleep -Milliseconds 200
@@ -830,6 +839,10 @@ function Invoke-Step {
     $all = $r.Speech -join ' | '
     $checks = New-Object System.Collections.Generic.List[object]
     foreach ($p in $Expect) { $checks.Add((New-Check "NVDA says ""$p""" ((Get-Count $all $p) -ge 1))) }
+    foreach ($p in $Once) {
+        $n = Get-Count $all $p
+        $checks.Add((New-Check "NVDA says ""$p"" once" ($n -eq 1) "said $n times"))
+    }
     foreach ($a in $ExpectAny) { $checks.Add((New-Check "NVDA says $(Format-Variants $a)" (Test-SaidAny $all $a))) }
     foreach ($p in $Forbid) { $checks.Add((New-Check "NVDA does not say $(Format-Variants $p)" (-not (Test-SaidAny $all $p)))) }
     foreach ($c in $script:StepChecks) { $checks.Add($c) }
@@ -883,9 +896,11 @@ function Test-TabRound {
 }
 
 function Invoke-LaunchScenario {
-    Invoke-Step 'Start: the window opens with focus on the profile list; NVDA announces AudioCaptor and the list' {
+    # On the first show NVDA names the window, then the page's document and the application around
+    # the controls, by role only (backlog TASK-18), and then the profile list: the app name once.
+    Invoke-Step 'Start: the window opens with focus on the profile list; NVDA says AudioCaptor once, then the list' {
         Start-App
-    } -Expect $AppTitle, $UI.ProfileList, $Profiles.System -Forbid $WebviewNoise
+    } -Once $AppTitle -Expect $UI.ProfileList, $Profiles.System -Forbid $WebviewNoise
 
     Invoke-Step 'Tab goes round the window: it reaches every control, each has a name and NVDA reads it' {
         Test-TabRound
@@ -902,12 +917,13 @@ function Invoke-RecordScenario {
 
     # Each state has its own record buttons, and the profile list is disabled while recording.
     # When the control with focus goes away or is disabled, focus moves to the first button of the
-    # new state, and NVDA names it: not "unavailable", not the page (AudioCaptor).
+    # new state, and NVDA names it: not "unavailable", not the page (the app name, its document or
+    # application).
     Invoke-Step "Alt+S on the profile list starts recording: NVDA says Recording started; focus moves to '$($UI.Pause)'" {
         Send-Keys 'Alt+S'
         $null = Wait-Until "the '$($UI.Pause)' button" { Find-ByName $UI.Pause }
         Confirm-Focus $UI.Pause
-    } -Expect $UI.Started, $UI.Pause -Forbid $Unavailable, $AppTitle
+    } -Expect $UI.Started, $UI.Pause -Forbid $Unavailable, $PageNoise
 
     Invoke-Step 'Alt+I while recording: NVDA says Recording and the time' {
         Start-Sleep -Seconds 1  # past 00:00:00
@@ -918,7 +934,7 @@ function Invoke-RecordScenario {
         Send-Keys 'Alt+P'
         $null = Wait-Until "the '$($UI.Resume)' button" { Find-ByName $UI.Resume }
         Confirm-Focus $UI.Resume
-    } -Expect $UI.Paused, $UI.Resume -Forbid $Unavailable, $AppTitle
+    } -Expect $UI.Paused, $UI.Resume -Forbid $Unavailable, $PageNoise
 
     Invoke-Step 'Alt+I while paused: NVDA says Paused and the time' { Send-Keys 'Alt+I' } -Expect $UI.PausedInfo
 
@@ -927,7 +943,7 @@ function Invoke-RecordScenario {
         Send-Keys 'Alt+R'
         $null = Wait-Until "the '$($UI.Pause)' button" { Find-ByName $UI.Pause }
         Confirm-Focus $UI.Pause
-    } -Expect $UI.Resumed, $UI.Pause -Forbid $UI.Started, $Unavailable, $AppTitle
+    } -Expect $UI.Resumed, $UI.Pause -Forbid $UI.Started, $Unavailable, $PageNoise
 
     Invoke-Step "Tab to the '$($UI.Stop)' button" { Move-Focus $UI.Stop } -Expect $UI.Stop
 
@@ -936,13 +952,13 @@ function Invoke-RecordScenario {
         Send-Keys 'Alt+P'
         $null = Wait-Until "the '$($UI.Resume)' button" { Find-ByName $UI.Resume }
         Confirm-Focus $UI.Stop
-    } -Expect $UI.Paused -Forbid $Unavailable, $AppTitle
+    } -Expect $UI.Paused -Forbid $Unavailable, $PageNoise
 
     Invoke-Step "Alt+T on '$($UI.Stop)' stops: NVDA says Recording stopped; focus moves to '$($UI.Start)'" {
         Send-Keys 'Alt+T'
         $null = Wait-Until "the '$($UI.Start)' button" { Find-ByName $UI.Start }
         Confirm-Focus $UI.Start
-    } -Expect $UI.Stopped, $UI.Start -Forbid $Unavailable, $AppTitle
+    } -Expect $UI.Stopped, $UI.Start -Forbid $Unavailable, $PageNoise
 
     Invoke-Step 'Alt+I after stopping: NVDA says Ready' { Send-Keys 'Alt+I' } -Expect $UI.Ready
 }

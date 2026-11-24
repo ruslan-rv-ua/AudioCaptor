@@ -21,19 +21,21 @@
                dialog, Escape closes it and focus returns to where the dialog was opened.
       tray     Escape hides the window; starting the exe again shows it and NVDA announces it.
 
-    Exit code: 0 everything passed; 1 a step or an NVDA check failed; 2 the test could not run
-    or stopped early (no exe, NVDA not running, wrong logging level, your AudioCaptor would not
-    quit, an error in the test itself). The report says which.
+    Exit code: 0 everything passed; 1 a step or an NVDA check failed, or the test copy wrote to
+    %LOCALAPPDATA%\com.audiocaptor.app; 2 the test could not run or stopped early (no exe, NVDA
+    not running, wrong logging level, your AudioCaptor would not quit, an error in the test
+    itself). The report says which.
 
     What it protects:
     - Your data. The test runs a copy of the exe from %TEMP%\audiocaptor-smoke with its own
       AudioCaptor-data (English interface, two test profiles). WebView2 keeps the browser data of
-      the copy there too: WEBVIEW2_USER_DATA_FOLDER is set for the test copy only. The browser
-      data of every other copy, %LOCALAPPDATA%\com.audiocaptor.app\EBWebView, must stay as it was;
-      anything else that changes in %LOCALAPPDATA%\com.audiocaptor.app was written by the app
-      itself and is reported as a note. There the test reads only the names of the top entries,
-      the number of files and folders in each and the time of the newest change. The test folder
-      is deleted at the end; the copy's own log is kept as %TEMP%\audiocaptor-smoke-app.log.
+      the copy there too: WEBVIEW2_USER_DATA_FOLDER is set for the test copy only. Every other
+      copy keeps its browser data in %LOCALAPPDATA%\com.audiocaptor.app\EBWebView. Nothing in
+      %LOCALAPPDATA%\com.audiocaptor.app may change during the run: the app keeps all its data in
+      AudioCaptor-data (decision-1), so any change there fails the test. There the test reads only
+      the names of the top entries, the number of files and folders in each and the time of the
+      newest change. The test folder is deleted at the end; the copy's own log is kept as
+      %TEMP%\audiocaptor-smoke-app.log.
     - Your AudioCaptor. The app allows one copy and holds the Pause key, so a running AudioCaptor
       is asked to quit, as its close button does, and is not started again. If it does not quit
       (for example, it is recording and asks to confirm), the test stops and leaves it alone.
@@ -117,8 +119,8 @@ $DataDir = Join-Path $Root 'AudioCaptor-data'
 $SettingsFile = Join-Path $DataDir 'settings.json'
 $WebviewDir = Join-Path $Root 'webview'
 # Every other copy of AudioCaptor keeps its browser data in EBWebView here (Tauri's
-# app_local_data_dir); the test copy must not touch it. Anything else the app writes here is
-# reported as a note: the test cannot redirect it.
+# app_local_data_dir). The test copy must not change anything here: its browser data is
+# redirected, and the app keeps the rest of its data in AudioCaptor-data (decision-1).
 $UserAppDir = Join-Path $env:LOCALAPPDATA 'com.audiocaptor.app'
 $BrowserEntry = 'EBWebView'
 $WebviewVar = 'WEBVIEW2_USER_DATA_FOLDER'
@@ -1247,6 +1249,7 @@ $lines.Add("Scenarios: $($Selected -join ', ')")
 if ($exeTime) { $lines.Add(('Exe: {0}, built {1:yyyy-MM-dd HH:mm}' -f $Exe, $exeTime)) } else { $lines.Add("Exe: $Exe") }
 if ($script:LogPath) { $lines.Add(('NVDA log: {0}, read from byte {1} on (only what NVDA wrote during this run)' -f $script:LogPath, $script:LogStart)) }
 $browserChanged = $false
+$wroteOutside = $false
 if ($null -ne $userBefore -and $null -ne $userAfter) {
     $names = @(@($userBefore.Keys) + @($userAfter.Keys) | Sort-Object -Unique)
     if ($names -notcontains $BrowserEntry) {
@@ -1266,7 +1269,8 @@ if ($null -ne $userBefore -and $null -ne $userAfter) {
                 $lines.Add("FAILED: the test copy changed the browser data of your AudioCaptor ($path): before $bText; after $aText.")
             }
         } elseif (-not $same) {
-            $lines.Add("Note: AudioCaptor itself wrote to $path, outside its AudioCaptor-data folder; the test cannot prevent that. Before: $bText; after: $aText.")
+            $wroteOutside = $true
+            $lines.Add("FAILED: AudioCaptor wrote to $path, outside its AudioCaptor-data folder. Before: $bText; after: $aText.")
         }
     }
 }
@@ -1309,7 +1313,7 @@ foreach ($r in $Results) {
 }
 
 $lines.Add('')
-$passed = -not $script:StopReason -and $stepsFailed -eq 0 -and -not $browserChanged
+$passed = -not $script:StopReason -and $stepsFailed -eq 0 -and -not $browserChanged -and -not $wroteOutside
 $verdict = if ($script:StopReason) { 'STOPPED' } elseif ($passed) { 'PASSED' } else { 'FAILED' }
 $lines.Add(('Result: {0}. Steps: {1} OK, {2} failed, {3} skipped. NVDA checks: {4} of {5} OK.' -f $verdict, $stepsOk, $stepsFailed, $stepsSkipped, $checksOk, $checksAll))
 if ($script:RunClock) { $lines.Add(('The keyboard was busy for {0:0} s.' -f $script:RunClock.Elapsed.TotalSeconds)) }

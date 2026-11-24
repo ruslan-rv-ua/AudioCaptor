@@ -12,6 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Starting AudioCaptor again while it is already running now brings its window to the front, even when it is
   hidden in the tray or minimized to the taskbar; before, nothing happened and the screen reader said nothing.
   Recording and pause are not affected.
+- When a dialog closes (About, Settings, a profile, or the delete or exit confirmation), keyboard focus now goes
+  back to where it was when the dialog opened, for example the button that opened it, and the screen reader reads
+  it. Before, focus always jumped to the About button or the profile list, and after Cancel in the exit
+  confirmation during a recording it was lost. When that place is no longer available, focus goes to the profile
+  list, or to the recording buttons while recording.
 
 ## [0.1.0] — 2026-04-20
 

@@ -100,8 +100,51 @@
     else if (state === "Idle") liveRegionText = m.live_recording_stopped();
   });
 
+  // Focus return (APG modal dialog pattern, backlog doc-3): when a dialog opens,
+  // remember the element that has focus; when it closes, give focus back to that
+  // element, once and straight to it. Each dialog keeps its own element, because
+  // About (F1, tray) and the exit confirmation can open on top of another dialog.
+  type Dialog = "about" | "settings" | "profile" | "delete" | "exit";
+  const openers = new Map<Dialog, Element | null>();
+
+  function rememberFocus(dialog: Dialog) {
+    openers.set(dialog, document.activeElement);
+  }
+
+  // Call after the dialog's open flag is cleared. If the opener is gone or cannot
+  // take focus (removed, disabled, hidden, or nothing had focus), focus goes to
+  // the profile list, and while that is disabled (recording) to the first
+  // recording button.
+  async function returnFocus(dialog: Dialog) {
+    const opener = openers.get(dialog);
+    openers.delete(dialog);
+    await tick();
+    const targets = [
+      opener,
+      document.getElementById("profile-select"),
+      document.querySelector(".record-controls button"),
+    ];
+    for (const el of targets) {
+      if (!(el instanceof HTMLElement) || el === document.body) continue;
+      el.focus();
+      if (document.activeElement === el) return;
+    }
+  }
+
+  function openAbout() {
+    if (aboutOpen) return;
+    rememberFocus("about");
+    aboutOpen = true;
+  }
+
+  function openConfirmExit() {
+    if (confirmExitOpen) return;
+    rememberFocus("exit");
+    confirmExitOpen = true;
+  }
+
   function handleMnemonic(e: KeyboardEvent) {
-    if (e.key === "F1") { e.preventDefault(); aboutOpen = true; return; }
+    if (e.key === "F1") { e.preventDefault(); openAbout(); return; }
     if (e.key === "Escape" && !settingsOpen && !dialogOpen && !confirmExitOpen && !deleteConfirmOpen && !aboutOpen) {
       e.preventDefault();
       void appWindow.hide();
@@ -153,11 +196,13 @@
 
   function handleProfileCreate() {
     editingProfile = null;
+    rememberFocus("profile");
     dialogOpen = true;
   }
 
   function handleProfileEdit(profile: RecordingProfile) {
     editingProfile = profile;
+    rememberFocus("profile");
     dialogOpen = true;
   }
 
@@ -172,11 +217,12 @@
       applyProfile(profile);
     }
     scheduleSave();
-    await focusProfileSelect();
+    await returnFocus("profile");
   }
 
   async function handleProfileDelete(id: string) {
     deletingProfileId = id;
+    rememberFocus("delete");
     deleteConfirmOpen = true;
   }
 
@@ -189,13 +235,14 @@
     const active = profileStore.active;
     if (active) applyProfile(active);
     scheduleSave();
-    await focusProfileSelect();
+    // After the list has changed: Delete is disabled once one profile is left.
+    await returnFocus("delete");
   }
 
   async function handleDeleteCancel() {
     deleteConfirmOpen = false;
     deletingProfileId = null;
-    await focusProfileSelect();
+    await returnFocus("delete");
   }
 
   function handleSettingsSave(_patch: Partial<import("./lib/types").Settings>) {
@@ -206,11 +253,6 @@
     setTheme(t);             // applies to DOM + writes localStorage
     setThemePreference(t);   // updates settings store reactive state
     scheduleSave();          // persists to Tauri backend
-  }
-
-  async function focusProfileSelect() {
-    await tick();
-    document.getElementById("profile-select")?.focus();
   }
 
   async function handleStopAndExit() {
@@ -246,7 +288,7 @@
         event.preventDefault();
         if (isRecording) {
           if (appSettings.confirmExitDuringRecording) {
-            if (!confirmExitOpen) confirmExitOpen = true;
+            openConfirmExit();
           } else {
             await handleStopAndExit();
           }
@@ -263,12 +305,12 @@
         }
       });
 
-      await listen("tray-about-requested", () => { aboutOpen = true; });
+      await listen("tray-about-requested", () => openAbout());
 
       unlistenTrayQuit = await listen("tray-quit-requested", async () => {
         if (isRecording) {
           if (appSettings.confirmExitDuringRecording) {
-            if (!confirmExitOpen) confirmExitOpen = true;
+            openConfirmExit();
           } else {
             await handleStopAndExit();
           }
@@ -306,13 +348,13 @@
         type="button"
         class="btn-about"
         aria-label={m.about_btn_aria()}
-        onclick={() => aboutOpen = true}
+        onclick={openAbout}
       >ⓘ</button>
       <button
         type="button"
         class="btn-settings"
         aria-label={m.settings_btn_aria()}
-        onclick={() => settingsOpen = true}
+        onclick={() => { rememberFocus("settings"); settingsOpen = true; }}
       >⚙</button>
     </div>
   </div>
@@ -335,7 +377,7 @@
   <ProfileDialog
     profile={editingProfile}
     open={dialogOpen}
-    onclose={async () => { dialogOpen = false; await focusProfileSelect(); }}
+    onclose={async () => { dialogOpen = false; await returnFocus("profile"); }}
     onsave={handleProfileSave}
   />
 
@@ -393,12 +435,7 @@
   <AboutDialog
     open={aboutOpen}
     hotkey={appSettings.hotkey}
-    onclose={() => {
-      aboutOpen = false;
-      requestAnimationFrame(() =>
-        document.querySelector<HTMLElement>(".btn-about")?.focus()
-      );
-    }}
+    onclose={async () => { aboutOpen = false; await returnFocus("about"); }}
   />
 
   <SettingsDialog
@@ -409,7 +446,7 @@
     minimizeToTrayOnFocusLoss={appSettings.minimizeToTrayOnFocusLoss}
     language={appSettings.language}
     theme={appSettings.theme}
-    onclose={async () => { settingsOpen = false; await focusProfileSelect(); }}
+    onclose={async () => { settingsOpen = false; await returnFocus("settings"); }}
     onsave={handleSettingsSave}
     onthemechange={handleThemeChange}
     onminimizetotraytoggle={(v) => { setMinimizeToTrayOnFocusLoss(v); scheduleSave(); }}
@@ -418,7 +455,7 @@
   <ConfirmExitDialog
     open={confirmExitOpen}
     onstopandexit={handleStopAndExit}
-    oncancel={async () => { confirmExitOpen = false; await focusProfileSelect(); }}
+    oncancel={async () => { confirmExitOpen = false; await returnFocus("exit"); }}
   />
 
   <ConfirmDeleteDialog

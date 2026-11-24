@@ -1,10 +1,11 @@
 ---
 id: TASK-24
 title: Опис релізу на GitHub читається цілими реченнями
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-24T23:27:43Z'
-updated_date: '2026-11-24T23:52:21Z'
+updated_date: '2026-11-24T23:58:07Z'
 labels:
   - release
   - model-sonnet
@@ -44,6 +45,15 @@ Release бере опис релізу з розділу `CHANGELOG.md`, а ря
 - [ ] #4 Документацію оновлено там, де змінилася поведінка чи порядок роботи (README.md, README_UK.md, DEVELOPMENT.md)
 - [ ] #5 CHANGELOG.md оновлено: лише зміни, помітні користувачам (без подробиць про інструменти, тести, CI чи збірку)
 <!-- DOD:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. `CHANGELOG.md`: угорі знову порожній `## [Unreleased]`; кожен пункт розділу 0.1.1 — одним рядком (розділ 0.1.0 уже такий).
+2. `DEVELOPMENT.md`: у правилах про `CHANGELOG.md` — писати кожен пункт одним рядком і чому (опис релізу на GitHub бере розділ як є й показує кожен перенос як новий рядок); у порядку випуску, крок 4 — над перейменованим розділом додати новий порожній `## [Unreleased]`.
+3. Перевірка: логіка кроку «Extract release notes» з `release.yml`, запущена локально для 0.1.1, дає кожен пункт одним рядком; `just check`.
+4. Гілка `feature/task-24-changelog-one-line`; завершення й відправка — за рішенням власника.
+<!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
 

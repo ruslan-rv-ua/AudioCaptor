@@ -4,7 +4,7 @@ title: Випуск 0.1.1
 status: To Do
 assignee: []
 created_date: '2026-11-23T11:31:35Z'
-updated_date: '2026-11-24T21:31:27Z'
+updated_date: '2026-11-24T21:35:20Z'
 labels:
   - release
   - model-sonnet
@@ -20,7 +20,6 @@ dependencies:
   - TASK-16
   - TASK-17
   - TASK-18
-  - TASK-19
   - TASK-20
   - TASK-22
 references:

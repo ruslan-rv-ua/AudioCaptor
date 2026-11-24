@@ -28,6 +28,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Alt+R, the Resume button, the global hotkey or the tray menu.
 - When AudioCaptor starts, the screen reader now says its name once before it names the profile list. Before,
   NVDA said "AudioCaptor" six or seven times in a row.
+- AudioCaptor now keeps its log only in the `AudioCaptor-data\logs` folder next to the exe, and the log no longer
+  fills up with technical lines from the audio library. Before, it also wrote a second log to
+  `%LOCALAPPDATA%\com.audiocaptor.app\logs`. You can delete that `logs` folder: earlier versions left it behind.
 
 ## [0.1.0] — 2026-04-20
 

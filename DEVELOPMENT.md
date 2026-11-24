@@ -22,7 +22,7 @@ TypeScript у WebView2. Тут описано, що встановити, як �
 | Глобальна гаряча клавіша | `tauri-plugin-global-shortcut` |
 | Одна копія програми | `tauri-plugin-single-instance` |
 | Вибір теки | `tauri-plugin-dialog` |
-| Журнал | `tauri-plugin-log` (файл і консоль) |
+| Журнал | `tauri-plugin-log`: файл у `AudioCaptor-data/logs/` і консоль `just dev` (розділ «Портативний режим») |
 | Менеджер пакетів | [pnpm](https://pnpm.io/) |
 | Запуск команд | [just](https://github.com/casey/just) |
 
@@ -263,9 +263,15 @@ AudioCaptor-data/
 
 Теки програма створює під час першого запуску (`portable.rs`).
 
-Поки що туди потрапляє не все: другий журнал програма пише в `%LOCALAPPDATA%\com.audiocaptor.app\logs`
-(це має виправити TASK-20), а дані WebView2 — у `%LOCALAPPDATA%\com.audiocaptor.app\EBWebView` (чернетка
-DRAFT-6).
+Журнал програма пише у файл `AudioCaptor-data/logs/audiocaptor.log`, а в `just dev` — ще й у консоль. Це
+задано в `run()` у `src-tauri/src/lib.rs`: список місць запису замінює типовий список `tauri-plugin-log`
+(`targets`, а не `target`), бо типовий пише ще й у `%LOCALAPPDATA%\com.audiocaptor.app\logs`. Рівень журналу —
+Info: рядки `log::debug!` і `log::trace!` нікуди не потрапляють. Так у журнал не йдуть службові рядки бібліотеки
+`wasapi` (близько сотні за секунду запису), які раніше заповнювали його. Коли файл перевищує 1 МБ, модуль
+видаляє його й починає новий.
+
+Поза `AudioCaptor-data/` поки що лишаються дані WebView2: `%LOCALAPPDATA%\com.audiocaptor.app\EBWebView`
+(чернетка DRAFT-6). Тека `logs` поруч із нею лишилася від версій до TASK-20: нинішня програма туди не пише.
 
 ## Значки
 

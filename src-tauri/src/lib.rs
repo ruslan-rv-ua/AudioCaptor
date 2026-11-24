@@ -621,14 +621,22 @@ pub fn run() {
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             tray::show_main_window(app);
         }))
+        // The log goes to AudioCaptor-data/logs and to the console (seen only in
+        // `just dev`). `targets` replaces the plugin's default targets: `target`
+        // would add to them, and the default `LogDir` writes a second log to
+        // %LOCALAPPDATA%, outside the portable data folder (decision-1).
+        // The app logs at info, warn and error; below Info the log filled up
+        // with TRACE and DEBUG lines from the wasapi crate.
         .plugin(
             tauri_plugin_log::Builder::new()
-                .target(tauri_plugin_log::Target::new(
-                    tauri_plugin_log::TargetKind::Folder {
+                .targets([
+                    tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Stdout),
+                    tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Folder {
                         path: portable::data_dir().unwrap_or_default().join("logs"),
                         file_name: Some("audiocaptor".into()),
-                    },
-                ))
+                    }),
+                ])
+                .level(log::LevelFilter::Info)
                 .max_file_size(1_000_000)
                 .build(),
         )

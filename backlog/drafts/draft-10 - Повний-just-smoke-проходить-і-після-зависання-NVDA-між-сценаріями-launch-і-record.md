@@ -6,7 +6,7 @@ title: >-
 status: Draft
 assignee: []
 created_date: '2026-11-24T17:38:48Z'
-updated_date: '2026-11-24T22:42:54Z'
+updated_date: '2026-11-24T23:52:06Z'
 labels:
   - a11y
   - testing
@@ -66,4 +66,6 @@ priority: medium
 - Звіти: `task-22-smoke-full.txt` і `task-22-smoke-record.txt` у спільній теці нотаток.
 
 2026-11-25: власник переніс чернетку у віху 0.2.0 (m-2), щоб вона не затримувала випуск 0.1.1.
+
+2026-11-25: під час розбору чернеток 0.2.0 власник поки відклав рішення.
 <!-- SECTION:NOTES:END -->

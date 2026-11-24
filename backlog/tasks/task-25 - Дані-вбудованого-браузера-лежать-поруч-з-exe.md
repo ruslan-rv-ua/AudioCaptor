@@ -1,10 +1,10 @@
 ---
-id: DRAFT-6
+id: TASK-25
 title: Дані вбудованого браузера лежать поруч з exe
-status: Draft
+status: To Do
 assignee: []
 created_date: '2026-11-23T18:20:09Z'
-updated_date: '2026-11-24T22:42:54Z'
+updated_date: '2026-11-24T23:52:06Z'
 labels:
   - backend
   - model-sonnet
@@ -13,6 +13,7 @@ milestone: m-2
 dependencies: []
 priority: medium
 type: task
+ordinal: 10700
 ---
 
 ## Description
@@ -22,13 +23,18 @@ type: task
 
 У quick-snippets це вирішено так: профіль браузера лежить у `quick-snippets-webview/` поруч з exe, окремо від теки даних, щоб Scoop не зберігав кеш між оновленнями, а резервні копії теки даних його не захоплювали.
 
-Що має вирішити власник:
-- лишити як є;
-- перенести профіль браузера в окрему теку поруч з exe (як у quick-snippets);
-- перенести його всередину `AudioCaptor-data` (тоді Scoop зберігатиме кеш між оновленнями).
+Рішення власника (2026-11-25): профіль браузера лежить в окремій теці поруч з exe, як у quick-snippets, окремо від `AudioCaptor-data`. Після оновлення через Scoop профіль починається з нуля: зникають кеш і підказки автозаповнення.
 
 Старий профіль у `%LOCALAPPDATA%` програма в жодному разі не видаляє: ним можуть користуватися інші копії.
 <!-- SECTION:DESCRIPTION:END -->
+
+## Acceptance Criteria
+<!-- AC:BEGIN -->
+- [ ] #1 Дані вбудованого браузера (WebView2) програма тримає в окремій теці поруч з exe, а не в `%LOCALAPPDATA%\com.audiocaptor.app` і не в `AudioCaptor-data`
+- [ ] #2 Після запуску, запису й виходу з програми в `%LOCALAPPDATA%\com.audiocaptor.app` нічого не з'являється і не змінюється, а старого профілю браузера там програма не видаляє
+- [ ] #3 `just smoke` проходить, і тестова копія тримає дані браузера поруч зі своїм exe
+- [ ] #4 У `CHANGELOG.md` є запис про нову теку з поясненням, що стару теку `EBWebView` у `%LOCALAPPDATA%\com.audiocaptor.app` можна видалити, якщо старіші версії програми більше не потрібні
+<!-- AC:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->

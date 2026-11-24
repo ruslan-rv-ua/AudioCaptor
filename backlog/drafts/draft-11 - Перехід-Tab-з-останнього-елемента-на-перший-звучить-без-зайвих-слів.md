@@ -4,7 +4,7 @@ title: Перехід Tab з останнього елемента на перш
 status: Draft
 assignee: []
 created_date: '2026-11-24T21:19:42Z'
-updated_date: '2026-11-24T21:19:45Z'
+updated_date: '2026-11-24T23:52:06Z'
 labels:
   - frontend
   - a11y
@@ -45,3 +45,9 @@ priority: low
 - [ ] #4 Документацію оновлено там, де змінилася поведінка чи порядок роботи (README.md, README_UK.md, DEVELOPMENT.md)
 - [ ] #5 CHANGELOG.md оновлено: лише зміни, помітні користувачам (без подробиць про інструменти, тести, CI чи збірку)
 <!-- DOD:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-25: під час розбору чернеток 0.2.0 власник поки відклав рішення.
+<!-- SECTION:NOTES:END -->

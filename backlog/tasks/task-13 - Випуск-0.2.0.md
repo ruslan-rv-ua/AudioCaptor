@@ -4,6 +4,7 @@ title: Випуск 0.2.0
 status: To Do
 assignee: []
 created_date: '2026-11-23T11:32:40Z'
+updated_date: '2026-11-24T23:52:06Z'
 labels:
   - release
   - model-sonnet
@@ -12,6 +13,8 @@ milestone: m-2
 dependencies:
   - TASK-10
   - TASK-12
+  - TASK-24
+  - TASK-25
 references:
   - DEVELOPMENT.md
   - CHANGELOG.md

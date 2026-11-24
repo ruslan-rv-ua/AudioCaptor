@@ -1,6 +1,7 @@
 <script lang="ts">
   import { getVersion } from "@tauri-apps/api/app";
   import * as m from "../../paraglide/messages";
+  import { bringToFront } from "../utils/dialogLayer";
 
   interface Props {
     open: boolean;
@@ -42,7 +43,7 @@
 
 {#if open}
   <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="dialog-backdrop" onkeydown={handleKeydown}>
+  <div class="dialog-backdrop" onkeydown={handleKeydown} {@attach bringToFront}>
     <div
       class="dialog"
       role="dialog"
@@ -124,7 +125,6 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 100;
   }
 
   .dialog {

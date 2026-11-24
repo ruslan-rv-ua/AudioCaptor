@@ -3,6 +3,7 @@
   import * as m from "../../paraglide/messages";
   import { open as openDialog } from "@tauri-apps/plugin-dialog";
   import { getRecordingsDir } from "../utils/invoke";
+  import { bringToFront } from "../utils/dialogLayer";
 
   interface Props {
     profile: RecordingProfile | null;
@@ -137,7 +138,7 @@
 </script>
 
 {#if open}
-  <div class="dialog-backdrop">
+  <div class="dialog-backdrop" {@attach bringToFront}>
     <div
       class="dialog"
       role="dialog"
@@ -267,7 +268,6 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 100;
   }
   .dialog {
     background: var(--surface);

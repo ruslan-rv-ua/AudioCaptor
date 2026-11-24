@@ -18,7 +18,9 @@
                through a pause. Recording really starts (system audio of the default playback
                device, so no microphone is needed); the WAV file is not checked.
       dialogs  About (F1), Settings, New Profile and the delete confirmation: focus enters the
-               dialog, Escape closes it and focus returns to where the dialog was opened.
+               dialog, Escape closes it and focus returns to where the dialog was opened. F1 in
+               Settings opens About on top of Settings: UI Automation finds About in the middle
+               of the window, and Settings again once About is closed.
       tray     Escape hides the window; starting the exe again shows it and NVDA announces it.
 
     Exit code: 0 everything passed; 1 a step or an NVDA check failed, or the test copy wrote to
@@ -189,7 +191,7 @@ $PageNoise = $AppTitle + '|document|' + [regex]::Unescape('\u0434\u043e\u043a\u0
 $WebviewNoise = 'tauri.localhost|web content|' + [regex]::Unescape('\u0432\u0435\u0431-\u0432\u043c\u0456\u0441\u0442')
 
 # --- Native helpers ----------------------------------------------------------------------------
-Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
+Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes, WindowsBase
 if (-not ('AcSmokeNative' -as [type])) {
     Add-Type -TypeDefinition @'
 using System;
@@ -556,6 +558,29 @@ function Close-Dialog([string]$InsideId, [string]$Opener) {
     Send-Keys 'Esc'
     $null = Wait-Until 'the dialog to close' { -not (Find-ById $InsideId) } 3
     Confirm-Focus $Opener
+}
+
+# The names of the element in the middle of the app window and of its parents, innermost first.
+# UI Automation finds that element by what is drawn there, so the dialog drawn on top is among them.
+function Get-NamesAtCenter {
+    $r = (Get-AppWindow).Current.BoundingRectangle
+    $e = $AE::FromPoint((New-Object System.Windows.Point ($r.X + $r.Width / 2), ($r.Y + $r.Height / 2)))
+    $walker = [System.Windows.Automation.TreeWalker]::ControlViewWalker
+    $names = New-Object System.Collections.Generic.List[string]
+    for ($i = 0; $e -and $i -lt 30; $i++) {
+        $names.Add([string]$e.Current.Name)
+        $e = $walker.GetParent($e)
+    }
+    return $names.ToArray()
+}
+
+# The dialog named $Name, not the one named $Not, must be drawn in the middle of the window.
+function Test-OnTop([string]$Name, [string]$Not) {
+    try { $null = Wait-Until "the '$Name' dialog in the middle of the window" { $n = @(Get-NamesAtCenter); ($n -contains $Name) -and ($n -notcontains $Not) } 2 } catch { }
+    $names = @(Get-NamesAtCenter)
+    $shown = (@($names | Where-Object { $_ } | ForEach-Object { "'$_'" })) -join ' < '
+    $script:StepInfo.Add("in the middle of the window: $shown")
+    Add-Check "the '$Name' dialog is drawn on top" (($names -contains $Name) -and ($names -notcontains $Not)) "the middle of the window shows $shown"
 }
 
 # --- The test's own window ---------------------------------------------------------------------
@@ -984,6 +1009,18 @@ function Invoke-DialogsScenario {
         Send-Keys 'Space'
         $null = Wait-Until 'focus on the hotkey field' { (Get-Focus).Id -eq 'settings-hotkey-display' }
     } -Expect $UI.Settings, $UI.CurrentHotkey -ExpectAny $Role.Dialog
+
+    # F1 works anywhere: About opens over Settings and must be drawn on top of it, since it has focus.
+    Invoke-Step 'F1 in Settings opens About on top of Settings: focus on its heading, NVDA reads the dialog' {
+        Send-Keys 'F1'
+        $null = Wait-Until 'focus on the About heading' { (Get-Focus).Id -eq 'about-dialog-title' }
+        Test-OnTop $UI.About $UI.Settings
+    } -Expect $UI.About -ExpectAny $Role.Dialog
+
+    Invoke-Step 'Escape closes About: Settings on top again, focus back on the hotkey field' {
+        Close-Dialog 'about-dialog-title' $UI.CurrentHotkey
+        Test-OnTop $UI.Settings $UI.About
+    } -Expect $UI.CurrentHotkey
 
     Invoke-Step "Escape closes Settings: focus back on the '$($UI.OpenSettings)' button" {
         Close-Dialog 'settings-hotkey-display' $UI.OpenSettings

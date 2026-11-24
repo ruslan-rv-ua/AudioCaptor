@@ -4,6 +4,7 @@
   import * as m from "../../paraglide/messages";
   import { updateHotkey, updateSoundEnabled, setLanguage, setConfirmExitDuringRecording } from "../stores/settings.svelte";
   import * as api from "../utils/invoke";
+  import { bringToFront } from "../utils/dialogLayer";
 
   interface Props {
     open: boolean;
@@ -134,7 +135,7 @@
 </script>
 
 {#if open}
-  <div class="dialog-backdrop">
+  <div class="dialog-backdrop" {@attach bringToFront}>
     <div
       class="dialog"
       role="dialog"
@@ -246,7 +247,6 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 100;
   }
   .dialog {
     background: var(--surface);

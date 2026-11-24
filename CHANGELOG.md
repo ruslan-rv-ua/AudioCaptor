@@ -31,6 +31,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - AudioCaptor now keeps its log only in the `AudioCaptor-data\logs` folder next to the exe, and the log no longer
   fills up with technical lines from the audio library. Before, it also wrote a second log to
   `%LOCALAPPDATA%\com.audiocaptor.app\logs`. You can delete that `logs` folder: earlier versions left it behind.
+- About, opened with F1 or from the tray menu while Settings or the delete or exit confirmation is open, now
+  appears on top of that dialog. Before, it opened behind it: the keys went to About and the screen reader read
+  About, but the screen showed the other dialog. Any dialog that opens over another one now appears on top of it.
 
 ## [0.1.0] — 2026-04-20
 

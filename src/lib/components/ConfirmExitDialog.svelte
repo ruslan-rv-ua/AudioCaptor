@@ -1,5 +1,6 @@
 <script lang="ts">
   import * as m from "../../paraglide/messages";
+  import { bringToFront } from "../utils/dialogLayer";
 
   interface Props {
     open: boolean;
@@ -28,7 +29,7 @@
 </script>
 
 {#if open}
-  <div class="dialog-backdrop">
+  <div class="dialog-backdrop" {@attach bringToFront}>
     <div
       class="dialog"
       role="alertdialog"
@@ -60,7 +61,6 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 200;
   }
   .dialog {
     background: var(--surface);

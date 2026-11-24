@@ -1,213 +1,352 @@
-# AudioCaptor — Development Guide
+# AudioCaptor — посібник розробника
 
-## Tech Stack
+AudioCaptor — портативний записувач звуку для Windows: Tauri v2, бекенд на Rust, інтерфейс на Svelte 5 і
+TypeScript у WebView2. Тут описано, що встановити, як зібрати й перевірити програму, як ведеться робота і як
+випустити нову версію.
 
-| Layer | Technology |
-|-------|-----------|
-| Framework | [Tauri v2](https://v2.tauri.app/) (Rust backend + WebView frontend) |
-| Backend | Rust 2021 edition |
-| Frontend | Svelte 5 + TypeScript + Vite |
-| Audio capture | [wasapi](https://github.com/HEnquist/wasapi-rs) (WASAPI bindings) |
-| Audio mixing | Real-time mixer with [rubato](https://github.com/HEnquist/rubato) resampling |
-| WAV writing | [hound](https://github.com/ruuda/hound) |
-| Sound notifications | [rodio](https://github.com/RustAudio/rodio) (OGG playback via `include_bytes!`) |
-| Global hotkeys | `tauri-plugin-global-shortcut` |
-| Single instance | `tauri-plugin-single-instance` |
-| Logging | `tauri-plugin-log` (file + console) |
-| Package manager | [pnpm](https://pnpm.io/) |
-| Task runner | [just](https://github.com/casey/just) |
+Найважливіша вимога — доступність для користувачів екранних читачів: кожна зміна інтерфейсу зберігає доступ
+із клавіатури, підписи й озвучення змін стану (розділ «Доступність»).
 
-## Prerequisites
+## Технології
 
-- **Windows 10+** (the app is Windows-only by design)
-- [Rust](https://rustup.rs/) via rustup: the version is pinned in `rust-toolchain.toml`, and rustup installs it automatically
-- [Node.js](https://nodejs.org/) 18+
-- [pnpm](https://pnpm.io/) (`npm install -g pnpm`)
-- [just](https://github.com/casey/just) (optional, for task shortcuts)
-- [WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/) (pre-installed on Windows 11; available on most Windows 10 machines)
+| Шар | Технологія |
+|-----|------------|
+| Фреймворк | [Tauri v2](https://v2.tauri.app/) (бекенд на Rust + інтерфейс у WebView) |
+| Бекенд | Rust (редакція 2021) |
+| Інтерфейс | Svelte 5 + TypeScript + Vite |
+| Переклади інтерфейсу | Paraglide JS (inlang), тексти в `messages/` |
+| Захоплення звуку | [wasapi](https://github.com/HEnquist/wasapi-rs) (обгортка WASAPI) |
+| Мікшування | Мікшер реального часу зі зміною частоти дискретизації через [rubato](https://github.com/HEnquist/rubato) |
+| Запис WAV | [hound](https://github.com/ruuda/hound) |
+| Звукові сигнали | [rodio](https://github.com/RustAudio/rodio) (OGG, вбудовані через `include_bytes!`) |
+| Глобальна гаряча клавіша | `tauri-plugin-global-shortcut` |
+| Одна копія програми | `tauri-plugin-single-instance` |
+| Вибір теки | `tauri-plugin-dialog` |
+| Журнал | `tauri-plugin-log` (файл і консоль) |
+| Менеджер пакетів | [pnpm](https://pnpm.io/) |
+| Запуск команд | [just](https://github.com/casey/just) |
 
-## Getting Started
+## Що потрібно встановити
 
-```bash
-# Install JavaScript dependencies
+- **Windows 10 або новіша** — програма працює лише у Windows.
+- **Rust** через [rustup](https://rustup.rs/). Версію й компоненти задає `rust-toolchain.toml`: rustup ставить
+  їх сам під час першої команди `cargo` у теці проєкту. Поставити наперед можна командою
+  `rustup toolchain install` у корені проєкту — так робить CI.
+- **Microsoft C++ Build Tools** з набором «Desktop development with C++»
+  ([завантаження](https://visualstudio.microsoft.com/visual-cpp-build-tools/)): ними Rust для Windows
+  компонує exe.
+- **[Node.js](https://nodejs.org/) 22** — цю версію ставлять CI і Release. Vite 8 і
+  `@sveltejs/vite-plugin-svelte` 7 працюють з Node 20.19+, 22.12+ або 24+; Node 18 уже не підходить.
+- **[pnpm](https://pnpm.io/) 10**: `npm install -g pnpm@10`. Точну версію записано в `package.json`
+  (`"packageManager": "pnpm@10.32.1"`), і CI бере її звідти. Без `@10` npm поставив би новішу основну версію
+  pnpm, ніж у CI.
+- **[just](https://github.com/casey/just)** — запускає `just check`, `just smoke` і решту рецептів із
+  `justfile`. Рецепти just виконує через `sh`, тож `sh` має бути в PATH: він є в Git for Windows (тека `bin`)
+  і в Scoop-пакеті `git`. Без нього just пише «could not find the shell `sh`».
+- **[WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/)** — уже є в Windows 11
+  і на більшості комп'ютерів з Windows 10.
+- Для роботи з проєктом: [git-flow-next](https://github.com/gittower/git-flow-next) (команда `git flow`),
+  [Backlog.md](https://github.com/MrLesk/Backlog.md) (команда `backlog`) і
+  [GitHub CLI](https://cli.github.com/) (команда `gh`: запуск workflow і перегляд релізів).
+- Для `just smoke`: NVDA і Windows PowerShell 5.1 (є у Windows).
+
+## Початок роботи
+
+```powershell
 pnpm install
-
-# Start development server (Rust + Vite hot-reload)
-just dev       # or: pnpm tauri dev
+just dev
 ```
 
-The app will open automatically. Rust changes trigger a rebuild; frontend changes hot-reload instantly.
+`just dev` (те саме, що `pnpm tauri dev`) збирає програму й відкриває її вікно. Зміни в Rust перезбирають
+програму, зміни інтерфейсу з'являються одразу. Файли перекладів у `src/paraglide/` Vite генерує сам; у git їх
+немає.
 
-## Project Structure
+Перед `just dev` закрийте свій AudioCaptor, якщо він запущений. Програма дозволяє лише одну копію, тож копія
+для розробки тільки покаже вікно вже запущеної і закриється.
+
+## Як ведеться проєкт
+
+Проєкт веде один власник. Правила для агентів Claude Code записано в `CLAUDE.md`; нижче головне з них. Власник
+координує роботу в головній сесії Claude Code, а кожну задачу віддає окремій робочій сесії на власній гілці.
+
+### Задачі, рішення й дослідження: Backlog.md
+
+Усе, що треба зробити, що вирішено й що досліджено, лежить у теці `backlog/`. Її веде
+[Backlog.md](https://github.com/MrLesk/Backlog.md) — програма командного рядка `backlog`. Записи в ній
+пишуться українською.
+
+| Що | Команда |
+|----|---------|
+| Задачі | `backlog task list --plain`; одна задача — `backlog task 8 --plain` |
+| Чернетки: робота, що чекає рішення власника чи даних ззовні | `backlog draft list --plain` |
+| Рішення | `backlog decision list --plain`; одне рішення — `backlog decision view decision-1 --plain` |
+| Дослідження та інші документи | `backlog doc list --plain`; один документ — `backlog doc view doc-3 --plain` |
+| Етапи | `backlog milestone list --plain` |
+| Пошук усюди | `backlog search "NVDA" --plain` |
+
+- Файли в `backlog/` змінюють лише командами `backlog` (виняток — `backlog/config.yml`): так зберігаються
+  зв'язки між записами та їхня історія. Довідка — `backlog <команда> --help`.
+- `backlog` запускають з PowerShell, не з Git Bash: Git Bash перетворює аргументи на кшталт `/api` на шляхи
+  Windows.
+- Роботу, знайдену мимохідь, спершу записують у backlog як задачу чи чернетку; до неї беруться лише зі слова
+  власника.
+- Кожна задача й чернетка має по одній мітці `model-*` і `effort-*`: рекомендовану модель Claude і рівень
+  зусиль.
+- Кожна задача має список Definition of Done (типовий записано в `backlog/config.yml`): `just check`, тексти
+  інтерфейсу двома мовами, перевірка з клавіатури й NVDA, документація, `CHANGELOG.md`.
+- Виконана задача переходить у стан Done, а потім в архів (`backlog/archive/`). Її однаково можна прочитати
+  командою `backlog task <номер> --plain`.
+
+### Гілки: git flow
+
+Репозиторій працює за git flow з інструментом [git-flow-next](https://github.com/gittower/git-flow-next).
+Налаштування показує `git-flow overview`, довідку — `git-flow <команда> --help` (`git flow --help` не
+працює).
+
+- Кожну задачу роблять на окремій гілці від `develop`, названій за задачею:
+  `git flow feature start task-12-flac-export`; для виправлення помилки — `git flow bugfix start <назва>`.
+- Коли гілку завершувати, вирішує власник: `git flow feature finish <назва> --no-fetch --no-push` (для
+  помилки — `git flow bugfix finish <назва> --no-fetch --no-push`).
+- Зміни лише в `backlog/` і `CLAUDE.md` комітять прямо в `develop`, без гілки.
+- `main` змінюється тільки під час випуску (розділ «Порядок випуску»).
+- Гілки завершують локально; pull request відкривають, лише коли власник про це просить. Push і запуск
+  workflow на GitHub — тільки з дозволу власника.
+- Налаштування git flow зберігаються лише в `.git/config` цієї копії репозиторію: спільного файлу з ними
+  немає.
+
+### Перевірки: `just check`
+
+`just check` запускає всі локальні перевірки по черзі й зупиняється на першій помилці:
+
+1. `pnpm vite:build` — збирає інтерфейс і генерує `src/paraglide/` (без цих файлів `pnpm check` не працює);
+2. `pnpm check` — svelte-check і перевірка типів TypeScript;
+3. `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings`;
+4. `cargo test --manifest-path src-tauri/Cargo.toml`;
+5. `cargo fmt --manifest-path src-tauri/Cargo.toml -- --check`.
+
+Push на GitHub не запускає CI, тож саме локальний `just check` вирішує, чи задача готова. CI повторює ті самі
+перевірки лише для pull request і на запит (розділ «CI»).
+
+Rust-код форматується стандартним стилем rustfmt. Перед комітом:
+
+```powershell
+cargo fmt --manifest-path src-tauri/Cargo.toml
+```
+
+Версію Rust закріплено у файлі `rust-toolchain.toml` (зараз 1.99.1 з компонентами clippy і rustfmt). Так новий
+випуск Rust із новими правилами clippy не зробить перевірки червоними сам собою. Зміна цієї версії — окрема
+свідома задача. CI і Release ставлять ту саму версію з цього файлу.
+
+### Мови й тексти
+
+- Код, коментарі в коді й повідомлення комітів — англійською. Записи в Backlog і цей документ — українською.
+- Кожен новий чи змінений текст інтерфейсу має бути англійською й українською: у `messages/en.json` і
+  `messages/uk.json`. Підписи меню трея перекладаються в Rust, у `src-tauri/src/tray.rs` (рішення
+  decision-4).
+- `CHANGELOG.md` пишуть для користувачів: лише зміни, які вони помітять (нові можливості, виправлення, змінена
+  поведінка). Інструменти, тести, CI й збирання туди не потрапляють. Нові записи йдуть у розділ
+  `## [Unreleased]`.
+
+## Структура проєкту
 
 ```
 AudioCaptor/
-├── src/                        # Frontend (Svelte 5 + TypeScript)
-│   ├── App.svelte              # Main application component
-│   ├── main.ts                 # Entry point
-│   ├── app.css                 # Global styles & CSS tokens
+├── src/                        # Інтерфейс (Svelte 5 + TypeScript)
+│   ├── App.svelte              # Головний компонент
+│   ├── main.ts                 # Точка входу
+│   ├── app.css                 # Глобальні стилі й CSS-змінні
+│   ├── paraglide/              # Згенеровані переклади (створює Vite, у git немає)
 │   └── lib/
-│       ├── i18n.ts             # Paraglide i18n initialization
-│       ├── components/         # UI components
-│       ├── stores/             # Svelte state stores
-│       ├── types/              # TypeScript type definitions
-│       └── utils/              # IPC invoke helpers
-├── src-tauri/                  # Backend (Rust / Tauri)
+│       ├── i18n.ts             # Ініціалізація Paraglide
+│       ├── components/         # Компоненти інтерфейсу
+│       ├── stores/             # Сховища стану Svelte
+│       ├── types/              # Типи TypeScript
+│       └── utils/              # Виклики IPC і форматування
+├── src-tauri/                  # Бекенд (Rust / Tauri)
 │   ├── src/
-│   │   ├── lib.rs              # Tauri commands & app setup
-│   │   ├── main.rs             # Entry point
-│   │   ├── audio/              # Audio capture, mixing, writing
-│   │   │   ├── capture.rs      # WASAPI mic & loopback capture
-│   │   │   ├── devices.rs      # Device enumeration
-│   │   │   ├── mixer.rs        # Real-time audio mixer
-│   │   │   ├── writer.rs       # WAV file writer
-│   │   │   └── types.rs        # Audio types & enums
-│   │   ├── device_monitor.rs   # IMMNotificationClient hot-plug detection
-│   │   ├── hotkey.rs           # Global hotkey FSM (short/long press)
-│   │   ├── profiles.rs         # Recording profiles CRUD
-│   │   ├── settings.rs         # Settings persistence & migration
-│   │   ├── portable.rs         # Portable mode (paths relative to exe)
-│   │   ├── sounds.rs           # Notification sounds (start/pause/stop)
-│   │   ├── state.rs            # Shared application state
-│   │   └── tray.rs             # System tray icon & menu
-│   ├── sounds/                 # OGG notification sound files
-│   ├── icons/                  # App icons (all platforms)
-│   ├── capabilities/           # Tauri permission capabilities
-│   ├── tauri.conf.json         # Tauri configuration
-│   └── Cargo.toml              # Rust dependencies
-├── messages/                   # i18n message files (en, uk)
-├── backlog/                    # Tasks, milestones, decisions & research (Backlog.md)
+│   │   ├── lib.rs              # Команди Tauri і запуск програми
+│   │   ├── main.rs             # Точка входу
+│   │   ├── audio/              # Захоплення, мікшування, запис
+│   │   │   ├── capture.rs      # Захоплення мікрофона й системного звуку (WASAPI)
+│   │   │   ├── devices.rs      # Перелік пристроїв
+│   │   │   ├── mixer.rs        # Мікшер реального часу
+│   │   │   ├── writer.rs       # Запис WAV
+│   │   │   └── types.rs        # Аудіотипи й переліки
+│   │   ├── device_monitor.rs   # Підключення й відключення пристроїв (IMMNotificationClient)
+│   │   ├── hotkey.rs           # Глобальна гаряча клавіша: короткий і довгий натиск
+│   │   ├── profiles.rs         # Профілі запису
+│   │   ├── settings.rs         # Збереження налаштувань і їхні міграції
+│   │   ├── portable.rs         # Портативний режим (шляхи відносно exe)
+│   │   ├── sounds.rs           # Звукові сигнали (старт, пауза, стоп)
+│   │   ├── state.rs            # Спільний стан програми
+│   │   └── tray.rs             # Значок і меню трея
+│   ├── sounds/                 # Звуки OGG
+│   ├── icons/                  # Значки програми для всіх платформ
+│   ├── capabilities/           # Дозволи Tauri
+│   ├── .cargo/config.toml      # Статичний C runtime (+crt-static)
+│   ├── tauri.conf.json         # Конфігурація Tauri
+│   ├── Cargo.toml              # Залежності Rust і профілі збирання
+│   └── Cargo.lock              # Точні версії залежностей Rust
+├── messages/                   # Тексти інтерфейсу (en, uk)
+├── project.inlang/             # Налаштування Paraglide (inlang)
+├── backlog/                    # Задачі, чернетки, рішення, документи, етапи (Backlog.md)
 ├── scripts/
-│   └── smoke-nvda.ps1          # NVDA smoke test of the built exe (just smoke)
-├── public/                     # Static assets (favicon)
-├── index.html                  # HTML entry point
-├── package.json                # Node.js config & scripts
-├── vite.config.ts              # Vite bundler configuration
-├── justfile                    # Task runner recipes
-└── tsconfig*.json              # TypeScript configuration
+│   └── smoke-nvda.ps1          # Перевірка зібраного exe з NVDA (just smoke)
+├── .github/workflows/          # CI (ci.yml) і Release (release.yml)
+├── public/                     # Статичні файли (favicon)
+├── index.html                  # HTML-точка входу
+├── package.json                # Налаштування Node.js і скрипти
+├── vite.config.ts              # Налаштування Vite
+├── justfile                    # Рецепти just
+├── rust-toolchain.toml         # Закріплена версія Rust
+├── CLAUDE.md                   # Правила для агентів Claude Code
+├── CHANGELOG.md                # Зміни для користувачів
+└── tsconfig*.json              # Налаштування TypeScript
 ```
 
-## Build Commands
+## Команди
 
-| Command | Description |
-|---------|-------------|
-| `just dev` | Start dev server with hot-reload |
-| `just build` | Production build (optimized, slow compile) |
-| `just build-fast` | Fast build (less optimization, quick compile) |
-| `just clean` | Clean Rust build artifacts |
-| `just install` | Install JS dependencies |
-| `just vite-dev` | Frontend-only dev server (no Rust) |
-| `just check` | All local checks: frontend build and type check, clippy, tests, `cargo fmt --check`; stops at the first failure |
-| `just smoke [scenario]` | NVDA smoke test of the release exe, local only (see «Перевірка з NVDA» below) |
+| Команда | Що робить |
+|---------|-----------|
+| `just` | Показує список рецептів |
+| `just dev` | Запуск для розробки з автоматичним перезбиранням |
+| `just build` | Збирання для випуску (оптимізоване, компілюється повільно) |
+| `just build-fast` | Швидке збирання (менше оптимізацій, компілюється швидко) |
+| `just clean` | Видаляє зібране Rust (`src-tauri/target`) |
+| `just install` | Встановлює залежності JavaScript |
+| `just vite-dev` | Лише сервер інтерфейсу, без Rust |
+| `just check` | Усі локальні перевірки: збирання інтерфейсу й перевірка типів, clippy, тести, `cargo fmt --check`; зупиняється на першій помилці |
+| `just smoke [сценарій]` | Перевірка зібраного exe з NVDA, лише локально (розділ «Перевірка з NVDA») |
 
 <details>
-<summary>Equivalent pnpm commands</summary>
+<summary>Ті самі команди через pnpm</summary>
 
-```bash
-pnpm tauri dev                                       # dev
-pnpm tauri build --no-bundle                         # build (release profile)
+```powershell
+pnpm tauri dev                                          # dev
+pnpm tauri build --no-bundle                            # build (профіль release)
 pnpm tauri build --no-bundle -- --profile release-fast  # build-fast
-pnpm vite dev --port 1420                            # vite-dev
+pnpm vite dev --port 1420                               # vite-dev
 ```
 
 </details>
 
-## Build Profiles
+## Профілі збирання
 
-| Profile | Optimizations | Use Case |
-|---------|--------------|----------|
-| `release` | `lto=true`, `codegen-units=1`, `opt-level="s"`, `strip=true`, `panic="abort"` | Final distribution |
-| `release-fast` | `lto=false`, `codegen-units=16`, `opt-level=1`, `panic="unwind"` | Quick iteration during development |
+| Профіль | Оптимізації | Для чого |
+|---------|-------------|----------|
+| `release` | `lto=true`, `codegen-units=1`, `opt-level="s"`, `strip=true`, `panic="abort"` | Випуск |
+| `release-fast` | `lto=false`, `codegen-units=16`, `opt-level=1`, `strip=false`, `panic="unwind"` | Швидкі збирання під час розробки |
 
-The output binary is located at:
+Зібраний exe лежить тут:
+
 - **release**: `src-tauri/target/release/AudioCaptor.exe`
 - **release-fast**: `src-tauri/target/release-fast/AudioCaptor.exe`
 
-## Portable Mode
+Назву `AudioCaptor.exe` задано явно (`mainBinaryName` у `src-tauri/tauri.conf.json`); на неї спираються
+Release і маніфест Scoop (рішення decision-2).
 
-AudioCaptor runs as a **single portable executable** — no installation required. All data is stored in `AudioCaptor-data/` next to the exe:
+## Портативний режим
+
+AudioCaptor — **один портативний exe**, встановлювати його не треба. Свої дані програма тримає в теці
+`AudioCaptor-data/` поруч з exe (рішення decision-1):
 
 ```
 AudioCaptor.exe
 AudioCaptor-data/
-├── settings.json     # User preferences
-├── logs/             # Application logs
-└── Recordings/       # Default recordings folder
+├── settings.json     # Налаштування й профілі
+├── logs/             # Журнали програми
+└── Recordings/       # Тека записів за замовчуванням
 ```
 
-These directories are created automatically on first launch (see `portable.rs`).
+Теки програма створює під час першого запуску (`portable.rs`).
 
-## App Icons
+Поки що туди потрапляє не все: другий журнал програма пише в `%LOCALAPPDATA%\com.audiocaptor.app\logs`
+(це має виправити TASK-20), а дані WebView2 — у `%LOCALAPPDATA%\com.audiocaptor.app\EBWebView` (чернетка
+DRAFT-6).
 
-Icons are generated from a single 1024×1024 source PNG using the Tauri CLI:
+## Значки
 
-```bash
+Значки генерує Tauri CLI з одного PNG:
+
+```powershell
 pnpm tauri icon src-tauri/icons/128x128.png
 ```
 
-This generates all required variants in `src-tauri/icons/` (ICO for Windows, ICNS for macOS, PNGs for Linux, plus mobile icons). The Windows Store Square logos and the webview favicon are generated separately with ImageMagick.
+Команда перезаписує всі варіанти в `src-tauri/icons/`: ICO для Windows, ICNS для macOS, PNG різних розмірів
+(зокрема логотипи Windows Store `Square*Logo.png` і `StoreLogo.png`) і значки для Android та iOS.
 
-Icon integration points:
-- `src-tauri/icons/` — all platform icon variants
-- `src-tauri/tauri.conf.json` → `bundle.icon` — references for the packaging step
-- `public/favicon.png` — webview favicon (referenced in `index.html`)
+Вихідного файлу 1024×1024, з якого зроблено нинішні значки, у репозиторії вже немає, а `128x128.png` малий:
+усе, що більше за 128 пікселів (`icon.png`, `128x128@2x.png`, ICNS, значки iOS), вийде збільшеним і
+розмитим. Для нового логотипа передайте команді PNG 1024×1024.
 
-## Architecture Overview
+Значок вебсторінки `public/favicon.png` (32×32) команда не створює: його роблять окремо (раніше — у
+ImageMagick).
 
-### Audio Pipeline
+Де використовуються значки:
 
-```
-┌──────────┐     ┌───────────┐     ┌─────────┐     ┌───────────┐
-│ WASAPI   │────▶│ Ring      │────▶│ Mixer   │────▶│ WAV       │
-│ Capture  │     │ Buffers   │     │ Thread  │     │ Writer    │
-│ Threads  │     └───────────┘     │         │     │ (hound)   │
-│          │                       │ resample│     └───────────┘
-│ • mic    │                       │ volume  │
-│ • loopback│                      │ clip    │
-└──────────┘                       └─────────┘
-```
+- `src-tauri/icons/` — усі варіанти;
+- `src-tauri/tauri.conf.json` → `bundle.icon` — значки для збирання;
+- `public/favicon.png` — значок вебсторінки (підключено в `index.html`);
+- `README.md` і `README_UK.md` показують `src-tauri/icons/128x128.png`.
 
-- **Capture threads**: One per audio source (mic, loopback) using WASAPI shared mode
-- **Ring buffers**: Lock-free transfer from capture threads to mixer
-- **Mixer thread**: Resamples if needed, applies volume, clips, and writes to WAV
-- **Pause**: Mixer keeps reading buffers (prevents desync) but skips writing
+## Архітектура
 
-### IPC Commands
+### Звук: від захоплення до файлу
 
-Frontend communicates with backend via Tauri IPC commands:
+Звук проходить такий шлях: потоки захоплення WASAPI → кільцеві буфери → потік мікшера → запис WAV (hound).
 
-| Command | Direction |
-|---------|-----------|
-| `get_audio_devices` | Frontend → Backend |
-| `start_recording` | Frontend → Backend |
-| `pause_recording` | Frontend → Backend |
-| `resume_recording` | Frontend → Backend |
-| `stop_recording` | Frontend → Backend |
-| `load_settings` / `save_settings` | Frontend ↔ Backend |
-| `recording-state-changed` | Backend → Frontend (event) |
+- **Потоки захоплення** — по одному на джерело (мікрофон, системний звук через loopback), WASAPI у спільному
+  режимі.
+- **Кільцеві буфери** передають звук від потоків захоплення до мікшера без блокувань.
+- **Потік мікшера** за потреби змінює частоту дискретизації, застосовує гучність, обрізає піки й пише у WAV.
+- **Пауза**: мікшер далі читає буфери (щоб джерела не розійшлися в часі), але нічого не пише.
 
-### Global Hotkey FSM
+### Команди IPC
 
-The global hotkey (default: `Pause/Break`) uses a finite state machine with short/long press detection:
+Інтерфейс звертається до бекенду через команди IPC Tauri. Основні з них:
 
-| Current State | Short press (<500ms) | Long press (≥500ms) |
-|--------------|---------------------|---------------------|
-| Idle | → Start recording | → Start recording |
-| Recording | → Pause | → Stop |
-| Paused | → Resume | → Stop |
+| Команда | Напрям |
+|---------|--------|
+| `get_audio_devices` | Інтерфейс → бекенд |
+| `start_recording` | Інтерфейс → бекенд |
+| `pause_recording` | Інтерфейс → бекенд |
+| `resume_recording` | Інтерфейс → бекенд |
+| `stop_recording` | Інтерфейс → бекенд |
+| `load_settings` / `save_settings` | Інтерфейс ↔ бекенд |
+| `recording-state-changed` | Бекенд → інтерфейс (подія) |
 
-## Accessibility
+Повний список команд — у `tauri::generate_handler!` у `src-tauri/src/lib.rs`; події бекенд надсилає
+викликами `emit`.
 
-Accessibility (a11y) is a **highest-priority requirement**:
+### Глобальна гаряча клавіша
 
-- All UI elements have ARIA labels and roles
-- Full keyboard navigation (Tab, Enter, Escape)
-- Mnemonics: Alt+S (Start), Alt+P (Pause), Alt+R (Resume), Alt+T (Stop), Alt+I (Status info)
-- `aria-live` region announces state changes to screen readers
-- `decorations: true` in Tauri config (required for screen reader compatibility)
-- Svelte compile-time a11y checks are enabled
-- Sound notifications duplicate visual state changes
-- `<body role="application">` in `index.html` keeps NVDA out of browse mode, so keys reach the app; every text the user must hear has to be a label, a description or an announcement. Why, and how NVDA's browse and focus modes work in WebView2: backlog document doc-3 (`backlog doc view doc-3 --plain`)
+Глобальна гаряча клавіша (типово `Pause/Break`) розрізняє короткий і довгий натиск:
+
+| Поточний стан | Короткий натиск (<500 мс) | Довгий натиск (≥500 мс) |
+|---------------|---------------------------|-------------------------|
+| Очікування | → Почати запис | → Почати запис |
+| Запис | → Пауза | → Зупинити |
+| Пауза | → Продовжити | → Зупинити |
+
+Довгий натиск зупиняє запис, щойно клавішу протримали 500 мс, не чекаючи, поки її відпустять.
+
+## Доступність
+
+Доступність — **найважливіша вимога**:
+
+- Усі елементи інтерфейсу мають ARIA-підписи й ролі.
+- Повне керування з клавіатури (Tab, Enter, Escape).
+- Комбінації з Alt: Alt+S (старт), Alt+P (пауза), Alt+R (продовження), Alt+T (стоп), Alt+I (поточний стан).
+- Область `aria-live` оголошує зміни стану екранним читачам.
+- `decorations: true` у конфігурації Tauri (потрібно для сумісності з екранними читачами).
+- Svelte під час компіляції перевіряє доступність; попередження показує `pnpm check`.
+- Звукові сигнали дублюють зміни стану на екрані.
+- `<body role="application">` в `index.html` не пускає NVDA в режим огляду, тож клавіші доходять до програми.
+  Через це кожен текст, який користувач має почути, мусить бути підписом, описом або оголошенням. Чому так і
+  як режими огляду й фокуса NVDA працюють у WebView2 — документ doc-3 у Backlog
+  (`backlog doc view doc-3 --plain`).
+- Зміни в інтерфейсі, фокусі, діалогах чи оголошеннях перевіряють з клавіатури і з NVDA, зокрема тестом
+  `just smoke` (наступний розділ).
 
 ## Перевірка з NVDA (`just smoke`)
 
@@ -282,16 +421,32 @@ CI і Release її не запускають.
 Скрипт написано для Windows PowerShell 5.1 і лише символами ASCII: файл без BOM ця версія читає в
 кодуванні ANSI. Українські слова записано в ньому як послідовності `\u`.
 
-## CI/CD
+## CI
 
-### GitHub Actions Workflows
+### Workflow на GitHub
 
-| Workflow | Trigger | Description |
-|----------|---------|-------------|
-| **CI** (`ci.yml`) | pull request → `develop`, or manual (`workflow_dispatch`); a push starts nothing | The same checks as `just check`, with the Rust version from `rust-toolchain.toml` |
-| **Release** (`release.yml`) | manual (`workflow_dispatch`) | Checks the version and CHANGELOG, runs the same checks as `just check`, builds `AudioCaptor.exe`; publishes a GitHub Release only when `dry_run` is off |
+| Workflow | Коли запускається | Що робить |
+|----------|-------------------|-----------|
+| **CI** (`ci.yml`) | pull request у `develop` або вручну (`workflow_dispatch`); push нічого не запускає | Ті самі перевірки, що `just check`, у тому самому порядку: Rust з `rust-toolchain.toml`, Node 22, pnpm з `packageManager` у `package.json` |
+| **Release** (`release.yml`) | лише вручну (`workflow_dispatch`) | Звіряє версію й тег, бере опис релізу з `CHANGELOG.md`, виконує ті самі перевірки, що `just check`, збирає `AudioCaptor.exe`; публікує GitHub Release лише з вимкненим `dry_run` |
 
-### Release Process
+Перевірки й збирання йдуть на `windows-latest`; завдання `publish` у Release — на `ubuntu-latest`.
+
+### Ручний запуск CI
+
+```powershell
+gh workflow run ci.yml --ref <гілка>
+```
+
+Те саме — кнопка «Run workflow» у вкладці Actions. Гілку спершу треба відправити на GitHub. Стан запусків
+показує `gh run list --workflow ci.yml -L 3`.
+
+Коли задача змінює CI, збирання чи залежності, перед її закриттям власник просить прогнати її гілку через CI
+вручну. Червоний запуск стає задачею-помилкою.
+
+## Випуск
+
+### Що робить Release
 
 Release робить усе по черзі й зупиняється на першій помилці, ще до тегу й релізу:
 
@@ -299,17 +454,80 @@ Release робить усе по черзі й зупиняється на пе�
    і перевіряє, що тегу `v<версія>` ще немає (див. «Захист від повторної версії» нижче).
 2. Бере опис релізу — розділ `## [<версія>]` з `CHANGELOG.md`. Немає розділу — немає релізу.
 3. Ставить Rust із `rust-toolchain.toml` і виконує ті самі перевірки, що `just check`.
-4. Збирає `AudioCaptor.exe` і кладе його разом з описом релізу в артефакти запуску (зберігаються 7 днів).
+4. Збирає `AudioCaptor.exe`, показує його хеш SHA256 у підсумку запуску й кладе exe разом з описом релізу в
+   артефакти запуску (зберігаються 7 днів).
 5. Лише коли `dry_run` вимкнено, окреме завдання `publish` створює тег `v<версія>` на зібраному коміті
    й реліз з файлом `AudioCaptor.exe`. Тільки воно має право запису в репозиторій.
 
-Порядок справжнього релізу:
+Параметри запуску: `version` — версія без `v` (наприклад, `0.1.1`); `dry_run` — пробний запуск, увімкнений за
+замовчуванням; `prerelease` — позначити реліз на GitHub як попередній. Попередній реліз однаково справжній:
+правило «Чому не можна створювати справжній реліз для перевірки» діє й для нього.
 
-1. Версію в трьох файлах і розділ у `CHANGELOG.md` вже оновлено, гілку релізу завершено, `main` запушено.
-2. Пробний запуск на `main` (див. нижче) — зелений.
-3. Запустити Release на `main` з вимкненим `dry_run`:
-   `gh workflow run release.yml --ref main -f version=0.2.0 -f dry_run=false`
-4. Дочекатись створення GitHub Release. Scoop оновиться сам — див. нижче.
+### Порядок випуску
+
+Приклад для версії 0.1.1; для іншої версії замініть номер. Push і запуск workflow — тільки з дозволу власника.
+
+1. **Підготовка.** Задачі випуску закрито, їхні гілки завершено, `develop` чистий, `just check` проходить.
+   У `CHANGELOG.md` розділ `## [Unreleased]` містить зміни, помітні користувачам.
+2. **Гілка випуску** від `develop`:
+
+   ```powershell
+   git flow release start 0.1.1
+   ```
+
+   Команда створює гілку `release/0.1.1`.
+3. **Версія в трьох файлах.** Нова версія вписується в:
+   - `package.json` — поле `"version"`;
+   - `src-tauri/Cargo.toml` — `version` у розділі `[package]`;
+   - `src-tauri/tauri.conf.json` — поле `"version"`.
+
+   Потім `just check`: cargo сам запише нову версію пакета `audio-captor` у `src-tauri/Cargo.lock`, а
+   перевірки мають пройти. Release звіряє лише три файли, тож забутий `Cargo.lock` він не помітить:
+   `git status` має показати всі чотири.
+4. **CHANGELOG.** Заголовок `## [Unreleased]` стає `## [0.1.1] — <дата>` (дата у форматі `2026-04-20`, як у
+   розділі 0.1.0), а внизу файлу додається посилання
+   `[0.1.1]: https://github.com/ruslan-rv-ua/AudioCaptor/releases/tag/v0.1.1`. Цей розділ Release візьме
+   описом релізу на GitHub, тож у ньому — лише зміни для користувачів.
+5. **Коміт** цих п'яти файлів на гілці випуску.
+6. **Завершення:**
+
+   ```powershell
+   git flow release finish 0.1.1 --notag
+   ```
+
+   Команда зливає `release/0.1.1` у `main`, оновлює `develop` від `main` і видаляє гілку випуску. `--notag`
+   означає, що git flow не створює тег: тег `v0.1.1` створить Release на GitHub. Тег, створений і
+   відправлений вручну, зупинив би справжній запуск (див. «Захист від повторної версії»). Налаштування git
+   flow живуть лише в `.git/config`, тож у новому клоні без `--notag` тег з'явився б знову.
+7. **Відправити обидві гілки на GitHub:**
+
+   ```powershell
+   git push origin main develop
+   ```
+
+8. **Пробний запуск на `main`** (докладно — «Пробний запуск» нижче) має бути зеленим:
+
+   ```powershell
+   gh workflow run release.yml --ref main -f version=0.1.1 -f dry_run=true
+   ```
+
+9. **Справжній запуск** на `main`:
+
+   ```powershell
+   gh workflow run release.yml --ref main -f version=0.1.1 -f dry_run=false
+   ```
+
+10. **Перевірити реліз:**
+
+    ```powershell
+    gh release view v0.1.1
+    ```
+
+    Реліз має тег `v0.1.1`, файл `AudioCaptor.exe` і опис із розділу `CHANGELOG.md`. Завантажений exe
+    запускається, а діалог «About» показує нову версію.
+11. **Scoop.** Excavator у `ruslan-rv-ua/scoop-bucket` знаходить новий реліз упродовж доби, а одразу — якщо
+    запустити його вручну (див. «Оновлення Scoop-маніфесту»). Після цього `bucket/audiocaptor.json` показує
+    нову версію, і користувачі отримують її через `scoop update`.
 
 ### Пробний запуск
 
@@ -318,13 +536,14 @@ Release робить усе по черзі й зупиняється на пе�
 з токеном лише для читання, тож тегу й релізу не буде навіть через помилку в workflow.
 Зібраний exe можна завантажити з артефактів запуску й перевірити вручну.
 
-Запуск на будь-якій запушеній гілці (версія має збігатися з версією в коді цієї гілки):
+Запуск на будь-якій гілці, відправленій на GitHub (версія має збігатися з версією в коді цієї гілки):
 
 ```powershell
 gh workflow run release.yml --ref <гілка> -f version=<версія> -f dry_run=true
 ```
 
-Те саме — кнопка «Run workflow» у вкладці Actions: вибрати гілку й лишити позначку `dry_run`.
+Те саме — кнопка «Run workflow» у вкладці Actions: вибрати гілку й лишити позначку `dry_run`. Стан запусків
+показує `gh run list --workflow release.yml -L 3`.
 
 **Чому не можна створювати справжній реліз для перевірки.** Кожен опублікований реліз упродовж доби
 забирає Excavator у `scoop-bucket` і роздає користувачам Scoop як нову версію. Видалити реліз
@@ -346,8 +565,9 @@ gh workflow run release.yml --ref <гілка> -f version=<версія> -f dry_
 знаходить новий реліз, збирає URL і бере хеш — і комітить оновлений маніфест.
 
 Запускається він **вручну** з вкладки Actions репозиторію
-[scoop-bucket](https://github.com/ruslan-rv-ua/scoop-bucket/actions), плюс раз на добу
-о 04:20 UTC як підстраховка. Натискати безпечно будь-коли: якщо оновлювати нема чого,
+[scoop-bucket](https://github.com/ruslan-rv-ua/scoop-bucket/actions), плюс раз на добу за розкладом як
+підстраховка. У файлі розклад — 04:20 UTC, але GitHub запускає заплановані workflow із затримкою: у листопаді
+2026 запуски за розкладом ішли близько 13:00 UTC. Натискати безпечно будь-коли: якщо оновлювати нема чого,
 він нічого не змінює.
 
 Раніше тут був workflow `update-scoop.yml`, який слав `repository_dispatch` до bucket
@@ -355,7 +575,7 @@ gh workflow run release.yml --ref <гілка> -f version=<версія> -f dry_
 в чужий репозиторій треба ротувати, і він відмовляє мовчки — реліз проходить, а bucket
 тихо лишається позаду.
 
-### Required Secrets
+### Секрети
 
 Жодного. Workflow цього репозиторію користуються тільки тимчасовим `GITHUB_TOKEN`,
 який GitHub видає кожному запуску й забирає після нього.

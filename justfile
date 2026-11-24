@@ -27,7 +27,7 @@ check:
     cargo test --manifest-path src-tauri/Cargo.toml
     cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
 
-# NVDA smoke test of the release exe (just build first): `just smoke [launch|record|dialogs|tray] [-Start auto [-PauseSec 5]]`; starts after OK in a message box unless -Start auto
+# NVDA smoke test of the release exe (just build first): `just smoke [launch|record|dialogs|tray] [-PauseSec 5]`; one beep, the pause, the test, beeps at the end
 smoke *args:
     powershell -NoProfile -File scripts/smoke-nvda.ps1 {{args}}
 

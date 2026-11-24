@@ -19,8 +19,7 @@
       tray     Escape hides the window; starting the exe again shows it and NVDA announces it.
 
     Exit code: 0 everything passed; 1 a step or an NVDA check failed; 2 the test could not run
-    or stopped early (no exe, NVDA not running, wrong logging level, the start was not confirmed,
-    your AudioCaptor would not quit, an error in the test itself). The report says which.
+    or stopped early (no exe, NVDA not running, wrong logging level, your AudioCaptor would not quit, an error in the test itself). The report says which.
 
     What it protects:
     - Your data. The test runs a copy of the exe from %TEMP%\audiocaptor-smoke with its own
@@ -41,27 +40,17 @@
 
     Do not touch the keyboard or mouse while the test runs (one to two minutes).
 
-    How it starts. Once the exe, NVDA and its log are found, one beep sounds; then the test waits
-    either for a person's confirmation (-Start confirm, the default) or for a pause (-Start auto).
-    No key is pressed before that. The confirmation is a standard Windows message box on top of
-    other windows, with focus in it, so NVDA reads it; it works when the script is started by an
-    agent without a console. OK starts the test. Cancel, Escape, Enter (Cancel is the default
-    button, so a stray Enter does not start it) or no answer within -ConfirmSec seconds stops the
-    run with exit code 2, without pressing a key. When the run ends, three beeps sound if the
-    scenarios ran (exit code 0 or 1) and two lower ones if the test stopped (exit code 2). The
-    beeps are played as sound through the default playback device.
+    How it starts and ends. Once the exe, NVDA and its log are found, one beep sounds and the test
+    waits -PauseSec seconds before it presses the first key. When the run ends, three beeps sound
+    if the scenarios ran (exit code 0 or 1) and two lower ones if the test stopped (exit code 2).
+    The beeps are played as sound through the default playback device. An agent asks the person
+    in its chat before it starts the test; the script itself asks nothing.
 
 .PARAMETER Scenario
     One or more of launch, record, dialogs, tray. All of them when omitted.
 
-.PARAMETER Start
-    confirm (default): wait for OK in a message box. auto: start after -PauseSec seconds.
-
 .PARAMETER PauseSec
-    The pause before an automatic start, in seconds. Default: 5.
-
-.PARAMETER ConfirmSec
-    How long the message box waits for an answer, in seconds. Default: 120.
+    The pause between the first beep and the first key press, in seconds. Default: 5.
 
 .PARAMETER Exe
     The exe to test. Default: src-tauri\target\release\AudioCaptor.exe (just build).
@@ -76,7 +65,7 @@
     just smoke tray
 
 .EXAMPLE
-    just smoke dialogs -Start auto -PauseSec 10
+    just smoke dialogs -PauseSec 10
 
 .EXAMPLE
     powershell -NoProfile -File scripts/smoke-nvda.ps1 dialogs -Exe path\to\AudioCaptor.exe
@@ -87,9 +76,7 @@ param(
     [string[]]$Scenario,
     [string]$Exe,
     [string]$NvdaLog,
-    [string]$Start = 'confirm',
     [int]$PauseSec = 5,
-    [int]$ConfirmSec = 120,
     [int]$TimeoutSec = 8,
     [int]$SpeechWaitSec = 5,
     [int]$SettleMs = 700
@@ -108,9 +95,7 @@ if ($unknown.Count) {
     $ArgError = "Unknown scenario: $($unknown -join ', '). Scenarios: $($AllScenarios -join ', '); none for all of them."
 }
 $Selected = @($AllScenarios | Where-Object { $Selected -contains $_ })  # their own order, no repeats
-$Start = "$Start".ToLowerInvariant()
-if (@('confirm', 'auto') -notcontains $Start) { $ArgError = "Unknown start mode: -Start $Start. Use confirm (the default) or auto." }
-if ($PauseSec -lt 0 -or $ConfirmSec -lt 1) { $ArgError = '-PauseSec must be 0 or more and -ConfirmSec 1 or more.' }
+if ($PauseSec -lt 0) { $ArgError = '-PauseSec must be 0 or more.' }
 
 # Windows PowerShell 5.1 does not set $PSScriptRoot inside param() defaults.
 $DefaultExe = Join-Path $PSScriptRoot '..\src-tauri\target\release\AudioCaptor.exe'
@@ -257,55 +242,6 @@ public static class AcSmokeNative {
             keybd_event(vks[i], (byte)MapVirtualKey(vks[i], 0), (extended[i] ? 1u : 0u) | 2u, UIntPtr.Zero);
             Thread.Sleep(30);
         }
-    }
-
-    [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int MessageBoxW(IntPtr hWnd, string text, string caption, uint type);
-    [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetClassName(IntPtr hWnd, StringBuilder name, int max);
-    delegate bool EnumThreadProc(IntPtr hWnd, IntPtr lParam);
-    [DllImport("user32.dll")] static extern bool EnumThreadWindows(uint threadId, EnumThreadProc callback, IntPtr lParam);
-
-    // The visible dialog window (a message box) of this thread, or zero.
-    static IntPtr FindThreadDialog(uint threadId) {
-        IntPtr found = IntPtr.Zero;
-        EnumThreadWindows(threadId, delegate(IntPtr h, IntPtr l) {
-            StringBuilder name = new StringBuilder(64);
-            GetClassName(h, name, 64);
-            if (name.ToString() != "#32770" || !IsWindowVisible(h)) return true;
-            found = h;
-            return false;
-        }, IntPtr.Zero);
-        return found;
-    }
-
-    // A standard OK/Cancel message box on top of other windows, with Cancel as the default
-    // button, brought to the foreground so that NVDA reads it. Returns 1 for OK, 2 for Cancel
-    // (also Escape), 0 when nobody answered within timeoutMs (the box is then closed, which
-    // counts as Cancel) and -1 when it could not be shown.
-    public static int Confirm(string text, string caption, int timeoutMs) {
-        int result = -1;
-        uint boxThread = 0;
-        Thread t = new Thread(delegate() {
-            boxThread = GetCurrentThreadId();
-            // MB_OKCANCEL | MB_ICONWARNING | MB_DEFBUTTON2 | MB_SETFOREGROUND | MB_TOPMOST
-            int r = MessageBoxW(IntPtr.Zero, text, caption, 0x1u | 0x30u | 0x100u | 0x10000u | 0x40000u);
-            result = r == 0 ? -1 : r;
-        });
-        t.SetApartmentState(ApartmentState.STA);
-        t.IsBackground = true;
-        t.Start();
-        DateTime deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
-        IntPtr box = IntPtr.Zero;
-        while (box == IntPtr.Zero && t.IsAlive && DateTime.UtcNow < deadline) {
-            Thread.Sleep(50);
-            if (boxThread != 0) box = FindThreadDialog(boxThread);
-        }
-        // Windows may refuse the first attempt to take the foreground.
-        for (int i = 0; box != IntPtr.Zero && i < 10 && t.IsAlive && !Activate(box); i++) Thread.Sleep(100);
-        int left = (int)Math.Max(0, (deadline - DateTime.UtcNow).TotalMilliseconds);
-        if (t.Join(left)) return result;
-        if (box != IntPtr.Zero) PostMessage(box, 0x0010, IntPtr.Zero, IntPtr.Zero);  // WM_CLOSE
-        t.Join(5000);
-        return 0;
     }
 
     // Plays count beeps of hz for ms each, gapMs apart, as one sound through the default playback
@@ -1187,37 +1123,14 @@ function Initialize-TestFolder {
     Copy-Item -LiteralPath $Exe -Destination $TestExe
 }
 
-# One beep, then the confirmation or the pause. Nothing is pressed before this returns.
+# One beep, then the pause. Nothing is pressed before this returns.
 function Wait-ForStart {
-    $script:StartedHow = $null
     Invoke-Beep 'start'
-    if ($Start -eq 'auto') {
-        Write-Host "Starting in $PauseSec s."
-        Start-Sleep -Seconds $PauseSec
-        $script:StartedHow = "automatically after a $PauseSec s pause"
-        return
-    }
-    Write-Host "Waiting for OK in the message box '$ConfirmTitle' (up to $ConfirmSec s)."
-    $text = "The NVDA smoke test is about to run: $($Selected -join ', ').`r`n`r`n" +
-        "For one to two minutes it takes the keyboard, the mouse and NVDA's voice; do not touch them " +
-        'until three beeps sound.'
-    if (Get-Process $AppTitle -ErrorAction SilentlyContinue) { $text += ' Your running AudioCaptor will be closed and not started again.' }
-    $text += "`r`n`r`nOK starts the test. Cancel stops it without pressing any key. Without an answer within $ConfirmSec s, it stops."
-    $clock = [Diagnostics.Stopwatch]::StartNew()
-    $answer = [AcSmokeNative]::Confirm($text, $ConfirmTitle, $ConfirmSec * 1000)
-    switch ($answer) {
-        1 { $script:StartedHow = ('after confirmation (OK after {0:0} s)' -f $clock.Elapsed.TotalSeconds) }
-        2 { Stop-Run 'The start was cancelled in the confirmation box. No key was pressed.' }
-        0 { Stop-Run "Nobody confirmed the start within $ConfirmSec s. No key was pressed." }
-        default { Stop-Run 'The confirmation box could not be shown. No key was pressed; to start without it: -Start auto' }
-    }
-    # Let NVDA finish reading the box and the person take their hands away.
-    Start-Sleep -Seconds 1
+    Write-Host "Starting in $PauseSec s."
+    Start-Sleep -Seconds $PauseSec
 }
 
 # --- Run ---------------------------------------------------------------------------------------
-$ConfirmTitle = 'AudioCaptor smoke test'
-$script:StartedHow = $null
 $exeTime = $null
 $userBefore = $null
 $userAfter = $null
@@ -1286,7 +1199,6 @@ try {
 $lines = New-Object System.Collections.Generic.List[string]
 $lines.Add(('AudioCaptor NVDA smoke test, {0:yyyy-MM-dd HH:mm}' -f (Get-Date)))
 $lines.Add("Scenarios: $($Selected -join ', ')")
-if ($script:StartedHow) { $lines.Add("Started $script:StartedHow.") }
 if ($exeTime) { $lines.Add(('Exe: {0}, built {1:yyyy-MM-dd HH:mm}' -f $Exe, $exeTime)) } else { $lines.Add("Exe: $Exe") }
 if ($script:LogPath) { $lines.Add(('NVDA log: {0}, read from byte {1} on (only what NVDA wrote during this run)' -f $script:LogPath, $script:LogStart)) }
 $browserChanged = $false

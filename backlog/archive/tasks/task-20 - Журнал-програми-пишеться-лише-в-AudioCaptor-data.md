@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-23T18:19:58Z'
-updated_date: '2026-11-24T22:06:28Z'
+updated_date: '2026-11-24T22:41:26Z'
 labels:
   - backend
   - model-sonnet
@@ -29,9 +29,9 @@ ordinal: 9600
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Після запуску, запису й виходу з програми в `%LOCALAPPDATA%\com.audiocaptor.app\logs` нічого не з'являється і не змінюється
-- [ ] #2 Журнал у `AudioCaptor-data/logs/` не містить рядків рівня TRACE і DEBUG від сторонніх бібліотек
-- [ ] #3 Тест `just smoke` більше не показує примітку про записи програми поза її текою
+- [x] #1 Після запуску, запису й виходу з програми в `%LOCALAPPDATA%\com.audiocaptor.app\logs` нічого не з'являється і не змінюється
+- [x] #2 Журнал у `AudioCaptor-data/logs/` не містить рядків рівня TRACE і DEBUG від сторонніх бібліотек
+- [x] #3 Тест `just smoke` більше не показує примітку про записи програми поза її текою
 - [x] #4 У `CHANGELOG.md` є запис про виправлення
 <!-- AC:END -->
 
@@ -79,6 +79,8 @@ ordinal: 9600
 - Знімок перед прогоном (лише читання): у `%LOCALAPPDATA%\com.audiocaptor.app\logs` один файл `AudioCaptor.log`, 957 386 байт, змінений 2026-11-24 23:18:09 (кінець повного прогону TASK-18), SHA256 AC6F12CD538BAE2142E7FE8406BAB5929352BBCF32EF60B75BBF9A2F71D00DDB.
 
 Знайдене мимохідь: DRAFT-12 — час у журналі пишеться в UTC, а не за годинником Windows.
+
+2026-11-25: критерії #1–#3 підтвердив повний `just smoke` у робочій сесії TASK-22 (00:30). Рядка FAILED про `%LOCALAPPDATA%\com.audiocaptor.app` у звіті немає, `EBWebView` не змінилася (так само в окремих прогонах `dialogs` і `record`). `Select-String -Path $env:TEMP\audiocaptor-smoke-app.log -Pattern '\]\[(TRACE|DEBUG)\] '` нічого не знаходить; у журналі 30 рядків INFO лише з модулів програми, рядків wasapi немає.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
@@ -93,9 +95,7 @@ ordinal: 9600
 - `scripts/smoke-nvda.ps1`: будь-яка зміна в `%LOCALAPPDATA%\com.audiocaptor.app`, не лише в `EBWebView`, тепер означає, що тест не пройшов; примітки більше немає.
 - `CHANGELOG.md` (Fixed; користувачам сказано, що стару теку `logs` можна видалити — так вирішив власник), `DEVELOPMENT.md` (таблиця бібліотек, «Портативний режим», розділ про `just smoke`).
 
-Перевірки: `just check` проходить (у робочій сесії двічі й повторно в головній), `just build` проходить.
-
-Не перевірено: тести з NVDA (`just smoke record` і повний `just smoke`) власник вирішив цього разу пропустити. Тож критерії #1–#3 на запущеній програмі не підтверджено й не відмічено. Це покаже перший наступний повний `just smoke`: тепер він не проходить, якщо програма пише в `%LOCALAPPDATA%\com.audiocaptor.app`, а рядки TRACE і DEBUG видно в `%TEMP%\audiocaptor-smoke-app.log`. DoD #3 задачі не стосується: інтерфейс не змінювався.
+Перевірки: `just check` проходить (у робочій сесії двічі й повторно в головній), `just build` проходить. Тести з NVDA в самій задачі власник вирішив пропустити; критерії #1–#3 підтвердив повний `just smoke` у TASK-22 (2026-11-25): у `%LOCALAPPDATA%\com.audiocaptor.app` програма нічого не записала, а журнал тестової копії має 30 рядків INFO самої програми й жодного рядка TRACE чи DEBUG. DoD #3 задачі не стосується: інтерфейс не змінювався.
 
 Побічне: DRAFT-12 (час у журналі записано за UTC).
 

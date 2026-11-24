@@ -19,7 +19,8 @@
       tray     Escape hides the window; starting the exe again shows it and NVDA announces it.
 
     Exit code: 0 everything passed; 1 a step or an NVDA check failed; 2 the test could not run
-    or stopped early (no exe, NVDA not running, wrong logging level, your AudioCaptor would not quit, an error in the test itself). The report says which.
+    or stopped early (no exe, NVDA not running, wrong logging level, your AudioCaptor would not
+    quit, an error in the test itself). The report says which.
 
     What it protects:
     - Your data. The test runs a copy of the exe from %TEMP%\audiocaptor-smoke with its own

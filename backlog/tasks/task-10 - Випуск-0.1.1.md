@@ -4,7 +4,7 @@ title: Випуск 0.1.1
 status: To Do
 assignee: []
 created_date: '2026-11-23T11:31:35Z'
-updated_date: '2026-11-23T18:20:09Z'
+updated_date: '2026-11-24T12:55:58Z'
 labels:
   - release
   - model-sonnet
@@ -64,4 +64,6 @@ ordinal: 10000
 
 <!-- SECTION:NOTES:BEGIN -->
 Зауваження головної сесії, 2026-11-23: розділ 0.1.0 у `CHANGELOG.md` містить рядок «CI/CD: GitHub Actions workflows for CI, Release, and Scoop manifest update». Це подробиця для розробників, а не для користувачів, і вона застаріла: workflow оновлення Scoop прибрано. Під час підготовки 0.1.1 вирішити з власником, чи прибрати рядок із розділу 0.1.0. Опис релізу тепер береться з `CHANGELOG.md`, тож такі рядки потрапляють і на сторінку релізу.
+
+Зауваження головної сесії, 2026-11-24 (після TASK-8): порядок випуску в `DEVELOPMENT.md` змінено — пробний запуск Release іде на гілці `release/0.1.1`, відправленій на GitHub, ще до `git flow release finish`; після завершення гілку випуску видаляють на GitHub. Excavator за розкладом (04:20 UTC у файлі) у листопаді 2026 фактично запускався близько 13:00 UTC; швидше — запустити його вручну.
 <!-- SECTION:NOTES:END -->

@@ -4,6 +4,7 @@ title: Модулі inlang для збірки не завантажуються
 status: Draft
 assignee: []
 created_date: '2026-11-23T18:45:48Z'
+updated_date: '2026-11-24T12:46:01Z'
 labels:
   - security
   - frontend
@@ -45,3 +46,9 @@ Paraglide завантажує й виконує їх у Node під час ко
 - [ ] #4 Документацію оновлено там, де змінилася поведінка чи порядок роботи (README.md, README_UK.md, DEVELOPMENT.md)
 - [ ] #5 CHANGELOG.md оновлено: лише зміни, помітні користувачам (без подробиць про інструменти, тести, CI чи збірку)
 <!-- DOD:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-24 (TASK-8): перший запуск сервера інтерфейсу (`pnpm vite dev --port 1420`) чекав на Paraglide близько 32 с («ready in 31800 ms», компіляція locale-modules); перший `just vite-dev` за 40 с так і не відповів. Наступний запуск пропустив компіляцію («inputs unchanged») і стартував за 0,5 с. `pnpm vite:build` у той самий час зібрався за 1,4 с. Чи затримку дає завантаження модулів із CDN, не перевірено.
+<!-- SECTION:NOTES:END -->

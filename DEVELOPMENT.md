@@ -61,8 +61,8 @@ just dev
 програму, зміни інтерфейсу з'являються одразу. Файли перекладів у `src/paraglide/` Vite генерує сам; у git їх
 немає.
 
-У цьому режимі exe називається `src-tauri/target/debug/audio-captor.exe` (назву `AudioCaptor.exe` дає лише
-`just build`), а свої дані копія тримає в `src-tauri/target/debug/AudioCaptor-data/`.
+У цьому режимі exe називається `src-tauri/target/debug/audio-captor.exe` (назву `AudioCaptor.exe` дають лише
+`just build` і `just build-fast`), а свої дані копія тримає в `src-tauri/target/debug/AudioCaptor-data/`.
 
 Перед `just dev` закрийте свій AudioCaptor, якщо він запущений. Програма дозволяє лише одну копію, тож копія
 для розробки тільки покаже вікно вже запущеної і закриється.

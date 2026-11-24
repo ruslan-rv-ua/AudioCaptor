@@ -24,8 +24,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   names it. Before, the screen reader said "unavailable" or only the app name, and you had to find your place
   again. Focus on Stop now stays there when you pause or resume.
 - When you resume a paused recording, the screen reader now says "Recording resumed" instead of "Recording
-  started", so you can tell it apart from a new recording. This works for Alt+R, the Resume button, the global
-  hotkey and the tray menu.
+  started", so you can tell it apart from a new recording. The announcement is the same however you resume:
+  Alt+R, the Resume button, the global hotkey or the tray menu.
 
 ## [0.1.0] — 2026-04-20
 

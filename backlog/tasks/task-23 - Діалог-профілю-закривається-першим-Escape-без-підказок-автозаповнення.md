@@ -4,13 +4,13 @@ title: Діалог профілю закривається першим Escape,
 status: To Do
 assignee: []
 created_date: '2026-11-24T14:09:40Z'
-updated_date: '2026-11-24T16:01:47Z'
+updated_date: '2026-11-24T21:31:27Z'
 labels:
   - frontend
   - a11y
   - model-sonnet
   - effort-low
-milestone: m-1
+milestone: m-3
 dependencies: []
 priority: medium
 type: bug
@@ -40,3 +40,9 @@ ordinal: 9700
 - [ ] #4 Документацію оновлено там, де змінилася поведінка чи порядок роботи (README.md, README_UK.md, DEVELOPMENT.md)
 - [ ] #5 CHANGELOG.md оновлено: лише зміни, помітні користувачам (без подробиць про інструменти, тести, CI чи збірку)
 <!-- DOD:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-24: власник відклав задачу на невизначений термін. Її перенесено у віху «Пізніше» (m-3) і прибрано із залежностей випуску 0.1.1 (TASK-10).
+<!-- SECTION:NOTES:END -->

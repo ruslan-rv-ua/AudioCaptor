@@ -41,8 +41,8 @@ TypeScript у WebView2. Тут описано, що встановити, як �
   (`"packageManager": "pnpm@10.32.1"`), і CI бере її звідти. Без `@10` npm поставив би новішу основну версію
   pnpm, ніж у CI.
 - **[just](https://github.com/casey/just)** — запускає `just check`, `just smoke` і решту рецептів із
-  `justfile`. Рецепти just виконує через `sh`, тож `sh` має бути в PATH: він є в Git for Windows (тека `bin`)
-  і в Scoop-пакеті `git`. Без нього just пише «could not find the shell `sh`».
+  `justfile`. Рецепти just виконує через `sh`, тож `sh` має бути в PATH (наприклад, з Git for Windows;
+  Scoop-пакет `git` додає його сам). Без нього just пише «could not find the shell `sh`».
 - **[WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/)** — уже є в Windows 11
   і на більшості комп'ютерів з Windows 10.
 - Для роботи з проєктом: [git-flow-next](https://github.com/gittower/git-flow-next) (команда `git flow`),
@@ -60,6 +60,9 @@ just dev
 `just dev` (те саме, що `pnpm tauri dev`) збирає програму й відкриває її вікно. Зміни в Rust перезбирають
 програму, зміни інтерфейсу з'являються одразу. Файли перекладів у `src/paraglide/` Vite генерує сам; у git їх
 немає.
+
+У цьому режимі exe називається `src-tauri/target/debug/audio-captor.exe` (назву `AudioCaptor.exe` дає лише
+`just build`), а свої дані копія тримає в `src-tauri/target/debug/AudioCaptor-data/`.
 
 Перед `just dev` закрийте свій AudioCaptor, якщо він запущений. Програма дозволяє лише одну копію, тож копія
 для розробки тільки покаже вікно вже запущеної і закриється.

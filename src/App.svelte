@@ -92,10 +92,17 @@
     }, 500);
   }
 
+  // Announces each recording state change. Recording that follows Paused is a
+  // resumed recording, not a new one, whatever resumed it (Alt+R, the Resume
+  // button, the global hotkey or the tray menu).
+  let announcedState: RecordingState | undefined;
   $effect(() => {
     if (!initialized) return;
     const state = recording.state;
-    if (state === "Recording") liveRegionText = m.live_recording_started();
+    const previous = announcedState;
+    announcedState = state;
+    if (state === "Recording" && previous === "Paused") liveRegionText = m.live_recording_resumed();
+    else if (state === "Recording") liveRegionText = m.live_recording_started();
     else if (state === "Paused") liveRegionText = m.live_recording_paused();
     else if (state === "Idle") liveRegionText = m.live_recording_stopped();
   });

@@ -87,6 +87,7 @@
   "btn_browse_folder": "Огляд...",
   "live_recording_started": "Запис розпочато",
   "live_recording_paused": "Запис призупинено",
+  "live_recording_resumed": "Запис продовжено",
   "live_recording_stopped": "Запис зупинено",
   "live_status_info": "{state}, {duration}",
   "btn_minimize_to_tray_aria": "Згорнути в трей",

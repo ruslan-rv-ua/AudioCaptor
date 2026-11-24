@@ -6,13 +6,13 @@ title: >-
 status: Draft
 assignee: []
 created_date: '2026-11-24T17:38:48Z'
-updated_date: '2026-11-24T22:37:50Z'
+updated_date: '2026-11-24T22:42:54Z'
 labels:
   - a11y
   - testing
   - model-opus
   - effort-medium
-milestone: m-1
+milestone: m-2
 dependencies: []
 references:
   - doc-3
@@ -64,4 +64,6 @@ priority: medium
 - У журналі NVDA о 00:30:03 — помилка `VBufBackend_t::terminate` для закритого процесу WebView2, одразу після неї зависання на 0,61 с («Recovered from freeze»): перехід між сценаріями `launch` і `record`.
 - Окремий `just smoke record` о 00:37 пройшов: 11 кроків з 11, крок 3 теж.
 - Звіти: `task-22-smoke-full.txt` і `task-22-smoke-record.txt` у спільній теці нотаток.
+
+2026-11-25: власник переніс чернетку у віху 0.2.0 (m-2), щоб вона не затримувала випуск 0.1.1.
 <!-- SECTION:NOTES:END -->

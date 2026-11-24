@@ -212,7 +212,6 @@
   async function handleProfileSave(profile: RecordingProfile) {
     const isNew = !profileStore.list.some(p => p.id === profile.id);
     await saveProfile(profile);
-    dialogOpen = false;
     if (isNew) {
       await selectProfile(profile.id);
     }
@@ -220,7 +219,9 @@
       applyProfile(profile);
     }
     scheduleSave();
-    // To the profile list, where NVDA names the profile that is now active.
+    // Closed only now, so focus goes from the dialog straight to the profile
+    // list, where NVDA names the active profile, without resting on the page.
+    dialogOpen = false;
     await returnFocus("profile", "profile-select");
   }
 
@@ -230,18 +231,26 @@
     deleteConfirmOpen = true;
   }
 
+  let deleting = false;
+
   async function handleDeleteConfirm() {
-    deleteConfirmOpen = false;
     const id = deletingProfileId;
-    deletingProfileId = null;
-    if (!id) return;
-    await deleteProfile(id);
-    const active = profileStore.active;
-    if (active) applyProfile(active);
-    scheduleSave();
-    // Once the list has changed, to the profile list: NVDA names the profile
-    // that is now active.
-    await returnFocus("delete", "profile-select");
+    if (!id || deleting) return; // a second press while the first one runs
+    deleting = true;
+    try {
+      await deleteProfile(id);
+      const active = profileStore.active;
+      if (active) applyProfile(active);
+      scheduleSave();
+    } finally {
+      deleting = false;
+      // Closed only now, once the list has changed, so focus goes from the
+      // dialog straight to the profile list, where NVDA names the active
+      // profile, without resting on the page.
+      deleteConfirmOpen = false;
+      deletingProfileId = null;
+      await returnFocus("delete", "profile-select");
+    }
   }
 
   async function handleDeleteCancel() {

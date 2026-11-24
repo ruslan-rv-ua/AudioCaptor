@@ -104,6 +104,8 @@
   // remember the element that has focus; when it closes, give focus back to that
   // element, once and straight to it. Each dialog keeps its own element, because
   // About (F1, tray) and the exit confirmation can open on top of another dialog.
+  // After Save or Delete of a profile, focus goes to the profile list instead,
+  // where NVDA names the active profile (the APG exception for a finished task).
   type Dialog = "about" | "settings" | "profile" | "delete" | "exit";
   const openers = new Map<Dialog, Element | null>();
 
@@ -111,16 +113,17 @@
     openers.set(dialog, document.activeElement);
   }
 
-  // Call after the dialog's open flag is cleared. If the opener is gone or cannot
-  // take focus (removed, disabled, hidden, or nothing had focus), focus goes to
-  // the profile list, and while that is disabled (recording) to the first
+  // Call after the dialog's open flag is cleared. Focus goes to the element with
+  // `targetId` when given, otherwise back to the opener. If that element is gone
+  // or cannot take focus (removed, disabled, hidden, or nothing had focus), focus
+  // goes to the profile list, and while that is disabled (recording) to the first
   // recording button.
-  async function returnFocus(dialog: Dialog) {
+  async function returnFocus(dialog: Dialog, targetId?: string) {
     const opener = openers.get(dialog);
     openers.delete(dialog);
     await tick();
     const targets = [
-      opener,
+      targetId ? document.getElementById(targetId) : opener,
       document.getElementById("profile-select"),
       document.querySelector(".record-controls button"),
     ];
@@ -217,7 +220,8 @@
       applyProfile(profile);
     }
     scheduleSave();
-    await returnFocus("profile");
+    // To the profile list, where NVDA names the profile that is now active.
+    await returnFocus("profile", "profile-select");
   }
 
   async function handleProfileDelete(id: string) {
@@ -235,8 +239,9 @@
     const active = profileStore.active;
     if (active) applyProfile(active);
     scheduleSave();
-    // After the list has changed: Delete is disabled once one profile is left.
-    await returnFocus("delete");
+    // Once the list has changed, to the profile list: NVDA names the profile
+    // that is now active.
+    await returnFocus("delete", "profile-select");
   }
 
   async function handleDeleteCancel() {

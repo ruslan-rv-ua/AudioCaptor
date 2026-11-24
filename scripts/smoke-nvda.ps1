@@ -142,8 +142,9 @@ $UI = @{
     Resume         = 'Resume recording (Alt+R)' # resume_recording_aria
     Stop           = 'Stop recording (Alt+T)'   # stop_recording_aria
     Ready          = 'Ready'                    # status_ready (Alt+I while idle)
-    Started        = 'Recording started'        # live_recording_started (also after Alt+R)
+    Started        = 'Recording started'        # live_recording_started
     Paused         = 'Recording paused'         # live_recording_paused
+    Resumed        = 'Recording resumed'        # live_recording_resumed
     Stopped        = 'Recording stopped'        # live_recording_stopped
     RecordingInfo  = 'Recording, 00:'           # live_status_info with status_recording
     PausedInfo     = 'Paused, 00:'              # live_status_info with status_paused
@@ -921,12 +922,12 @@ function Invoke-RecordScenario {
 
     Invoke-Step 'Alt+I while paused: NVDA says Paused and the time' { Send-Keys 'Alt+I' } -Expect $UI.PausedInfo
 
-    # The app announces a resumed recording as started (live_recording_started).
-    Invoke-Step "Alt+R on '$($UI.Resume)' resumes: NVDA says Recording started; focus moves to '$($UI.Pause)'" {
+    # A resumed recording has its own announcement, not the one for a new recording.
+    Invoke-Step "Alt+R on '$($UI.Resume)' resumes: NVDA says Recording resumed; focus moves to '$($UI.Pause)'" {
         Send-Keys 'Alt+R'
         $null = Wait-Until "the '$($UI.Pause)' button" { Find-ByName $UI.Pause }
         Confirm-Focus $UI.Pause
-    } -Expect $UI.Started, $UI.Pause -Forbid $Unavailable, $AppTitle
+    } -Expect $UI.Resumed, $UI.Pause -Forbid $UI.Started, $Unavailable, $AppTitle
 
     Invoke-Step "Tab to the '$($UI.Stop)' button" { Move-Focus $UI.Stop } -Expect $UI.Stop
 

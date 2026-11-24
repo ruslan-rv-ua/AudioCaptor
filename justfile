@@ -27,9 +27,9 @@ check:
     cargo test --manifest-path src-tauri/Cargo.toml
     cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
 
-# NVDA smoke test of the release exe (just build first); `just smoke <scenario>` runs one: launch, record, dialogs, tray
-smoke *scenario:
-    powershell -NoProfile -File scripts/smoke-nvda.ps1 {{scenario}}
+# NVDA smoke test of the release exe (just build first): `just smoke [launch|record|dialogs|tray] [-Start auto [-PauseSec 5]]`; starts after OK in a message box unless -Start auto
+smoke *args:
+    powershell -NoProfile -File scripts/smoke-nvda.ps1 {{args}}
 
 # Clean Rust build artifacts
 clean:

@@ -12,8 +12,11 @@
       launch   NVDA announces the window; Tab goes round every control, each one has a name
                and NVDA reads it.
       record   Alt+S, Alt+P, Alt+R and Alt+T announce the new state, Alt+I the current one.
-               Recording really starts (system audio of the default playback device, so no
-               microphone is needed); the WAV file is not checked.
+               When the control with focus is disabled or goes away (Alt+S on the profile list,
+               Alt+P on Pause, Alt+R on Resume, Alt+T on Stop), focus moves to the button of the
+               new state and NVDA names it, without "unavailable"; focus on Stop stays there
+               through a pause. Recording really starts (system audio of the default playback
+               device, so no microphone is needed); the WAV file is not checked.
       dialogs  About (F1), Settings, New Profile and the delete confirmation: focus enters the
                dialog, Escape closes it and focus returns to where the dialog was opened.
       tray     Escape hides the window; starting the exe again shows it and NVDA announces it.
@@ -137,6 +140,7 @@ $UI = @{
     Start          = 'Start recording (Alt+S)'  # start_recording_aria
     Pause          = 'Pause recording (Alt+P)'  # pause_recording_aria
     Resume         = 'Resume recording (Alt+R)' # resume_recording_aria
+    Stop           = 'Stop recording (Alt+T)'   # stop_recording_aria
     Ready          = 'Ready'                    # status_ready (Alt+I while idle)
     Started        = 'Recording started'        # live_recording_started (also after Alt+R)
     Paused         = 'Recording paused'         # live_recording_paused
@@ -161,12 +165,14 @@ $TabOrder = @($UI.MinimizeToTray, $UI.About, $UI.OpenSettings, $UI.ProfileList, 
     $UI.EditProfile, $UI.DeleteProfile, $UI.Microphone, $UI.LoopbackDevice, $UI.MicVolume,
     $UI.LoopbackVolume, $UI.Start)
 
-# NVDA says role words in its own language; any variant counts. Ukrainian words are written as
-# \u escapes so that this file stays ASCII: Windows PowerShell 5.1 reads a file without a BOM
-# in the ANSI code page.
+# NVDA says role and state words in its own language; any variant counts. Ukrainian words are
+# written as \u escapes so that this file stays ASCII: Windows PowerShell 5.1 reads a file without
+# a BOM in the ANSI code page.
 $Role = @{
     Dialog = 'dialog|' + [regex]::Unescape('\u0434\u0456\u0430\u043b\u043e\u0433')
 }
+# What NVDA says when the control with focus becomes disabled.
+$Unavailable = 'unavailable|' + [regex]::Unescape('\u043d\u0435\u0434\u043e\u0441\u0442\u0443\u043f\u043d\u043e')
 
 # What NVDA says when it reads the web content through UI Automation instead of the usual way
 # (the address of the page): a sign of the broken first reading of a WebView2 window.
@@ -524,17 +530,22 @@ function Move-Focus([string]$Name) {
     throw "$key did not reach '$Name' in 20 presses"
 }
 
+# Focus must end on the control with this name; the app may move it there a moment after the
+# change. Wrong focus fails the step but not the scenario.
+function Confirm-Focus([string]$Name) {
+    try { $null = Wait-Until "focus on '$Name'" { (Get-Focus).Name -eq $Name } 3 } catch { }
+    $f = Get-Focus
+    if (-not $f -or $f.Name -ne $Name) {
+        $script:SoftFail = "focus went to $(Format-Focus $f) instead of '$Name'"
+    }
+}
+
 # Escape closes the dialog that contains the element with this DOM id; focus must then return to
-# the control named $Opener. Wrong focus fails the step but not the scenario.
+# the control named $Opener (the app moves it once the dialog is gone, on the next frame).
 function Close-Dialog([string]$InsideId, [string]$Opener) {
     Send-Keys 'Esc'
     $null = Wait-Until 'the dialog to close' { -not (Find-ById $InsideId) } 3
-    # The app moves focus once the dialog is gone (on the next frame): give it a moment.
-    try { $null = Wait-Until "focus on '$Opener'" { (Get-Focus).Name -eq $Opener } 3 } catch { }
-    $f = Get-Focus
-    if (-not $f -or $f.Name -ne $Opener) {
-        $script:SoftFail = "focus went to $(Format-Focus $f) instead of '$Opener'"
-    }
+    Confirm-Focus $Opener
 }
 
 # --- The test's own window ---------------------------------------------------------------------
@@ -888,33 +899,49 @@ function Invoke-RecordScenario {
 
     Invoke-Step 'Alt+I while idle: NVDA says Ready' { Send-Keys 'Alt+I' } -Expect $UI.Ready
 
-    Invoke-Step 'Alt+S starts recording: NVDA says Recording started' {
+    # Each state has its own record buttons, and the profile list is disabled while recording.
+    # When the control with focus goes away or is disabled, focus moves to the first button of the
+    # new state, and NVDA names it: not "unavailable", not the page (AudioCaptor).
+    Invoke-Step "Alt+S on the profile list starts recording: NVDA says Recording started; focus moves to '$($UI.Pause)'" {
         Send-Keys 'Alt+S'
         $null = Wait-Until "the '$($UI.Pause)' button" { Find-ByName $UI.Pause }
-    } -Expect $UI.Started
+        Confirm-Focus $UI.Pause
+    } -Expect $UI.Started, $UI.Pause -Forbid $Unavailable, $AppTitle
 
     Invoke-Step 'Alt+I while recording: NVDA says Recording and the time' {
         Start-Sleep -Seconds 1  # past 00:00:00
         Send-Keys 'Alt+I'
     } -Expect $UI.RecordingInfo
 
-    Invoke-Step 'Alt+P pauses: NVDA says Recording paused' {
+    Invoke-Step "Alt+P on '$($UI.Pause)' pauses: NVDA says Recording paused; focus moves to '$($UI.Resume)'" {
         Send-Keys 'Alt+P'
         $null = Wait-Until "the '$($UI.Resume)' button" { Find-ByName $UI.Resume }
-    } -Expect $UI.Paused
+        Confirm-Focus $UI.Resume
+    } -Expect $UI.Paused, $UI.Resume -Forbid $Unavailable, $AppTitle
 
     Invoke-Step 'Alt+I while paused: NVDA says Paused and the time' { Send-Keys 'Alt+I' } -Expect $UI.PausedInfo
 
     # The app announces a resumed recording as started (live_recording_started).
-    Invoke-Step 'Alt+R resumes: NVDA says Recording started' {
+    Invoke-Step "Alt+R on '$($UI.Resume)' resumes: NVDA says Recording started; focus moves to '$($UI.Pause)'" {
         Send-Keys 'Alt+R'
         $null = Wait-Until "the '$($UI.Pause)' button" { Find-ByName $UI.Pause }
-    } -Expect $UI.Started
+        Confirm-Focus $UI.Pause
+    } -Expect $UI.Started, $UI.Pause -Forbid $Unavailable, $AppTitle
 
-    Invoke-Step 'Alt+T stops: NVDA says Recording stopped' {
+    Invoke-Step "Tab to the '$($UI.Stop)' button" { Move-Focus $UI.Stop } -Expect $UI.Stop
+
+    # Stop is the same button while recording and while paused, so focus stays on it.
+    Invoke-Step "Alt+P on '$($UI.Stop)' pauses: NVDA says Recording paused; focus stays on '$($UI.Stop)'" {
+        Send-Keys 'Alt+P'
+        $null = Wait-Until "the '$($UI.Resume)' button" { Find-ByName $UI.Resume }
+        Confirm-Focus $UI.Stop
+    } -Expect $UI.Paused -Forbid $Unavailable, $AppTitle
+
+    Invoke-Step "Alt+T on '$($UI.Stop)' stops: NVDA says Recording stopped; focus moves to '$($UI.Start)'" {
         Send-Keys 'Alt+T'
         $null = Wait-Until "the '$($UI.Start)' button" { Find-ByName $UI.Start }
-    } -Expect $UI.Stopped
+        Confirm-Focus $UI.Start
+    } -Expect $UI.Stopped, $UI.Start -Forbid $Unavailable, $AppTitle
 
     Invoke-Step 'Alt+I after stopping: NVDA says Ready' { Send-Keys 'Alt+I' } -Expect $UI.Ready
 }

@@ -4,7 +4,10 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/favicon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>AudioCaptor</title>
+    <!-- Empty on purpose (backlog TASK-18): when the window first gets focus, NVDA names the
+         page document before the focused control, so a title here would repeat the window
+         title. The window title (tauri.conf.json) stays "AudioCaptor". -->
+    <title></title>
     <script>
       // Runs synchronously before first paint — prevents theme flash.
       // Reads the localStorage mirror written by the theme store.
@@ -23,7 +26,10 @@
       })();
     </script>
   </head>
-  <body role="application" aria-label="AudioCaptor">
+  <!-- role="application" keeps NVDA out of browse mode (backlog doc-3). No aria-label: NVDA
+       names the application whenever focus enters it from outside, right after the window
+       title, so a name here would repeat "AudioCaptor" (TASK-18). -->
+  <body role="application">
     <div id="app"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>

@@ -26,6 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - When you resume a paused recording, the screen reader now says "Recording resumed" instead of "Recording
   started", so you can tell it apart from a new recording. The announcement is the same however you resume:
   Alt+R, the Resume button, the global hotkey or the tray menu.
+- When AudioCaptor starts, the screen reader now says its name once before it names the profile list. Before,
+  NVDA said "AudioCaptor" six or seven times in a row.
 
 ## [0.1.0] — 2026-04-20
 

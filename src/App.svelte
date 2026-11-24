@@ -375,7 +375,9 @@
 </script>
 
 {#if initialized}
-<main aria-label="AudioCaptor">
+<!-- A plain block, not a <main> landmark: inside role="application" a landmark is of no use,
+     and NVDA would name it every time focus enters it (backlog TASK-18). -->
+<div class="main">
   <div class="header-row">
     <h1>{m.app_title()}</h1>
     <div class="header-btns">
@@ -505,11 +507,11 @@
     onconfirm={handleDeleteConfirm}
     oncancel={handleDeleteCancel}
   />
-</main>
+</div>
 {/if}
 
 <style>
-  main {
+  .main {
     max-width: 480px;
     margin: 0 auto;
     padding: 20px 16px 16px;

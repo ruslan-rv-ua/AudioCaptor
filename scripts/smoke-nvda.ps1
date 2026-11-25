@@ -30,14 +30,15 @@
 
     What it protects:
     - Your data. The test runs a copy of the exe from %TEMP%\audiocaptor-smoke with its own
-      AudioCaptor-data (English interface, two test profiles). WebView2 keeps the browser data of
-      the copy there too: WEBVIEW2_USER_DATA_FOLDER is set for the test copy only. Every other
-      copy keeps its browser data in %LOCALAPPDATA%\com.audiocaptor.app\EBWebView. Nothing in
-      %LOCALAPPDATA%\com.audiocaptor.app may change during the run: the app keeps all its data in
-      AudioCaptor-data (decision-1), so any change there fails the test. There the test reads only
-      the names of the top entries, the number of files and folders in each and the time of the
-      newest change. The test folder is deleted at the end; the copy's own log is kept as
-      %TEMP%\audiocaptor-smoke-app.log.
+      AudioCaptor-data (English interface, two test profiles). Like every copy of the app, it
+      keeps the data of its built-in browser (WebView2) in AudioCaptor-webview next to its exe;
+      the test checks that the copy created it there. AudioCaptor 0.1.1 and older kept that data
+      in %LOCALAPPDATA%\com.audiocaptor.app\EBWebView. Nothing in
+      %LOCALAPPDATA%\com.audiocaptor.app may change during the run, and the folder must not
+      appear if it was not there: the app keeps all its data next to its exe (decision-1), so
+      any change there fails the test. There the test reads only the names of the top entries,
+      the number of files and folders in each and the time of the newest change. The test folder
+      is deleted at the end; the copy's own log is kept as %TEMP%\audiocaptor-smoke-app.log.
     - Your AudioCaptor. The app allows one copy and holds the Pause key, so a running AudioCaptor
       is asked to quit, as its close button does, and is not started again. If it does not quit
       (for example, it is recording and asks to confirm), the test stops and leaves it alone.
@@ -119,13 +120,13 @@ $Root = Join-Path $env:TEMP 'audiocaptor-smoke'
 $TestExe = Join-Path $Root 'AudioCaptor.exe'
 $DataDir = Join-Path $Root 'AudioCaptor-data'
 $SettingsFile = Join-Path $DataDir 'settings.json'
-$WebviewDir = Join-Path $Root 'webview'
-# Every other copy of AudioCaptor keeps its browser data in EBWebView here (Tauri's
-# app_local_data_dir). The test copy must not change anything here: its browser data is
-# redirected, and the app keeps the rest of its data in AudioCaptor-data (decision-1).
-$UserAppDir = Join-Path $env:LOCALAPPDATA 'com.audiocaptor.app'
+# The app keeps the data of its built-in browser (WebView2) next to its exe
+# ("appDirectoriesOverride" in tauri.conf.json); WebView2 puts it in an EBWebView subfolder.
+$WebviewDir = Join-Path $Root 'AudioCaptor-webview'
 $BrowserEntry = 'EBWebView'
-$WebviewVar = 'WEBVIEW2_USER_DATA_FOLDER'
+# AudioCaptor 0.1.1 and older keep their browser data in EBWebView here (Tauri's default). The
+# test copy must not change anything here: the app keeps all its data next to its exe (decision-1).
+$UserAppDir = Join-Path $env:LOCALAPPDATA 'com.audiocaptor.app'
 
 # English interface strings from messages/en.json (keys in the comments). The test copy runs
 # with "language": "en".
@@ -433,13 +434,9 @@ function Format-Focus($Focus) {
     return "an element without a name ($($Focus.Type))"
 }
 
-# Starts the test copy (or a second copy of it) with its own WebView2 data folder; the variable
-# is set in this process only for the moment of the start.
+# Starts the test copy (or a second copy of it).
 function Start-TestCopy {
-    $old = [Environment]::GetEnvironmentVariable($WebviewVar, 'Process')
-    [Environment]::SetEnvironmentVariable($WebviewVar, $WebviewDir, 'Process')
-    try { return Start-Process -FilePath $TestExe -WorkingDirectory $Root -PassThru }
-    finally { [Environment]::SetEnvironmentVariable($WebviewVar, $old, 'Process') }
+    return Start-Process -FilePath $TestExe -WorkingDirectory $Root -PassThru
 }
 
 # Waits, without UI Automation, until the window is on screen and in the foreground, then gives
@@ -500,8 +497,8 @@ function Start-App {
         $null = [AcSmokeNative]::Activate((Get-AppHandle))
         $script:StepInfo.Add('the window appeared but did not come to the foreground by itself; the test brought it there')
     }
-    if (-not (Test-Path -LiteralPath (Join-Path $WebviewDir 'EBWebView'))) {
-        throw "WebView2 did not put its data into $WebviewDir, so the test copy may be using the browser data of your AudioCaptor"
+    if (-not (Test-Path -LiteralPath (Join-Path $WebviewDir $BrowserEntry))) {
+        throw "the test copy did not put its browser data (WebView2) into $WebviewDir, next to its exe"
     }
     $null = Wait-Until "focus on the '$($UI.ProfileList)' list" { (Get-Focus).Name -eq $UI.ProfileList } 15
 }
@@ -1203,7 +1200,8 @@ function Initialize-TestFolder {
     if (Test-Path -LiteralPath $Root) { Stop-Run "Cannot clear $Root, left by an earlier run: a program still uses it. Close it and run the test again." }
     Remove-Item -LiteralPath $AppLogCopy -Force -ErrorAction SilentlyContinue  # the log of an earlier run
     $script:FolderReady = $true
-    $null = New-Item -ItemType Directory -Force -Path $DataDir, $WebviewDir
+    # No AudioCaptor-webview: the test copy has to create it itself (Start-App checks it).
+    $null = New-Item -ItemType Directory -Force -Path $DataDir
     Copy-Item -LiteralPath $Exe -Destination $TestExe
 }
 
@@ -1216,8 +1214,10 @@ function Wait-ForStart {
 
 # --- Run ---------------------------------------------------------------------------------------
 $exeTime = $null
+$userDirBefore = $false
 $userBefore = $null
 $userAfter = $null
+$testBrowser = $null
 $script:RunClock = $null
 $script:FolderReady = $false
 $script:AppLogCopied = $false
@@ -1256,6 +1256,7 @@ try {
     }
     Close-UserAudioCaptor
     Initialize-TestFolder
+    $userDirBefore = Test-Path -LiteralPath $UserAppDir
     $userBefore = Get-SettledEntryStates $UserAppDir
     foreach ($name in $Selected) { Invoke-Scenario $name }
 } catch {
@@ -1267,6 +1268,7 @@ try {
     if ($null -ne $userBefore) { $userAfter = Get-SettledEntryStates $UserAppDir }
     Stop-HomeWindow
     if ($script:FolderReady) {
+        $testBrowser = Get-FolderState (Join-Path $WebviewDir $BrowserEntry)
         $appLog = Join-Path $DataDir 'logs\audiocaptor.log'
         if (Test-Path -LiteralPath $appLog) {
             Copy-Item -LiteralPath $appLog -Destination $AppLogCopy -Force
@@ -1285,12 +1287,17 @@ $lines.Add(('AudioCaptor NVDA smoke test, {0:yyyy-MM-dd HH:mm}' -f (Get-Date)))
 $lines.Add("Scenarios: $($Selected -join ', ')")
 if ($exeTime) { $lines.Add(('Exe: {0}, built {1:yyyy-MM-dd HH:mm}' -f $Exe, $exeTime)) } else { $lines.Add("Exe: $Exe") }
 if ($script:LogPath) { $lines.Add(('NVDA log: {0}, read from byte {1} on (only what NVDA wrote during this run)' -f $script:LogPath, $script:LogStart)) }
+if ($testBrowser) { $lines.Add("Browser data of the test copy, next to its exe ($(Join-Path $WebviewDir $BrowserEntry)): $($testBrowser.Text).") }
 $browserChanged = $false
 $wroteOutside = $false
 if ($null -ne $userBefore -and $null -ne $userAfter) {
+    if (-not $userDirBefore -and (Test-Path -LiteralPath $UserAppDir)) {
+        $wroteOutside = $true
+        $lines.Add("FAILED: AudioCaptor created $UserAppDir, outside the folder of its exe.")
+    }
     $names = @(@($userBefore.Keys) + @($userAfter.Keys) | Sort-Object -Unique)
     if ($names -notcontains $BrowserEntry) {
-        $lines.Add("Browser data of your AudioCaptor ($(Join-Path $UserAppDir $BrowserEntry)): none, before or after the run.")
+        $lines.Add("Browser data of AudioCaptor 0.1.1 and older ($(Join-Path $UserAppDir $BrowserEntry)): none, before or after the run.")
     }
     foreach ($n in $names) {
         $b = $userBefore[$n]
@@ -1300,14 +1307,14 @@ if ($null -ne $userBefore -and $null -ne $userAfter) {
         $same = ($b -and $a -and $b.Key -eq $a.Key)
         $path = Join-Path $UserAppDir $n
         if ($n -eq $BrowserEntry) {
-            if ($same) { $lines.Add("Browser data of your AudioCaptor ($path): unchanged ($aText).") }
+            if ($same) { $lines.Add("Browser data of AudioCaptor 0.1.1 and older ($path): unchanged ($aText).") }
             else {
                 $browserChanged = $true
-                $lines.Add("FAILED: the test copy changed the browser data of your AudioCaptor ($path): before $bText; after $aText.")
+                $lines.Add("FAILED: the test copy changed the browser data of AudioCaptor 0.1.1 and older ($path): before $bText; after $aText.")
             }
         } elseif (-not $same) {
             $wroteOutside = $true
-            $lines.Add("FAILED: AudioCaptor wrote to $path, outside its AudioCaptor-data folder. Before: $bText; after: $aText.")
+            $lines.Add("FAILED: AudioCaptor wrote to $path, outside the folder of its exe. Before: $bText; after: $aText.")
         }
     }
 }

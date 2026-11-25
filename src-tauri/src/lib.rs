@@ -16,6 +16,8 @@ use state::SharedState;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tauri::{Emitter, Manager};
+use windows::Win32::Foundation::SYSTEMTIME;
+use windows::Win32::System::SystemInformation::GetLocalTime;
 
 #[tauri::command]
 fn load_settings() -> settings::Settings {
@@ -94,7 +96,7 @@ fn start_recording_inner(
         .cloned()
         .unwrap_or_default();
 
-    let timestamp = chrono::Local::now().format("%Y-%m-%d_%H-%M-%S");
+    let timestamp = local_timestamp();
     let base_dir = portable::data_dir().map_err(|e| e.to_string())?;
     let output_dir = base_dir.join(&profile.output_folder);
     std::fs::create_dir_all(&output_dir).map_err(|e| e.to_string())?;
@@ -275,6 +277,23 @@ fn start_recording_inner(
 
     log::info!("Recording started");
     Ok(())
+}
+
+/// The current local date and time for recording file names,
+/// e.g. `2026-11-25_14-03-09`.
+fn local_timestamp() -> String {
+    // SAFETY: GetLocalTime takes no arguments and only fills the struct it returns.
+    let now = unsafe { GetLocalTime() };
+    format_timestamp(&now)
+}
+
+/// Formats a date and time as `YYYY-MM-DD_hh-mm-ss` (strftime
+/// `%Y-%m-%d_%H-%M-%S`), the timestamp in recording file names.
+fn format_timestamp(t: &SYSTEMTIME) -> String {
+    format!(
+        "{:04}-{:02}-{:02}_{:02}-{:02}-{:02}",
+        t.wYear, t.wMonth, t.wDay, t.wHour, t.wMinute, t.wSecond
+    )
 }
 
 #[tauri::command]
@@ -715,4 +734,36 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn timestamp_keeps_the_file_name_format() {
+        // Every field is zero-padded; milliseconds are left out.
+        let early = SYSTEMTIME {
+            wYear: 2026,
+            wMonth: 1,
+            wDay: 5,
+            wHour: 7,
+            wMinute: 8,
+            wSecond: 9,
+            wMilliseconds: 987,
+            ..Default::default()
+        };
+        assert_eq!(format_timestamp(&early), "2026-01-05_07-08-09");
+
+        let late = SYSTEMTIME {
+            wYear: 2026,
+            wMonth: 12,
+            wDay: 31,
+            wHour: 23,
+            wMinute: 59,
+            wSecond: 59,
+            ..Default::default()
+        };
+        assert_eq!(format_timestamp(&late), "2026-12-31_23-59-59");
+    }
 }

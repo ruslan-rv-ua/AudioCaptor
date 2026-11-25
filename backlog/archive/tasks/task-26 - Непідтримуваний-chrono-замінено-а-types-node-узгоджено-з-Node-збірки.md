@@ -1,11 +1,11 @@
 ---
 id: TASK-26
 title: Непідтримуваний chrono замінено, а @types/node узгоджено з Node збірки
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-25T01:05:47Z'
-updated_date: '2026-11-25T08:04:50Z'
+updated_date: '2026-11-25T08:09:27Z'
 labels:
   - backend
   - frontend
@@ -30,19 +30,19 @@ ordinal: 10900
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Місцеві дату й час для назви файлу запису програма бере без `chrono`, а формат назви не змінився (`%Y-%m-%d_%H-%M-%S`); його перевіряє тест
-- [ ] #2 `chrono` не збирається в програму: його немає в `src-tauri/Cargo.toml`, а `cargo tree -i chrono --target all -e all` нічого не знаходить
-- [ ] #3 Мажорна версія `@types/node` у `package.json` збігається з версією Node, на якій CI і Release збирають програму
-- [ ] #4 Запис на зібраному exe створює файл із назвою того самого формату, що й до зміни
+- [x] #1 Місцеві дату й час для назви файлу запису програма бере без `chrono`, а формат назви не змінився (`%Y-%m-%d_%H-%M-%S`); його перевіряє тест
+- [x] #2 `chrono` не збирається в програму: його немає в `src-tauri/Cargo.toml`, а `cargo tree -i chrono --target all -e all` нічого не знаходить
+- [x] #3 Мажорна версія `@types/node` у `package.json` збігається з версією Node, на якій CI і Release збирають програму
+- [x] #4 Запис на зібраному exe створює файл із назвою того самого формату, що й до зміни
 <!-- AC:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 Усі локальні перевірки проходять: `just check`
-- [ ] #2 Новий або змінений текст інтерфейсу є англійською й українською: у `messages/en.json` і `messages/uk.json`, а підписи меню трея — у `src-tauri/src/tray.rs`
-- [ ] #3 Зміни в інтерфейсі, фокусі, діалогах чи оголошеннях перевірено з клавіатури і з NVDA (якщо задача їх містить)
-- [ ] #4 Документацію оновлено там, де змінилася поведінка чи порядок роботи (README.md, README_UK.md, DEVELOPMENT.md)
-- [ ] #5 CHANGELOG.md оновлено: лише зміни, помітні користувачам (без подробиць про інструменти, тести, CI чи збірку)
+- [x] #1 Усі локальні перевірки проходять: `just check`
+- [x] #2 Новий або змінений текст інтерфейсу є англійською й українською: у `messages/en.json` і `messages/uk.json`, а підписи меню трея — у `src-tauri/src/tray.rs`
+- [x] #3 Зміни в інтерфейсі, фокусі, діалогах чи оголошеннях перевірено з клавіатури і з NVDA (якщо задача їх містить)
+- [x] #4 Документацію оновлено там, де змінилася поведінка чи порядок роботи (README.md, README_UK.md, DEVELOPMENT.md)
+- [x] #5 CHANGELOG.md оновлено: лише зміни, помітні користувачам (без подробиць про інструменти, тести, CI чи збірку)
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -75,3 +75,15 @@ Node: власник обрав `@types/node` 22, як Node у CI і Release (`n
 - `just build`: пройшов, exe зібрано 2026-11-25 03:33:01, після останнього коміту з кодом.
 - AC #4, з дозволу власника: скрипт task-26-filename-check.ps1 (спільна тека нотаток сесій) запустив копію exe в %TEMP%\audiocaptor-task26 з власною AudioCaptor-data і записав 2 с системного звуку (Alt+S, Alt+T). Файл `loopback_2026-11-25_09-57-37.wav`: час у назві місцевий (Alt+S о 09:57:37.439; журнал копії, де час UTC, — 07:57:37). Стара збірка в TASK-22 назвала файл так само: `loopback_2026-11-25_00-30-07.wav` при 22:30:07 UTC у журналі. Теку копії видалено; %LOCALAPPDATA%\com.audiocaptor.app не змінилася.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+`chrono` замінено на `GetLocalTime` із крейта `windows`, який програма вже мала (додано лише фічу `Win32_System_SystemInformation`). Чиста `format_timestamp` пише `YYYY-MM-DD_hh-mm-ss`, як раніше `%Y-%m-%d_%H-%M-%S`; тест перевіряє нулі попереду й найбільші значення.
+
+`chrono` більше не збирається в програму. Його запис у `Cargo.lock` лишився, бо його згадує `serde_with` у tauri-utils; власник погодив нове формулювання AC #2. Попередження `cargo audit` про такі записи описано в примітках DRAFT-5.
+
+`@types/node` 20 → 22, як Node у CI і Release (вибір власника); DEVELOPMENT.md каже, що їх міняють разом.
+
+Перевірки: `just check` (67 тестів) у робочій і головній сесіях, `just build`, запис на копії exe дав `loopback_2026-11-25_09-57-37.wav` з місцевим часом, ручний CI на develop пройшов (https://github.com/ruslan-rv-ua/AudioCaptor/actions/runs/45573242675). CHANGELOG не змінено: користувачі нічого не помітять.
+<!-- SECTION:FINAL_SUMMARY:END -->

@@ -4,7 +4,7 @@ title: Перехід Tab з останнього елемента на перш
 status: Draft
 assignee: []
 created_date: '2026-11-24T21:19:42Z'
-updated_date: '2026-11-24T23:52:06Z'
+updated_date: '2026-11-25T00:51:59Z'
 labels:
   - frontend
   - a11y
@@ -50,4 +50,6 @@ priority: low
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-25: під час розбору чернеток 0.2.0 власник поки відклав рішення.
+
+Доповнення 2026-11-25, робоча сесія TASK-25: у сценарії `launch` (о 02:37 і 02:47) перехід Tab з «Start recording (Alt+S)» на «Minimize to tray» обидва рази звучав «документ | додаток, пробіл | додаток | Minimize to tray, кнопка». Обидва рази старт звучав коротко («AudioCaptor | документ | додаток | Recording profile…»). Схоже, що копію режиму огляду NVDA тоді прочитав не на старті, а на цьому переході. Звіти: `task-25-smoke-launch.txt` і `task-25-smoke-full.txt` у спільній теці нотаток.
 <!-- SECTION:NOTES:END -->

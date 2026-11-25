@@ -35,8 +35,10 @@ TypeScript у WebView2. Тут описано, що встановити, як �
 - **Microsoft C++ Build Tools** з набором «Desktop development with C++»
   ([завантаження](https://visualstudio.microsoft.com/visual-cpp-build-tools/)): ними Rust для Windows
   компонує exe.
-- **[Node.js](https://nodejs.org/) 22** — цю версію ставлять CI і Release. Vite 8 і
-  `@sveltejs/vite-plugin-svelte` 7 працюють з Node 20.19+, 22.12+ або 24+; Node 18 уже не підходить.
+- **[Node.js](https://nodejs.org/) 22** — цю версію ставлять CI і Release. Мажорна версія `@types/node` у
+  `package.json` така сама, тож перехід на інший Node міняє і `node-version` у `ci.yml` та `release.yml`, і
+  `@types/node`. Vite 8 і `@sveltejs/vite-plugin-svelte` 7 працюють з Node 20.19+, 22.12+ або 24+; Node 18 уже
+  не підходить.
 - **[pnpm](https://pnpm.io/) 10**: `npm install -g pnpm@10`. Точну версію записано в `package.json`
   (`"packageManager": "pnpm@10.32.1"`), і CI бере її звідти. Без `@10` npm поставив би новішу основну версію
   pnpm, ніж у CI.

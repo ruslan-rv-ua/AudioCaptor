@@ -29,6 +29,9 @@
     ],
     "security": {
       "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline';"
+    },
+    "appDirectoriesOverride": {
+      "localData": "AudioCaptor-webview"
     }
   },
   "bundle": {

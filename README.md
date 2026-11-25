@@ -51,7 +51,10 @@ AudioCaptor-data/
 ├── settings.json      # Your preferences (auto-saved)
 ├── logs/              # Diagnostic logs
 └── Recordings/        # Default recordings folder
+AudioCaptor-webview/   # Cache of the built-in browser
 ```
+
+The built-in browser that draws the window (Microsoft Edge WebView2) keeps its cache and its own state in the `AudioCaptor-webview` folder. None of your settings or recordings are in it, so it needs no backup; if you delete it while AudioCaptor is closed, the app creates it again. Versions 0.1.1 and older kept this data in `%LOCALAPPDATA%\com.audiocaptor.app`: once you no longer run them, you can delete that folder.
 
 ## Usage
 
@@ -94,7 +97,7 @@ scoop bucket add ruslan-rv-ua https://github.com/ruslan-rv-ua/scoop-bucket
 scoop install audiocaptor
 ```
 
-When installed via Scoop, the `AudioCaptor-data/` folder is automatically persisted across updates.
+When installed via Scoop, the `AudioCaptor-data/` folder is automatically persisted across updates. The `AudioCaptor-webview/` folder is not: it lies in the folder of each version, so after an update the browser starts with an empty cache.
 
 ## Accessibility
 

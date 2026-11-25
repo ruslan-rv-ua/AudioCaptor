@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- AudioCaptor now keeps the data of its built-in browser (Microsoft Edge WebView2, which draws the window) in a new `AudioCaptor-webview` folder next to `AudioCaptor.exe` instead of `%LOCALAPPDATA%\com.audiocaptor.app\EBWebView`, so copies in different folders no longer share it. The folder holds only the browser's cache and its own state, none of your settings or recordings; if you delete it while AudioCaptor is closed, the app creates it again. With Scoop it lies in the folder of each version, so after an update the browser starts with an empty cache. This version neither uses nor deletes the old `EBWebView` folder, so an older copy still works; you can delete it once you no longer need AudioCaptor 0.1.1 or older.
+
 ## [0.1.1] — 2026-11-25
 
 ### Fixed

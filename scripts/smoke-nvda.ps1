@@ -20,11 +20,20 @@
       dialogs  About (F1), Settings, New Profile and the delete confirmation: focus enters the
                dialog, Escape closes it and focus returns to where the dialog was opened. F1 in
                Settings opens About on top of Settings: UI Automation finds About in the middle
-               of the window, and Settings again once About is closed.
+               of the window, and Settings again once About is closed. In New Profile, Tab
+               reaches the Format list, NVDA reads its name and value, and Down changes it. In
+               Edit Profile, Opus is chosen and saved: the profile in settings.json has it.
       tray     Escape hides the window; starting the exe again shows it and NVDA announces it.
       settings Start with an unreadable settings.json: the app keeps a copy next to it
                (settings.unreadable.json), NVDA reads the message that the settings were reset
                and where the old file is kept.
+      convert  Recordings left to convert to Opus by the last run (two generated WAV files, the
+               first one large enough to take about half a minute): NVDA says that the app is
+               finishing them, Alt+I says about how long is left and how many files wait,
+               Alt+F4 asks before it exits, Exit leaves the WAV files whole and no half-written
+               Opus file, and the next start finishes the job. While it runs a new recording
+               starts and stops (it joins the queue), and NVDA says when all is converted. The
+               generated files need -ConvertMB megabytes of free space in the temp folder.
 
     Exit code: 0 everything passed; 1 a step or an NVDA check failed, or the test copy wrote to
     %LOCALAPPDATA%\com.audiocaptor.app; 2 the test could not run or stopped early (no exe, NVDA
@@ -50,7 +59,8 @@
       that NVDA reads during the run do end up in it: turn on "Do not disturb" to keep them out.
     - Only the part of nvda.log written during the run is read.
 
-    Do not touch the keyboard or mouse while the test runs (one to two minutes).
+    Do not touch the keyboard or mouse while the test runs (two to three minutes for all
+    scenarios; the convert scenario alone takes over a minute).
 
     How it starts and ends. Once the exe, NVDA and its log are found, one beep sounds and the test
     waits -PauseSec seconds before it presses the first key. When the run ends, three beeps sound
@@ -59,7 +69,13 @@
     in its chat before it starts the test; the script itself asks nothing.
 
 .PARAMETER Scenario
-    One or more of launch, record, dialogs, tray. All of them when omitted.
+    One or more of launch, record, dialogs, tray, settings, convert. All of them when omitted.
+
+.PARAMETER ConvertMB
+    The size of the large WAV file of the convert scenario, in megabytes. Default: 900, which a
+    2024 desktop PC converts in about half a minute. The conversion has to last longer than the
+    steps made while it runs (about 10 s); raise the number on a much faster PC if the report
+    says that the conversion ended too early.
 
 .PARAMETER PauseSec
     The pause between the first beep and the first key press, in seconds. Default: 5.
@@ -89,6 +105,7 @@ param(
     [string]$Exe,
     [string]$NvdaLog,
     [int]$PauseSec = 5,
+    [int]$ConvertMB = 900,
     [int]$TimeoutSec = 8,
     [int]$SpeechWaitSec = 5,
     [int]$SettleMs = 700
@@ -97,7 +114,7 @@ param(
 $ErrorActionPreference = 'Stop'
 
 # --- Arguments ---------------------------------------------------------------------------------
-$AllScenarios = @('launch', 'record', 'dialogs', 'tray', 'settings')
+$AllScenarios = @('launch', 'record', 'dialogs', 'tray', 'settings', 'convert')
 $Selected = @($Scenario | Where-Object { $_ } | ForEach-Object { $_.ToLowerInvariant() })
 if ($Selected.Count -eq 0 -or $Selected -contains 'all') { $Selected = $AllScenarios }
 $unknown = @($Selected | Where-Object { $AllScenarios -notcontains $_ })
@@ -108,6 +125,7 @@ if ($unknown.Count) {
 }
 $Selected = @($AllScenarios | Where-Object { $Selected -contains $_ })  # their own order, no repeats
 if ($PauseSec -lt 0) { $ArgError = '-PauseSec must be 0 or more.' }
+if ($ConvertMB -lt 1) { $ArgError = '-ConvertMB must be 1 or more.' }
 
 # Windows PowerShell 5.1 does not set $PSScriptRoot inside param() defaults.
 $DefaultExe = Join-Path $PSScriptRoot '..\src-tauri\target\release\AudioCaptor.exe'
@@ -159,8 +177,24 @@ $UI = @{
     Settings       = 'Settings'                 # settings_dialog_title
     CurrentHotkey  = 'Current hotkey: Pause'    # settings_hotkey_current_aria
     NewProfile     = 'New Profile'              # profile_dialog_create_title
+    EditTitle      = 'Edit Profile'             # profile_dialog_edit_title
+    Save           = 'Save'                     # btn_save
+    Format         = 'Format'                   # field_output_format, the name of the format list
+    FormatWav      = 'WAV (uncompressed)'       # format_wav
+    FormatSpeech   = 'speech (mono)'            # format_opus_speech, the part after the dash
     DeleteTitle    = 'Delete this profile?'     # delete_profile_confirm
     Cancel         = 'Cancel'                   # btn_cancel
+    Exit           = 'Exit'                     # btn_exit
+    ExitTitle      = 'Exit AudioCaptor?'        # confirm_exit_conversion_title
+    ExitBody       = 'Recordings are still being converted. If you exit now, AudioCaptor will finish converting them the next time it starts.'  # confirm_exit_conversion_body
+    Resumed2       = 'Finishing the conversion of recordings from last time. Files: 2.'  # live_conversion_resumed
+    ReadyConverting = 'Ready. Converting to Opus'    # status_ready, then conversion_time_left or conversion_in_progress
+    TimeLeft       = 'seconds left|minute left|minutes left'  # time_about_* inside conversion_time_left
+    Waiting1       = 'Files waiting: 1.'        # conversion_files_waiting
+    Waiting2       = 'Files waiting: 2.'        # conversion_files_waiting
+    StoppedWaiting = 'Recording stopped. The recording is waiting to be converted to Opus.'  # live_recording_stopped_conversion_waiting
+    Converted      = 'Conversion finished.'     # live_conversion_finished
+    ConvertErrors  = 'Conversion finished with errors|Could not finish the conversion'  # live_conversion_finished_with_errors, error_conversion_failed
 }
 
 # The two profiles of the test copy. The first one is active: system audio only, so Alt+S
@@ -294,6 +328,28 @@ public static class AcSmokeNative {
         w.Flush();
         s.Position = 0;
         using (System.Media.SoundPlayer p = new System.Media.SoundPlayer(s)) p.PlaySync();
+    }
+
+    // Writes a 48 kHz stereo 16-bit WAV of the given number of frames: the same block of noise
+    // over and over. Nothing plays it; it is only there to be converted. Returns its size.
+    public static long WriteNoiseWav(string path, long frames) {
+        byte[] block = new byte[1 << 20];
+        new Random(28).NextBytes(block);
+        long bytes = frames * 4;
+        using (System.IO.FileStream f = System.IO.File.Create(path)) {
+            System.IO.BinaryWriter w = new System.IO.BinaryWriter(f);
+            w.Write(Encoding.ASCII.GetBytes("RIFF")); w.Write((uint)(36 + bytes));
+            w.Write(Encoding.ASCII.GetBytes("WAVEfmt ")); w.Write(16);
+            w.Write((short)1); w.Write((short)2); w.Write(48000); w.Write(48000 * 4); w.Write((short)4); w.Write((short)16);
+            w.Write(Encoding.ASCII.GetBytes("data")); w.Write((uint)bytes);
+            w.Flush();
+            for (long left = bytes; left > 0; ) {
+                int n = (int)Math.Min(left, block.Length);
+                f.Write(block, 0, n);
+                left -= n;
+            }
+            return f.Length;
+        }
     }
 
     [ComImport, Guid("BCDE0395-E52F-467C-8E3D-C4579291692E")]
@@ -468,20 +524,26 @@ function Write-TestSettings {
         [IO.File]::WriteAllText($SettingsFile, '{ "version": 5, "profiles": [', (New-Object Text.UTF8Encoding $false))
         return
     }
+    # Profiles as settings version 5 wrote them, without a format: every start of the test copy
+    # also goes through the migration to version 6. The convert scenario adds the format to the
+    # active profile, so that its recording is converted to Opus.
     $newProfile = {
-        param([string]$Id, [string]$Name, [string]$Mode)
-        [ordered]@{ id = $Id; name = $Name; description = ''; outputFolder = 'Recordings'; outputMode = $Mode
-                    sampleRate = 48000; micVolume = 1.0; loopbackVolume = 0.5
-                    micFilename = 'mic'; loopbackFilename = 'loopback'; mixFilename = 'mix' }
+        param([string]$Id, [string]$Name, [string]$Mode, [string]$Format)
+        $p = [ordered]@{ id = $Id; name = $Name; description = ''; outputFolder = 'Recordings'; outputMode = $Mode
+                         sampleRate = 48000; micVolume = 1.0; loopbackVolume = 0.5
+                         micFilename = 'mic'; loopbackFilename = 'loopback'; mixFilename = 'mix' }
+        if ($Format) { $p.outputFormat = $Format }
+        $p
     }
+    $systemFormat = if ($script:OpusProfile) { 'OpusSpeech' } else { '' }
     $settings = [ordered]@{
         version                    = 5
         selectedMic                = $null
         selectedLoopback           = $script:PlaybackDeviceId
         hotkey                     = 'Pause'
         soundEnabled               = $true
-        profiles                   = @((& $newProfile 'smoke-system' $Profiles.System 'Loopback'),
-                                       (& $newProfile 'smoke-spare' $Profiles.Spare 'Mix'))
+        profiles                   = @((& $newProfile 'smoke-system' $Profiles.System 'Loopback' $systemFormat),
+                                       (& $newProfile 'smoke-spare' $Profiles.Spare 'Mix' ''))
         activeProfileId            = 'smoke-system'
         language                   = 'en'
         confirmExitDuringRecording = $true
@@ -528,6 +590,16 @@ function Stop-App {
         $null = $p.WaitForExit(5000)
         $Notes.Add("[$script:CurrentScenario] the test copy did not quit within 5 s of WM_CLOSE and was ended.")
     }
+}
+
+# Tab inside a dialog until $Reached is true for the control with focus.
+function Move-InDialog([scriptblock]$Reached, [string]$What) {
+    for ($k = 0; $k -lt 15 -and -not (& $Reached); $k++) {
+        $prev = Get-Focus
+        Send-Keys 'Tab'
+        try { $null = Wait-Until 'focus to move' { $g = Get-Focus; $g -and (-not $prev -or $g.Key -ne $prev.Key) } 3 } catch { }
+    }
+    if (-not (& $Reached)) { throw "Tab did not reach $What in 15 presses" }
 }
 
 # Tab or Shift+Tab, whichever is shorter by $TabOrder, until the control with this name has focus.
@@ -1042,6 +1114,15 @@ function Invoke-DialogsScenario {
         $null = Wait-Until 'focus on the Name field' { (Get-Focus).Id -eq 'profile-name' }
     } -Once $UI.NewProfile -ExpectAny $Role.Dialog
 
+    # The list of recording formats: it has a name, the keyboard reaches it and changes it.
+    Invoke-Step "Tab to the '$($UI.Format)' list: NVDA reads its name and the default, WAV" {
+        Move-InDialog { (Get-Focus).Id -eq 'profile-format' } "the '$($UI.Format)' list"
+    } -Expect $UI.Format, $UI.FormatWav
+
+    Invoke-Step 'Down in the list: NVDA reads the next format, Opus for speech' {
+        Send-Keys 'Down'
+    } -Expect $UI.FormatSpeech
+
     Invoke-Step "Escape closes New Profile: focus back on the '$($UI.CreateProfile)' button" {
         Close-Dialog 'profile-name' $UI.CreateProfile
     } -Expect $UI.CreateProfile
@@ -1059,6 +1140,28 @@ function Invoke-DialogsScenario {
         $names = @(([IO.File]::ReadAllText($SettingsFile) | ConvertFrom-Json).profiles | ForEach-Object { $_.name })
         if ($names.Count -ne 2) { throw "a profile was deleted: settings.json now lists $($names -join ', ')" }
     } -Expect $UI.DeleteProfile
+
+    # The format chosen in the dialog has to reach the profile in settings.json.
+    Invoke-Step "Tab to the '$($UI.EditProfile)' button" { Move-Focus $UI.EditProfile } -Expect $UI.EditProfile
+
+    Invoke-Step 'Space opens Edit Profile: focus on the Name field, NVDA reads the dialog' {
+        Send-Keys 'Space'
+        $null = Wait-Until 'focus on the Name field' { (Get-Focus).Id -eq 'profile-name' }
+    } -Once $UI.EditTitle -ExpectAny $Role.Dialog
+
+    Invoke-Step "Opus for speech is chosen in '$($UI.Format)' and saved: focus on the '$($UI.ProfileList)' list, the profile in settings.json has the format" {
+        Move-InDialog { (Get-Focus).Id -eq 'profile-format' } "the '$($UI.Format)' list"
+        Send-Keys 'Down'
+        Move-InDialog { (Get-Focus).Name -eq $UI.Save } "the '$($UI.Save)' button"
+        Send-Keys 'Space'
+        $null = Wait-Until 'the dialog to close' { -not (Find-ById 'profile-name') } 3
+        Confirm-Focus $UI.ProfileList
+        Start-Sleep -Milliseconds 300
+        $settings = [IO.File]::ReadAllText($SettingsFile) | ConvertFrom-Json
+        $saved = $settings.profiles | Where-Object { $_.id -eq 'smoke-system' }
+        Add-Check 'the profile in settings.json has the format chosen in the dialog (OpusSpeech)' ($saved.outputFormat -eq 'OpusSpeech') "outputFormat is '$($saved.outputFormat)'"
+        Add-Check 'settings.json, written as version 5 by the test, is version 6 now' ($settings.version -eq 6) "version is $($settings.version)"
+    } -Expect $UI.FormatSpeech, $UI.Save, $UI.ProfileList
 }
 
 function Invoke-TrayScenario {
@@ -1110,6 +1213,149 @@ function Invoke-SettingsScenario {
     }
 }
 
+# The files of the test copy's Recordings folder: name -> size.
+function Get-RecordingFiles {
+    $files = @{}
+    $dir = Join-Path $DataDir 'Recordings'
+    if (Test-Path -LiteralPath $dir) { foreach ($f in @(Get-ChildItem -LiteralPath $dir -File)) { $files[$f.Name] = $f.Length } }
+    return $files
+}
+
+function Format-RecordingFiles($Files) {
+    if (-not $Files.Count) { return 'no files' }
+    return (@($Files.Keys | Sort-Object | ForEach-Object { '{0} ({1:0.0} MB)' -f $_, ($Files[$_] / 1MB) }) -join ', ')
+}
+
+# The WAV files listed in the test copy's conversion queue, in order; none when there is no file.
+function Get-QueuedWavs {
+    $queue = Join-Path $DataDir 'conversion-queue.json'
+    if (-not (Test-Path -LiteralPath $queue)) { return @() }
+    return @(([IO.File]::ReadAllText($queue) | ConvertFrom-Json).jobs | ForEach-Object { ([string]$_.wav) -replace '\\', '/' })
+}
+
+# The conversion must still be running when a step is made during it.
+function Assert-Converting([string]$Step) {
+    if (-not (Test-Path -LiteralPath (Join-Path $DataDir 'conversion-queue.json'))) {
+        throw "the conversion ended before $Step; give the scenario a larger file: -ConvertMB $($ConvertMB * 2)"
+    }
+}
+
+function Invoke-ConvertScenario {
+    $recordings = Join-Path $DataDir 'Recordings'
+    $queueFile = Join-Path $DataDir 'conversion-queue.json'
+    $long = 'smoke-long.wav'
+    $short = 'smoke-short.wav'
+    $script:OpusProfile = $true
+    try {
+        # What the last run would have left behind: two recordings stopped but not yet converted.
+        Invoke-Step "Start with two recordings left to convert: NVDA says that the app is finishing them" {
+            if (-not $script:PlaybackDeviceId) { throw 'Windows has no default playback device; this scenario records system audio and needs one' }
+            # The folder may hold the recording of the record scenario: this one counts the files.
+            Remove-Item -LiteralPath $recordings -Recurse -Force -ErrorAction SilentlyContinue
+            $null = New-Item -ItemType Directory -Force -Path $recordings
+            $clock = [Diagnostics.Stopwatch]::StartNew()
+            $longFrames = [long]$ConvertMB * 1MB / 4
+            $shortFrames = 48000L * 3
+            $null = [AcSmokeNative]::WriteNoiseWav((Join-Path $recordings $long), $longFrames)
+            $null = [AcSmokeNative]::WriteNoiseWav((Join-Path $recordings $short), $shortFrames)
+            $job = { param([string]$Name, [long]$Frames) [ordered]@{ wav = "Recordings/$Name"; frames = $Frames; sampleRate = 48000; channels = 2; format = 'OpusMusic' } }
+            $queue = [ordered]@{ version = 1; jobs = @((& $job $long $longFrames), (& $job $short $shortFrames)) }
+            [IO.File]::WriteAllText($queueFile, ($queue | ConvertTo-Json -Depth 5), (New-Object Text.UTF8Encoding $false))
+            $script:StepInfo.Add(('generated {0} in {1:0.0} s' -f (Format-RecordingFiles (Get-RecordingFiles)), $clock.Elapsed.TotalSeconds))
+            Start-App
+        } -Expect $UI.Resumed2, $UI.ProfileList
+
+        Invoke-Step 'Alt+I during the conversion: NVDA says that it runs, about how long is left and that one file waits' {
+            Assert-Converting 'Alt+I'
+            Send-Keys 'Alt+I'
+        } -Expect $UI.ReadyConverting, $UI.Waiting1 -ExpectAny $UI.TimeLeft
+
+        Invoke-Step 'Alt+F4 during the conversion asks first: focus on Cancel, NVDA reads the question' {
+            Assert-Converting 'Alt+F4'
+            Send-Keys 'Alt+F4'
+            $null = Wait-Until 'focus on Cancel' { (Get-Focus).Id -eq 'confirm-exit-cancel' }
+        } -Once $UI.ExitTitle -Expect $UI.ExitBody, $UI.Cancel -ExpectAny $Role.Dialog
+
+        Invoke-Step "Escape closes the question: the app keeps running, focus back on the '$($UI.ProfileList)' list" {
+            Close-Dialog 'confirm-exit-cancel' $UI.ProfileList
+            if ($script:AppProc.HasExited) { throw 'the app quit instead of going on' }
+        } -Expect $UI.ProfileList
+
+        Invoke-Step 'Alt+F4, Tab to Exit, Space: the app quits; both WAV files are whole, no Opus file is left half-written' {
+            Assert-Converting 'the exit'
+            $before = Get-RecordingFiles
+            Send-Keys 'Alt+F4'
+            $null = Wait-Until 'focus on Cancel' { (Get-Focus).Id -eq 'confirm-exit-cancel' }
+            Send-Keys 'Tab'
+            $null = Wait-Until "focus on '$($UI.Exit)'" { (Get-Focus).Name -eq $UI.Exit } 3
+            $sawTemp = Test-Path -LiteralPath (Join-Path $recordings 'smoke-long.opus.tmp')
+            Send-Keys 'Space'
+            if (-not $script:AppProc.WaitForExit(8000)) { throw 'the app did not quit within 8 s of Exit' }
+            Start-Sleep -Milliseconds 300
+            $after = Get-RecordingFiles
+            $script:StepInfo.Add("files after the exit: $(Format-RecordingFiles $after); the queue file lists: $((Get-QueuedWavs) -join ', ')")
+            Add-Check 'the conversion was under way when the app quit (its temporary file was there)' $sawTemp
+            Add-Check 'both WAV files are there with the size they had' (($after[$long] -eq $before[$long]) -and ($after[$short] -eq $before[$short]) -and $before[$long] -gt 0)
+            $extra = @($after.Keys | Where-Object { $_ -ne $long -and $_ -ne $short })
+            Add-Check 'no Opus file and no temporary file is left' ($extra.Count -eq 0) ($extra -join ', ')
+            Add-Check 'the queue file still lists both recordings' (((Get-QueuedWavs) -join ', ') -eq "Recordings/$long, Recordings/$short")
+        } -Expect $UI.Exit
+
+        Invoke-Step 'Start again: NVDA says that the app is finishing the two recordings' {
+            Start-App
+        } -Expect $UI.Resumed2, $UI.ProfileList
+
+        # The interface answers during the conversion: a recording starts and stops as usual.
+        Invoke-Step "Alt+S during the conversion starts a recording: NVDA says Recording started; focus moves to '$($UI.Pause)'" {
+            Assert-Converting 'Alt+S'
+            Send-Keys 'Alt+S'
+            $null = Wait-Until "the '$($UI.Pause)' button" { Find-ByName $UI.Pause }
+            Confirm-Focus $UI.Pause
+        } -Expect $UI.Started, $UI.Pause -Forbid $Unavailable, $PageNoise
+
+        Invoke-Step "Alt+T stops it: NVDA says that the recording waits to be converted; focus moves to '$($UI.Start)'" {
+            Start-Sleep -Seconds 2
+            Assert-Converting 'Alt+T'
+            Send-Keys 'Alt+T'
+            $null = Wait-Until "the '$($UI.Start)' button" { Find-ByName $UI.Start }
+            Confirm-Focus $UI.Start
+        } -Expect $UI.StoppedWaiting, $UI.Start -Forbid $Unavailable, $PageNoise
+
+        Invoke-Step 'Alt+I: NVDA says that two files wait now' {
+            Assert-Converting 'the second Alt+I'
+            Send-Keys 'Alt+I'
+        } -Expect $UI.ReadyConverting, $UI.Waiting2 -ExpectAny $UI.TimeLeft
+
+        Invoke-Step 'The queue empties: NVDA says Conversion finished; three Opus files, no WAV, no queue file' {
+            $clock = [Diagnostics.Stopwatch]::StartNew()
+            $null = Wait-Until 'the conversion queue to empty' { -not (Test-Path -LiteralPath $queueFile) } 300
+            Start-Sleep -Milliseconds 500
+            $files = Get-RecordingFiles
+            $script:StepInfo.Add(('waited {0:0} s more; files: {1}' -f $clock.Elapsed.TotalSeconds, (Format-RecordingFiles $files)))
+            $opus = @($files.Keys | Where-Object { $_ -like '*.opus' -and $files[$_] -gt 0 })
+            $other = @($files.Keys | Where-Object { $_ -notlike '*.opus' })
+            Add-Check 'both left-over recordings are Opus files now' (($opus -contains 'smoke-long.opus') -and ($opus -contains 'smoke-short.opus'))
+            Add-Check 'the new recording is an Opus file too' (@($opus | Where-Object { $_ -like 'loopback_*.opus' }).Count -eq 1)
+            Add-Check 'no WAV file and no temporary file is left' ($other.Count -eq 0) ($other -join ', ')
+        } -Expect $UI.Converted -Forbid $UI.ConvertErrors
+
+        Invoke-Step 'Alt+I after the conversion: NVDA says Ready and nothing about a conversion' {
+            Send-Keys 'Alt+I'
+        } -Expect $UI.Ready -Forbid 'Converting'
+
+        Invoke-Step 'Alt+F4 with nothing left to convert: the app quits without asking' {
+            Send-Keys 'Alt+F4'
+            if (-not $script:AppProc.WaitForExit(8000)) { throw 'the app did not quit within 8 s of Alt+F4' }
+        } -Forbid $UI.ExitTitle
+    } finally {
+        $script:OpusProfile = $false
+        Stop-App
+        # The generated files are large: free the space at once, whatever happened.
+        Remove-Item -LiteralPath $recordings -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath $queueFile -Force -ErrorAction SilentlyContinue
+    }
+}
+
 function Invoke-Scenario([string]$Name) {
     $script:CurrentScenario = $Name
     $script:StepNumber = 0
@@ -1122,6 +1368,7 @@ function Invoke-Scenario([string]$Name) {
             'dialogs' { Invoke-DialogsScenario }
             'tray'    { Invoke-TrayScenario }
             'settings' { Invoke-SettingsScenario }
+            'convert' { Invoke-ConvertScenario }
         }
     } finally {
         Stop-App
@@ -1253,6 +1500,7 @@ $script:RunClock = $null
 $script:FolderReady = $false
 $script:AppLogCopied = $false
 $script:PlaybackDeviceId = $null
+$script:OpusProfile = $false
 try {
     if (-not (Test-Path -LiteralPath $Exe)) { Stop-Run "AudioCaptor.exe not found: $Exe. Build it first: just build" }
     $Exe = (Resolve-Path -LiteralPath $Exe).Path
@@ -1267,7 +1515,7 @@ try {
     try { $script:PlaybackDeviceId = [AcSmokeNative]::DefaultPlaybackDeviceId() } catch { }
 
     Write-Host "AudioCaptor NVDA smoke test: $($Selected -join ', ')."
-    Write-Host 'It takes one to two minutes. Do not touch the keyboard or mouse until the report appears.'
+    Write-Host 'It takes up to three minutes. Do not touch the keyboard or mouse until the report appears.'
     if (Get-Process $AppTitle -ErrorAction SilentlyContinue) { Write-Host 'Your running AudioCaptor will be closed and not started again.' }
     Wait-ForStart
 

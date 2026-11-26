@@ -9,7 +9,8 @@
     /**
      * What to show while recordings are converted, e.g. "Converting to Opus:
      * 45%"; empty otherwise. For the eye only: a screen reader gets the same
-     * from the announcements and from Alt+I.
+     * from the announcements and from Alt+I. It shares the row of the state
+     * label, so the card keeps its height and the window does not reflow.
      */
     conversion?: string;
   }
@@ -35,6 +36,9 @@
       <span class="rec-dot" aria-hidden="true"></span>
     {/if}
     <span class="state-label">{stateLabel}</span>
+    {#if conversion}
+      <span class="conversion">{conversion}</span>
+    {/if}
   </div>
   <span
     class="timer"
@@ -42,9 +46,6 @@
     role="timer"
     aria-label={m.recording_duration({ duration: formattedDuration })}
   >{formattedDuration}</span>
-  {#if conversion}
-    <span class="conversion">{conversion}</span>
-  {/if}
 </div>
 
 <style>
@@ -122,7 +123,9 @@
   }
 
   .conversion {
-    font-size: 0.75rem;
+    margin-left: 6px;
+    font-size: 9.5px;
+    line-height: 1;
     color: var(--text-secondary);
   }
 </style>

@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Recordings can now be saved as Opus, a compressed format that takes many times less space than WAV. Edit a profile and choose its new Format: "WAV (uncompressed)", which stays the default, "Opus — speech (mono)", about 14 MB per hour, or "Opus — music (stereo)", about 43 MB per hour; an hour of WAV at 48 kHz takes 691 MB. The recording is still written as WAV. When you stop it, AudioCaptor converts it in the background (an hour takes about half a minute on a recent PC), checks that the new `.opus` file can be decoded and lasts exactly as long as the recording, and only then deletes the WAV. Recordings are converted one at a time, in the order you stopped them, and you can start a new recording meanwhile.
+- If a recording cannot be converted, it is not lost: the WAV stays, no unfinished `.opus` file is left, the warning sound plays (unless another recording is running, so that the sound does not get into it) and a message, which the screen reader reads, says where the WAV is.
+- The screen reader says when a conversion starts and when all conversions are finished. `Alt+I` now also says that a conversion is running, about how long is left for all of them and how many files are waiting.
+- If you exit while recordings are being converted or are waiting for it, AudioCaptor asks first. Nothing is lost if you exit: the WAV stays whole, no unfinished `.opus` file is left, and the conversion is finished the next time AudioCaptor starts, which the screen reader says. The setting that turns this question off is the one for recordings, now called "Confirm exit during recording or conversion".
+- Opus works at every sample rate of a profile. A 44.1 kHz recording is converted to 48 kHz, because Opus has no 44.1 kHz. At 16 and 8 kHz the sample rate itself limits the quality, so the files are smaller there (speech 24 and 16 kbit/s, music 48 and 32 kbit/s instead of 32 and 96): a higher bitrate would not sound better.
+
+### Changed
+
+- If you go back to AudioCaptor 0.1.2 or older, your profiles stay, but the older version does not know the Format and records WAV; after you update again, choose the format once more.
+
 ## [0.1.2] — 2026-11-26
 
 ### Fixed

@@ -34,6 +34,50 @@ impl OutputMode {
     }
 }
 
+/// The file format a profile records to: one entry of the format list in the
+/// profile dialog (decision-6). Each variant stands for fixed encoder settings.
+///
+/// A profile stores the id as plain text (`RecordingProfile::output_format`),
+/// so a value written by a newer version survives in `settings.json`; this
+/// version then records WAV.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum OutputFormat {
+    #[default]
+    Wav,
+    OpusSpeech,
+    OpusMusic,
+}
+
+impl OutputFormat {
+    /// The id stored in `settings.json`.
+    pub fn id(self) -> &'static str {
+        match self {
+            OutputFormat::Wav => "Wav",
+            OutputFormat::OpusSpeech => "OpusSpeech",
+            OutputFormat::OpusMusic => "OpusMusic",
+        }
+    }
+
+    /// The format with this id, or `None` for an id this version does not know.
+    pub fn from_id(id: &str) -> Option<Self> {
+        [
+            OutputFormat::Wav,
+            OutputFormat::OpusSpeech,
+            OutputFormat::OpusMusic,
+        ]
+        .into_iter()
+        .find(|format| format.id() == id)
+    }
+
+    /// The name of the format in messages, e.g. "Converting to Opus".
+    pub fn family(self) -> &'static str {
+        match self {
+            OutputFormat::Wav => "WAV",
+            OutputFormat::OpusSpeech | OutputFormat::OpusMusic => "Opus",
+        }
+    }
+}
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AudioDevice {

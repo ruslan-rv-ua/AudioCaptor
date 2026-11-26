@@ -1,4 +1,4 @@
-use crate::audio::types::OutputMode;
+use crate::audio::types::{OutputFormat, OutputMode};
 use crate::profiles::RecordingProfile;
 use std::fs;
 use std::io::Write;
@@ -42,7 +42,7 @@ fn default_theme() -> String {
 impl Default for Settings {
     fn default() -> Self {
         Self {
-            version: 5,
+            version: 6,
             selected_mic: None,
             selected_loopback: None,
             hotkey: Some("Pause".to_string()),
@@ -86,6 +86,7 @@ pub(crate) fn migrate_settings(mut settings: Settings) -> Settings {
                     mic_filename: "mic".to_string(),
                     loopback_filename: "loopback".to_string(),
                     mix_filename: "mix".to_string(),
+                    output_format: OutputFormat::Wav.id().to_string(),
                 };
                 settings.profiles = vec![profile];
                 settings.active_profile_id = "default".to_string();
@@ -111,6 +112,11 @@ pub(crate) fn migrate_settings(mut settings: Settings) -> Settings {
                 // serde #[serde(default)] fills minimize_to_tray_on_focus_loss = false for old files
             }
             5 => {
+                // outputFormat added to each profile in v6; serde fills "Wav"
+                // for profiles written by older versions
+                settings.version = 6;
+            }
+            6 => {
                 break; // terminal version
             }
             v => {
@@ -357,7 +363,7 @@ mod tests {
     fn settings_missing_version_defaults_to_struct_default() {
         // When "version" is absent from JSON, serde fills it with Settings::default().version
         // (because #[serde(default)] on the struct uses Default::default() to seed missing fields).
-        // Since Default::version is now 5, the deserialized value is 5.
+        // Since Default::version is now 6, the deserialized value is 6.
         let json = r#"{
             "selectedMic": null,
             "selectedLoopback": null,
@@ -369,28 +375,28 @@ mod tests {
             "soundEnabled": true
         }"#;
         let settings: Settings = serde_json::from_str(json).unwrap();
-        assert_eq!(settings.version, 5);
+        assert_eq!(settings.version, 6);
     }
 
     #[test]
-    fn migrate_settings_upgrades_v0_to_v5() {
+    fn migrate_settings_upgrades_v0_to_v6() {
         let settings = Settings {
             version: 0,
             ..Settings::default()
         };
         let migrated = migrate_settings(settings);
-        assert_eq!(migrated.version, 5);
+        assert_eq!(migrated.version, 6);
         assert_eq!(migrated.profiles.len(), 1);
     }
 
     #[test]
-    fn migrate_settings_upgrades_v1_to_v5() {
+    fn migrate_settings_upgrades_v1_to_v6() {
         let settings = Settings {
             version: 1,
             ..Settings::default()
         };
         let migrated = migrate_settings(settings);
-        assert_eq!(migrated.version, 5);
+        assert_eq!(migrated.version, 6);
         assert_eq!(migrated.profiles.len(), 1);
         assert_eq!(migrated.active_profile_id, "default");
     }
@@ -409,7 +415,7 @@ mod tests {
     #[test]
     fn settings_v2_has_profiles_and_active_id() {
         let settings = Settings::default();
-        assert_eq!(settings.version, 5);
+        assert_eq!(settings.version, 6);
         assert_eq!(settings.profiles.len(), 1);
         assert_eq!(settings.active_profile_id, "default");
         assert_eq!(settings.profiles[0].name, "Default");
@@ -430,7 +436,7 @@ mod tests {
         }"#;
         let settings: Settings = serde_json::from_str(json).unwrap();
         let migrated = migrate_settings(settings);
-        assert_eq!(migrated.version, 5);
+        assert_eq!(migrated.version, 6);
         assert_eq!(migrated.profiles.len(), 1);
         let p = &migrated.profiles[0];
         assert_eq!(p.id, "default");
@@ -445,7 +451,7 @@ mod tests {
     }
 
     #[test]
-    fn migrate_v0_to_v5_goes_through_all_steps() {
+    fn migrate_v0_to_v6_goes_through_all_steps() {
         let json = r#"{
             "selectedMic": null,
             "selectedLoopback": null,
@@ -458,7 +464,7 @@ mod tests {
         }"#;
         let settings: Settings = serde_json::from_str(json).unwrap();
         let migrated = migrate_settings(settings);
-        assert_eq!(migrated.version, 5);
+        assert_eq!(migrated.version, 6);
         assert_eq!(migrated.profiles.len(), 1);
     }
 
@@ -485,7 +491,7 @@ mod tests {
     }
 
     #[test]
-    fn migrate_v2_to_v5_adds_language_and_confirm_exit() {
+    fn migrate_v2_to_v6_adds_language_and_confirm_exit() {
         let json = r#"{
             "version": 2,
             "selectedMic": null,
@@ -497,13 +503,13 @@ mod tests {
         }"#;
         let settings: Settings = serde_json::from_str(json).unwrap();
         let migrated = migrate_settings(settings);
-        assert_eq!(migrated.version, 5);
+        assert_eq!(migrated.version, 6);
         assert_eq!(migrated.language, "en");
         assert!(migrated.confirm_exit_during_recording);
     }
 
     #[test]
-    fn migrate_v3_to_v5_adds_theme() {
+    fn migrate_v3_to_v6_adds_theme() {
         let json = r#"{
             "version": 3,
             "selectedMic": null,
@@ -517,19 +523,19 @@ mod tests {
         }"#;
         let settings: Settings = serde_json::from_str(json).unwrap();
         let migrated = migrate_settings(settings);
-        assert_eq!(migrated.version, 5);
+        assert_eq!(migrated.version, 6);
         assert_eq!(migrated.theme, "auto");
     }
 
     #[test]
-    fn settings_default_has_version_5() {
+    fn settings_default_has_version_6() {
         let s = Settings::default();
-        assert_eq!(s.version, 5);
+        assert_eq!(s.version, 6);
         assert!(!s.minimize_to_tray_on_focus_loss);
     }
 
     #[test]
-    fn migrate_v4_to_v5_adds_minimize_to_tray_on_focus_loss() {
+    fn migrate_v4_to_v6_adds_minimize_to_tray_on_focus_loss() {
         let json = r#"{
             "version": 4,
             "selectedMic": null,
@@ -544,8 +550,135 @@ mod tests {
         }"#;
         let settings: Settings = serde_json::from_str(json).unwrap();
         let migrated = migrate_settings(settings);
-        assert_eq!(migrated.version, 5);
+        assert_eq!(migrated.version, 6);
         assert!(!migrated.minimize_to_tray_on_focus_loss);
+    }
+
+    /// `settings.json` as version 0.1.2 writes it (settings v5), with two profiles.
+    const SETTINGS_V5: &str = r#"{
+        "version": 5,
+        "selectedMic": "{0.0.1.00000000}.{mic}",
+        "selectedLoopback": "{0.0.0.00000000}.{speakers}",
+        "hotkey": "F9",
+        "soundEnabled": false,
+        "profiles": [
+            {
+                "id": "default",
+                "name": "Default",
+                "description": "",
+                "outputFolder": "Recordings",
+                "outputMode": "Mix",
+                "sampleRate": 48000,
+                "micVolume": 1.0,
+                "loopbackVolume": 0.5,
+                "micFilename": "mic",
+                "loopbackFilename": "loopback",
+                "mixFilename": "mix"
+            },
+            {
+                "id": "3f2c7a0e-5b1d-4c58-9a57-0d6f3f1f2a11",
+                "name": "Лекції",
+                "description": "Мікрофон і звук окремо",
+                "outputFolder": "D:\\Записи\\Лекції",
+                "outputMode": "SeparateFiles",
+                "sampleRate": 16000,
+                "micVolume": 2.5,
+                "loopbackVolume": 0.8,
+                "micFilename": "голос",
+                "loopbackFilename": "звук",
+                "mixFilename": "mix"
+            }
+        ],
+        "activeProfileId": "3f2c7a0e-5b1d-4c58-9a57-0d6f3f1f2a11",
+        "language": "uk",
+        "confirmExitDuringRecording": false,
+        "theme": "dark",
+        "minimizeToTrayOnFocusLoss": true
+    }"#;
+
+    #[test]
+    fn migrate_v5_to_v6_keeps_profiles_and_records_wav() {
+        let dir = test_dir("v5");
+        fs::write(dir.join("settings.json"), SETTINGS_V5).unwrap();
+        let loaded = read_settings_from(&dir);
+        assert!(loaded.unreadable_kept_at.is_none());
+        assert!(loaded.write_back);
+        let s = loaded.settings;
+
+        assert_eq!(s.version, 6);
+        assert_eq!(s.selected_mic.as_deref(), Some("{0.0.1.00000000}.{mic}"));
+        assert_eq!(
+            s.selected_loopback.as_deref(),
+            Some("{0.0.0.00000000}.{speakers}")
+        );
+        assert_eq!(s.hotkey.as_deref(), Some("F9"));
+        assert!(!s.sound_enabled);
+        assert_eq!(s.active_profile_id, "3f2c7a0e-5b1d-4c58-9a57-0d6f3f1f2a11");
+        assert_eq!(s.language, "uk");
+        assert!(!s.confirm_exit_during_recording);
+        assert_eq!(s.theme, "dark");
+        assert!(s.minimize_to_tray_on_focus_loss);
+
+        // Both profiles are there, unchanged, and record WAV as before.
+        assert_eq!(s.profiles.len(), 2);
+        assert_eq!(s.profiles[0], RecordingProfile::default());
+        assert_eq!(
+            s.profiles[1],
+            RecordingProfile {
+                id: "3f2c7a0e-5b1d-4c58-9a57-0d6f3f1f2a11".into(),
+                name: "Лекції".into(),
+                description: "Мікрофон і звук окремо".into(),
+                output_folder: PathBuf::from("D:\\Записи\\Лекції"),
+                output_mode: OutputMode::SeparateFiles,
+                sample_rate: 16000,
+                mic_volume: 2.5,
+                loopback_volume: 0.8,
+                mic_filename: "голос".into(),
+                loopback_filename: "звук".into(),
+                mix_filename: "mix".into(),
+                output_format: "Wav".into(),
+            }
+        );
+        assert!(s.profiles.iter().all(|p| p.format() == OutputFormat::Wav));
+
+        // What the app writes back is version 6 with the format in each profile.
+        let written: serde_json::Value =
+            serde_json::from_str(&serde_json::to_string(&s).unwrap()).unwrap();
+        assert_eq!(written["version"], 6);
+        assert_eq!(written["profiles"][0]["outputFormat"], "Wav");
+        assert_eq!(written["profiles"][1]["outputFormat"], "Wav");
+        assert_eq!(written["profiles"][1]["name"], "Лекції");
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn profile_format_from_newer_version_is_read_and_kept() {
+        // A file from a newer version: a higher settings version and a format this
+        // version does not know. It is read without an error, no "unreadable"
+        // copy is made, the profile records WAV, and the unknown value stays.
+        let json = SETTINGS_V5
+            .replace(r#""version": 5"#, r#""version": 7"#)
+            .replace(
+                r#""mixFilename": "mix"
+            },"#,
+                r#""mixFilename": "mix",
+                "outputFormat": "Mp3Standard"
+            },"#,
+            );
+        let dir = test_dir("newer");
+        fs::write(dir.join("settings.json"), &json).unwrap();
+        let loaded = read_settings_from(&dir);
+        assert!(loaded.unreadable_kept_at.is_none());
+        let s = loaded.settings;
+        assert_eq!(s.version, 7);
+        assert_eq!(s.profiles.len(), 2);
+        assert_eq!(s.profiles[0].output_format, "Mp3Standard");
+        assert_eq!(s.profiles[0].format(), OutputFormat::Wav);
+        assert_eq!(s.profiles[1].format(), OutputFormat::Wav);
+
+        let written = serde_json::to_string(&s).unwrap();
+        assert!(written.contains(r#""outputFormat":"Mp3Standard""#));
+        let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]
@@ -565,7 +698,7 @@ mod tests {
         }"#;
         let settings: Settings = serde_json::from_str(json).unwrap();
         let migrated = migrate_settings(settings);
-        assert_eq!(migrated.version, 5);
+        assert_eq!(migrated.version, 6);
         assert!(!migrated.minimize_to_tray_on_focus_loss);
     }
 
@@ -587,7 +720,7 @@ mod tests {
         }"#;
         let settings: Settings = serde_json::from_str(json).unwrap();
         let migrated = migrate_settings(settings);
-        assert_eq!(migrated.version, 5);
+        assert_eq!(migrated.version, 6);
         assert!(migrated.minimize_to_tray_on_focus_loss);
     }
 }

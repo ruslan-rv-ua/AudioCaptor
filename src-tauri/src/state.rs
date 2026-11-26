@@ -1,6 +1,6 @@
 use crate::audio::capture::CaptureHandle;
 use crate::audio::mixer::MixerHandle;
-use crate::audio::types::{AudioCommand, OutputMode, RecordingState};
+use crate::audio::types::{AudioCommand, OutputFormat, OutputMode, RecordingState};
 use crossbeam_channel::Sender;
 use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
@@ -12,6 +12,9 @@ pub struct AppState {
     pub mic_volume: f32,
     pub loopback_volume: f32,
     pub output_mode: OutputMode,
+    /// The format of the profile the running recording was started with: what
+    /// its WAV files are converted to once it stops.
+    pub recording_format: OutputFormat,
     pub recording_start_time: Option<std::time::Instant>,
     pub paused_duration: std::time::Duration,
     pub pause_start_time: Option<std::time::Instant>,
@@ -42,6 +45,7 @@ impl Default for AppState {
             mic_volume: 1.0,
             loopback_volume: 0.5,
             output_mode: OutputMode::Mix,
+            recording_format: OutputFormat::Wav,
             recording_start_time: None,
             paused_duration: std::time::Duration::ZERO,
             pause_start_time: None,

@@ -1,5 +1,5 @@
 use crate::audio::types::{AudioCommand, OutputMode};
-use crate::audio::writer::OutputWriter;
+use crate::audio::writer::{OutputWriter, RecordedFile};
 use crossbeam_channel::Receiver;
 use ringbuf::traits::{Consumer, Observer};
 use rubato::{FftFixedIn, Resampler};
@@ -29,14 +29,17 @@ pub struct MixerConfig {
 
 pub struct MixerHandle {
     pub running: Arc<AtomicBool>,
-    pub thread: Option<std::thread::JoinHandle<()>>,
+    pub thread: Option<std::thread::JoinHandle<Vec<RecordedFile>>>,
 }
 
 impl MixerHandle {
-    pub fn stop(&mut self) {
+    /// Stops the mixer and returns the files it wrote, the main one first.
+    /// Empty when the mixer was already stopped.
+    pub fn stop(&mut self) -> Vec<RecordedFile> {
         self.running.store(false, Ordering::Relaxed);
-        if let Some(handle) = self.thread.take() {
-            let _ = handle.join();
+        match self.thread.take() {
+            Some(handle) => handle.join().unwrap_or_default(),
+            None => Vec::new(),
         }
     }
 }
@@ -54,9 +57,7 @@ pub fn start_mixer(config: MixerConfig) -> anyhow::Result<MixerHandle> {
 
     let thread = std::thread::Builder::new()
         .name("mixer".into())
-        .spawn(move || {
-            mixer_loop(config, running_clone);
-        })?;
+        .spawn(move || mixer_loop(config, running_clone))?;
 
     Ok(MixerHandle {
         running,
@@ -174,7 +175,7 @@ fn mix_samples(
     out
 }
 
-fn mixer_loop(mut config: MixerConfig, running: Arc<AtomicBool>) {
+fn mixer_loop(mut config: MixerConfig, running: Arc<AtomicBool>) -> Vec<RecordedFile> {
     let mut paused = false;
 
     // After Resume, keep discarding until the loopback ring buffer has been quiet
@@ -528,21 +529,21 @@ fn mixer_loop(mut config: MixerConfig, running: Arc<AtomicBool>) {
         }
     }
 
-    // Finalize WAV file
-    match config.writer.finalize() {
-        Ok(path) => log::info!("Recording saved: {}", path.display()),
-        Err(e) => log::error!("Failed to finalize WAV: {}", e),
-    }
-
-    // Finalize secondary WAV file (parallel modes)
+    // Finalize the WAV file, then the secondary one (parallel modes)
+    let mut files = vec![config.writer.finalize()];
     if let Some(sw) = config.secondary_writer {
-        match sw.finalize() {
-            Ok(path) => log::info!("Secondary recording saved: {}", path.display()),
-            Err(e) => log::error!("Failed to finalize secondary WAV: {}", e),
-        }
+        files.push(sw.finalize());
+    }
+    for file in &files {
+        log::info!(
+            "Recording saved: {} ({} frames)",
+            file.path.display(),
+            file.frames
+        );
     }
 
     log::info!("Mixer thread stopped");
+    files
 }
 
 #[cfg(test)]

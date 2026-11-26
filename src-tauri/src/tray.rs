@@ -204,7 +204,11 @@ fn handle_menu_event(app: &AppHandle, id: &str) {
                 .lock()
                 .map(|s| s.recording_state != RecordingState::Idle)
                 .unwrap_or(false);
-            if is_recording {
+            let is_converting = app
+                .try_state::<crate::convert::queue::ConversionQueue>()
+                .is_some_and(|queue| queue.is_busy());
+            // The window asks first, as it does for its own close button.
+            if is_recording || is_converting {
                 show_main_window(app);
                 let _ = app.emit("tray-quit-requested", ());
             } else {

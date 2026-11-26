@@ -1,4 +1,5 @@
 pub mod audio;
+pub mod convert;
 pub mod device_monitor;
 pub mod hotkey;
 pub mod portable;
@@ -10,8 +11,9 @@ pub mod tray;
 
 use audio::capture;
 use audio::mixer::{self, MixerConfig};
-use audio::types::{AudioCommand, AudioDevice, OutputMode, RecordingState};
-use audio::writer::WavOutputWriter;
+use audio::types::{AudioCommand, AudioDevice, OutputFormat, OutputMode, RecordingState};
+use audio::writer::{RecordedFile, WavOutputWriter};
+use convert::queue::{ConversionQueue, QueueEvents, Queued, Status};
 use state::SharedState;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -257,6 +259,7 @@ fn start_recording_inner(
     s.paused_duration = std::time::Duration::ZERO;
     s.pause_start_time = None;
     s.output_mode = mode;
+    s.recording_format = profile.format();
     s.recording_mic_id = mic_id.clone();
     s.recording_loopback_id = loopback_id.clone();
     s.mic_capture = mic_handle;
@@ -359,26 +362,45 @@ fn resume_recording_inner(state: &SharedState) -> Result<(), String> {
     Ok(())
 }
 
+/// Returns what happens to the recording next: how many of its files are
+/// converted to the profile's format (none for WAV).
 #[tauri::command]
 fn stop_recording(
     state: tauri::State<'_, SharedState>,
     app: tauri::AppHandle,
-) -> Result<(), String> {
-    stop_recording_inner(&state)?;
+) -> Result<Queued, String> {
+    stop_and_convert(&app, &state)
+}
+
+/// Stops the recording, queues its files for conversion when the profile asks
+/// for a compressed format, and tells the window and the tray.
+fn stop_and_convert(app: &tauri::AppHandle, state: &SharedState) -> Result<Queued, String> {
+    let (files, format) = stop_recording_inner(state)?;
+    let queued = match app.try_state::<ConversionQueue>() {
+        Some(queue) => queue.enqueue(
+            files
+                .into_iter()
+                .map(|file| convert::Job::new(file, format)),
+        ),
+        None => Queued::default(),
+    };
     let _ = app.emit(
         "recording-state-changed",
         serde_json::json!({
             "state": "Idle",
             "durationMs": 0,
+            "conversion": queued,
         }),
     );
-    tray::update_tray_recording_state(&app, &state, RecordingState::Idle);
-    Ok(())
+    tray::update_tray_recording_state(app, state, RecordingState::Idle);
+    Ok(queued)
 }
 
-fn stop_recording_inner(state: &SharedState) -> Result<(), String> {
+/// Stops the recording and returns the files it wrote, with the format the
+/// profile wants them in.
+fn stop_recording_inner(state: &SharedState) -> Result<(Vec<RecordedFile>, OutputFormat), String> {
     // Extract handles and reset state under the lock
-    let (mic_handle, loopback_handle, mixer_handle, command_tx) = {
+    let (mic_handle, loopback_handle, mixer_handle, command_tx, format) = {
         let mut s = state.lock().map_err(|e| e.to_string())?;
         if s.recording_state == RecordingState::Idle {
             return Err("Not recording".into());
@@ -405,6 +427,7 @@ fn stop_recording_inner(state: &SharedState) -> Result<(), String> {
             s.loopback_capture.take(),
             s.mixer.take(),
             s.command_tx.take(),
+            std::mem::take(&mut s.recording_format),
         )
     }; // lock released here
 
@@ -420,12 +443,11 @@ fn stop_recording_inner(state: &SharedState) -> Result<(), String> {
     if let Some(mut h) = loopback_handle {
         h.stop();
     }
-    if let Some(mut h) = mixer_handle {
-        h.stop();
-    }
+    // The mixer finishes the WAV files before it returns them.
+    let files = mixer_handle.map(|mut h| h.stop()).unwrap_or_default();
 
     log::info!("Recording stopped");
-    Ok(())
+    Ok((files, format))
 }
 
 // --- Public do_* functions for hotkey module ---
@@ -472,16 +494,7 @@ pub fn do_resume_recording(app: &tauri::AppHandle) -> Result<(), String> {
 
 pub fn do_stop_recording(app: &tauri::AppHandle) -> Result<(), String> {
     let state = app.state::<SharedState>();
-    stop_recording_inner(&state)?;
-    let _ = app.emit(
-        "recording-state-changed",
-        serde_json::json!({
-            "state": "Idle",
-            "durationMs": 0,
-        }),
-    );
-    tray::update_tray_recording_state(app, &state, RecordingState::Idle);
-    Ok(())
+    stop_and_convert(app, &state).map(|_| ())
 }
 
 #[tauri::command]
@@ -516,6 +529,48 @@ fn set_sound_enabled(state: tauri::State<'_, SharedState>, enabled: bool) {
 #[tauri::command]
 fn quit_app(app: tauri::AppHandle) {
     app.exit(0);
+}
+
+/// The window listens to the conversion events now, so conversions may run.
+/// Returns how many recordings the last run left to convert (the first call
+/// only): the window says that it is finishing them.
+#[tauri::command]
+fn start_conversions(queue: tauri::State<'_, ConversionQueue>) -> usize {
+    queue.start()
+}
+
+#[tauri::command]
+fn conversion_status(queue: tauri::State<'_, ConversionQueue>) -> Status {
+    queue.status()
+}
+
+/// Passes what the conversion queue reports on to the window.
+struct QueueToWindow(tauri::AppHandle);
+
+impl QueueEvents for QueueToWindow {
+    fn status(&self, status: &Status) {
+        let _ = self.0.emit("conversion-status", status);
+    }
+
+    fn converted(&self, _job: &convert::Job, _output: &std::path::Path) {}
+
+    fn failed(&self, job: &convert::Job, _reason: &str) {
+        if let Ok(s) = self.0.state::<SharedState>().lock() {
+            // Not while a recording runs: the sound would end up in it, and the
+            // app keeps its own sounds out of recordings. The window still
+            // shows the message.
+            if s.recording_state != RecordingState::Recording {
+                play_sound(&s, sounds::SoundKind::Warning);
+            }
+        }
+        let _ = self.0.emit(
+            "conversion-failed",
+            serde_json::json!({
+                "wav": job.wav.display().to_string(),
+                "format": job.format.family(),
+            }),
+        );
+    }
 }
 
 #[tauri::command]
@@ -699,6 +754,13 @@ pub fn run() {
                 }
             }
 
+            // Recordings the last run left to convert are in the queue from here
+            // on; they are converted once the window calls `start_conversions`.
+            app.manage(ConversionQueue::open(
+                portable::data_dir().map_err(|e| e.to_string())?,
+                QueueToWindow(app.handle().clone()),
+            ));
+
             // Register global hotkey (only if one is configured)
             if let Some(ref hk) = settings.hotkey {
                 if let Err(e) = hotkey::register(app.handle(), hk) {
@@ -746,9 +808,22 @@ pub fn run() {
             cmd_get_active_profile,
             get_recordings_dir,
             quit_app,
+            start_conversions,
+            conversion_status,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app, event| {
+            // Every way out of the app ends here. The file being converted stays
+            // a WAV, its temporary file is removed, and the queue file keeps
+            // what is left for the next start.
+            if let tauri::RunEvent::Exit = event {
+                if let Some(queue) = app.try_state::<ConversionQueue>() {
+                    queue.shutdown();
+                }
+                log::info!("AudioCaptor closed");
+            }
+        });
 }
 
 #[cfg(test)]

@@ -1,4 +1,4 @@
-use crate::audio::types::OutputMode;
+use crate::audio::types::{OutputFormat, OutputMode};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
@@ -16,6 +16,22 @@ pub struct RecordingProfile {
     pub mic_filename: String,
     pub loopback_filename: String,
     pub mix_filename: String,
+    /// The id of an `OutputFormat`, NEW in settings v6. Kept as text, not as the
+    /// enum: a format added by a newer version must load without an error and
+    /// stay in the file (see `format`). Profiles from v5 have no such field.
+    #[serde(default = "default_output_format")]
+    pub output_format: String,
+}
+
+fn default_output_format() -> String {
+    OutputFormat::Wav.id().to_string()
+}
+
+impl RecordingProfile {
+    /// The format to record in. A format this version does not know records WAV.
+    pub fn format(&self) -> OutputFormat {
+        OutputFormat::from_id(&self.output_format).unwrap_or_default()
+    }
 }
 
 const FORBIDDEN_FILENAME_CHARS: &[char] = &['<', '>', ':', '"', '/', '\\', '|', '?', '*'];
@@ -34,6 +50,7 @@ impl Default for RecordingProfile {
             mic_filename: "mic".to_string(),
             loopback_filename: "loopback".to_string(),
             mix_filename: "mix".to_string(),
+            output_format: default_output_format(),
         }
     }
 }
@@ -110,6 +127,8 @@ mod tests {
         assert_eq!(p.mic_filename, "mic");
         assert_eq!(p.loopback_filename, "loopback");
         assert_eq!(p.mix_filename, "mix");
+        assert_eq!(p.output_format, "Wav");
+        assert_eq!(p.format(), OutputFormat::Wav);
     }
 
     #[test]
@@ -118,6 +137,55 @@ mod tests {
         let json = serde_json::to_string_pretty(&p).unwrap();
         let deserialized: RecordingProfile = serde_json::from_str(&json).unwrap();
         assert_eq!(deserialized, p);
+    }
+
+    #[test]
+    fn profile_format_is_stored_by_id() {
+        let p = RecordingProfile {
+            output_format: "OpusSpeech".into(),
+            ..RecordingProfile::default()
+        };
+        assert_eq!(p.format(), OutputFormat::OpusSpeech);
+        let json = serde_json::to_string(&p).unwrap();
+        assert!(json.contains(r#""outputFormat":"OpusSpeech""#), "{json}");
+        let music: RecordingProfile =
+            serde_json::from_str(&json.replace("OpusSpeech", "OpusMusic")).unwrap();
+        assert_eq!(music.format(), OutputFormat::OpusMusic);
+    }
+
+    #[test]
+    fn profile_without_format_records_wav() {
+        // A profile as settings v5 wrote it: no `outputFormat` field.
+        let json = r#"{
+            "id": "default", "name": "Default", "description": "",
+            "outputFolder": "Recordings", "outputMode": "Mix", "sampleRate": 48000,
+            "micVolume": 1.0, "loopbackVolume": 0.5,
+            "micFilename": "mic", "loopbackFilename": "loopback", "mixFilename": "mix"
+        }"#;
+        let p: RecordingProfile = serde_json::from_str(json).unwrap();
+        assert_eq!(p.output_format, "Wav");
+        assert_eq!(p.format(), OutputFormat::Wav);
+    }
+
+    #[test]
+    fn profile_with_unknown_format_loads_and_records_wav() {
+        // A format from a newer version: the profile loads, records WAV, and the
+        // unknown value is written back unchanged.
+        let json = r#"{
+            "id": "p", "name": "Podcast", "description": "",
+            "outputFolder": "Recordings", "outputMode": "Mix", "sampleRate": 48000,
+            "micVolume": 1.0, "loopbackVolume": 0.5,
+            "micFilename": "mic", "loopbackFilename": "loopback", "mixFilename": "mix",
+            "outputFormat": "Mp3Standard"
+        }"#;
+        let p: RecordingProfile = serde_json::from_str(json).unwrap();
+        assert_eq!(p.format(), OutputFormat::Wav);
+        assert_eq!(p.output_format, "Mp3Standard");
+        let written = serde_json::to_string(&p).unwrap();
+        assert!(
+            written.contains(r#""outputFormat":"Mp3Standard""#),
+            "{written}"
+        );
     }
 
     #[test]

@@ -27,6 +27,9 @@ serde_json = "1"
 wasapi = "0.17"
 hound = "3.5"
 rubato = "0.16"
+# Opus: libopus (C, built with CMake by opusic-sys) and the Ogg container (decision-8)
+opus = "0.4"
+ogg = "0.9"
 ringbuf = "0.5.2"
 crossbeam-channel = "0.5"
 rodio = { version = "0.20", default-features = false, features = ["vorbis"] }

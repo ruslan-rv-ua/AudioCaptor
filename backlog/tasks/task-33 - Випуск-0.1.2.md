@@ -4,6 +4,7 @@ title: Випуск 0.1.2
 status: To Do
 assignee: []
 created_date: '2026-11-26T08:52:02Z'
+updated_date: '2026-11-26T14:30:41Z'
 labels:
   - release
   - model-sonnet
@@ -54,3 +55,9 @@ ordinal: 10080
 - [ ] #4 Документацію оновлено там, де змінилася поведінка чи порядок роботи (README.md, README_UK.md, DEVELOPMENT.md)
 - [ ] #5 CHANGELOG.md оновлено: лише зміни, помітні користувачам (без подробиць про інструменти, тести, CI чи збірку)
 <!-- DOD:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-26: у TASK-19 тест NVDA пропущено за рішенням власника. Перед випуском (або раніше, у TASK-23) повний `just smoke` має підтвердити, що NVDA читає назву кожного діалогу один раз (сценарій `dialogs`, перевірка `-Once`) і що Enter закриває «About». Запуск — лише з дозволу власника.
+<!-- SECTION:NOTES:END -->

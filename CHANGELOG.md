@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-11-26
+
 ### Added
 
 - Recordings can now be saved as Opus, a compressed format that takes many times less space than WAV. Edit a profile and choose its new Format: "WAV (uncompressed)", which stays the default, "Opus — speech (mono)", about 14 MB per hour, or "Opus — music (stereo)", about 43 MB per hour; an hour of WAV at 48 kHz takes 691 MB. The recording is still written as WAV. When you stop it, AudioCaptor converts it in the background (an hour takes about half a minute on a recent PC), checks that the new `.opus` file can be decoded and lasts exactly as long as the recording, and only then deletes the WAV. Recordings are converted one at a time, in the order you stopped them, and you can start a new recording meanwhile.
@@ -17,7 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- If you go back to AudioCaptor 0.1.2 or older, your profiles stay, but the older version does not know the Format and records WAV; after you update again, choose the format once more.
+- When you update, the first start of AudioCaptor 0.2.0 moves `settings.json` to a new version (from 5 to 6). Your profiles and settings stay as they were, and every profile gets the Format "WAV (uncompressed)", so recording works as before until you choose Opus.
+- If you go back to AudioCaptor 0.1.x, it opens the new `settings.json` with your profiles and settings in place, but it does not know the Format and records WAV. Once it saves its settings (for example, after you change a setting or a profile), the profiles lose their Format; after you update again, choose the format once more.
 
 ### Fixed
 
@@ -69,6 +72,7 @@ Initial release.
 - Settings migration (v1 → v2 → v3 → v4 → v5)
 - Scoop package manifest in [ruslan-rv-ua/scoop-bucket](https://github.com/ruslan-rv-ua/scoop-bucket)
 
+[0.2.0]: https://github.com/ruslan-rv-ua/AudioCaptor/releases/tag/v0.2.0
 [0.1.2]: https://github.com/ruslan-rv-ua/AudioCaptor/releases/tag/v0.1.2
 [0.1.1]: https://github.com/ruslan-rv-ua/AudioCaptor/releases/tag/v0.1.1
 [0.1.0]: https://github.com/ruslan-rv-ua/AudioCaptor/releases/tag/v0.1.0

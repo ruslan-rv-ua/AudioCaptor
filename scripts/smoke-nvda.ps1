@@ -1005,7 +1005,7 @@ function Invoke-DialogsScenario {
 
     Invoke-Step 'F1 opens About AudioCaptor: focus on Close, NVDA reads the title once' {
         Send-Keys 'F1'
-        $null = Wait-Until 'focus on About's Close button' { (Get-Focus).Id -eq 'about-dialog-close' }
+        $null = Wait-Until "focus on About's Close button" { (Get-Focus).Id -eq 'about-dialog-close' }
     } -Once $UI.About -ExpectAny $Role.Dialog
 
     Invoke-Step "Escape closes About: focus back on the '$($UI.ProfileList)' list where F1 was pressed" {
@@ -1022,7 +1022,7 @@ function Invoke-DialogsScenario {
     # F1 works anywhere: About opens over Settings and must be drawn on top of it, since it has focus.
     Invoke-Step 'F1 in Settings opens About on top of Settings: focus on Close, NVDA reads the title once' {
         Send-Keys 'F1'
-        $null = Wait-Until 'focus on About's Close button' { (Get-Focus).Id -eq 'about-dialog-close' }
+        $null = Wait-Until "focus on About's Close button" { (Get-Focus).Id -eq 'about-dialog-close' }
         Test-OnTop $UI.About $UI.Settings
     } -Once $UI.About -ExpectAny $Role.Dialog
 

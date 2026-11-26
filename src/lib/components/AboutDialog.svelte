@@ -27,7 +27,7 @@
     if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); onclose(); return; }
     if (e.key === "Enter")  { e.preventDefault(); e.stopPropagation(); onclose(); return; }
     if (e.key === "Tab") {
-      // Tab cycle only over tabbable elements 
+      // Tab cycle only over tabbable elements
       const focusable = dialogEl?.querySelectorAll<HTMLElement>(
         'button:not([disabled]), [tabindex="0"]'
       );
@@ -53,7 +53,7 @@
     >
       <!-- role="document" lets NVDA/JAWS use browse mode (arrow-key navigation)
            even after programmatic focus inside role="dialog".
-           The heading stays tabindex="-1": focusable by JS, not by Tab. -->
+           Focus starts on the Close button, so the title is read once (as the dialog name). -->
       <div role="document">
         <h2 id="about-dialog-title">{m.about_title()}</h2>
 

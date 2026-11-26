@@ -508,7 +508,11 @@ function Start-App {
     if (-not (Test-Path -LiteralPath (Join-Path $WebviewDir $BrowserEntry))) {
         throw "the test copy did not put its browser data (WebView2) into $WebviewDir, next to its exe"
     }
-    $null = Wait-Until "focus on the '$($UI.ProfileList)' list" { (Get-Focus).Name -eq $UI.ProfileList } 15
+    # After a reset the interface speaks the Windows language, not the test copy's English, so the
+    # list has another name there.
+    if (-not $script:BrokenSettings) {
+        $null = Wait-Until "focus on the '$($UI.ProfileList)' list" { (Get-Focus).Name -eq $UI.ProfileList } 15
+    }
 }
 
 # Quits the test copy the way its close button does (WM_CLOSE; the app quits when it is not

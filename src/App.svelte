@@ -409,7 +409,10 @@
       await initRecordingListener();
       await initDeviceListener();
       await initConversionListener((failure) => {
-        showError(m.error_conversion_failed({ format: failure.format, path: failure.wav }));
+        const what = { format: failure.format, path: failure.wav };
+        // Without the encoder (Windows N without the Media Feature Pack) the
+        // message says how to get it.
+        showError(failure.noEncoder ? m.error_conversion_no_encoder(what) : m.error_conversion_failed(what));
       });
 
       await appWindow.onCloseRequested(async (event) => {

@@ -9,7 +9,7 @@ export type RecordingState = "Idle" | "Recording" | "Paused";
 export type OutputMode = "Microphone" | "Loopback" | "Mix" | "MixPlusMicrophone" | "MixPlusLoopback" | "SeparateFiles";
 
 /** The formats this version records in: the entries of the profile's format list. */
-export type OutputFormat = "Wav" | "OpusSpeech" | "OpusMusic";
+export type OutputFormat = "Wav" | "OpusSpeech" | "OpusMusic" | "Mp3Speech" | "Mp3Standard" | "Mp3High";
 
 export type Theme = "auto" | "light" | "dark";
 
@@ -82,4 +82,6 @@ export interface ConversionFailure {
   /** The WAV file, which is kept. */
   wav: string;
   format: string;
+  /** Windows has no encoder for the format: an N edition without the Media Feature Pack. */
+  noEncoder: boolean;
 }

@@ -38,6 +38,12 @@
                a recording that cannot be converted: NVDA reads the message that says where its
                WAV is kept, and the WAV is still there. The generated files need -ConvertMB
                megabytes of free space in the temp folder.
+      mp3      A recording in a profile with the format "MP3 - standard": when it stops, NVDA
+               says that the conversion to MP3 started and then that it finished, and the
+               recording is an .mp3 file. Then the same with AUDIOCAPTOR_NO_MP3_ENCODER=1, which
+               makes the app act as if Windows had no MP3 encoder (Windows N without the Media
+               Feature Pack): NVDA reads how to get the encoder and the end with errors, and the
+               WAV is kept.
 
     Exit code: 0 everything passed; 1 a step or an NVDA check failed, or the test copy wrote to
     %LOCALAPPDATA%\com.audiocaptor.app; 2 the test could not run or stopped early (no exe, NVDA
@@ -73,7 +79,7 @@
     in its chat before it starts the test; the script itself asks nothing.
 
 .PARAMETER Scenario
-    One or more of launch, record, dialogs, tray, settings, convert. All of them when omitted.
+    One or more of launch, record, dialogs, tray, settings, convert, mp3. All of them when omitted.
 
 .PARAMETER ConvertMB
     The size of the large WAV file of the convert scenario, in megabytes. Default: 900, which a
@@ -118,7 +124,7 @@ param(
 $ErrorActionPreference = 'Stop'
 
 # --- Arguments ---------------------------------------------------------------------------------
-$AllScenarios = @('launch', 'record', 'dialogs', 'tray', 'settings', 'convert')
+$AllScenarios = @('launch', 'record', 'dialogs', 'tray', 'settings', 'convert', 'mp3')
 $Selected = @($Scenario | Where-Object { $_ } | ForEach-Object { $_.ToLowerInvariant() })
 if ($Selected.Count -eq 0 -or $Selected -contains 'all') { $Selected = $AllScenarios }
 $unknown = @($Selected | Where-Object { $AllScenarios -notcontains $_ })
@@ -202,7 +208,12 @@ $UI = @{
     StoppedWaiting = 'Recording stopped. The recording is waiting to be converted to Opus.'  # live_recording_stopped_conversion_waiting
     Converted      = 'Conversion finished.'     # live_conversion_finished
     ConvertErrors  = 'Conversion finished with errors|Could not finish the conversion'  # live_conversion_finished_with_errors, error_conversion_failed
+    Mp3Started     = 'Recording stopped. Conversion to MP3 started.'  # live_recording_stopped_conversion_started
+    NoEncoder      = 'Windows has no MP3 encoder. To record in MP3, install the Media Feature Pack'  # error_conversion_no_encoder
 }
+
+# The environment variable that makes the app act as if Windows had no MP3 encoder (mp3.rs).
+$NoMp3Switch = 'AUDIOCAPTOR_NO_MP3_ENCODER'
 
 # The two profiles of the test copy. The first one is active: system audio only, so Alt+S
 # records without a microphone. The second one makes "Delete profile" available (the last
@@ -532,8 +543,8 @@ function Write-TestSettings {
         return
     }
     # Profiles as settings version 5 wrote them, without a format: every start of the test copy
-    # also goes through the migration to version 6. The convert scenario adds the format to the
-    # active profile, so that its recording is converted to Opus.
+    # also goes through the migration to version 6. The convert and mp3 scenarios give the active
+    # profile a format ($script:ProfileFormat), so that its recording is converted.
     $newProfile = {
         param([string]$Id, [string]$Name, [string]$Mode, [string]$Format)
         $p = [ordered]@{ id = $Id; name = $Name; description = ''; outputFolder = 'Recordings'; outputMode = $Mode
@@ -542,7 +553,7 @@ function Write-TestSettings {
         if ($Format) { $p.outputFormat = $Format }
         $p
     }
-    $systemFormat = if ($script:OpusProfile) { 'OpusSpeech' } else { '' }
+    $systemFormat = $script:ProfileFormat
     $settings = [ordered]@{
         version                    = 5
         selectedMic                = $null
@@ -1257,7 +1268,7 @@ function Invoke-ConvertScenario {
     $short = 'smoke-short.wav'
     $broken = 'smoke-broken.wav'
     $job = { param([string]$Name, [long]$Frames) [ordered]@{ wav = "Recordings/$Name"; frames = $Frames; sampleRate = 48000; channels = 2; format = 'OpusMusic' } }
-    $script:OpusProfile = $true
+    $script:ProfileFormat = 'OpusSpeech'
     try {
         # What the last run would have left behind: two recordings stopped but not yet converted.
         Invoke-Step "Start with two recordings left to convert: NVDA says that the app is finishing them" {
@@ -1393,9 +1404,94 @@ function Invoke-ConvertScenario {
             if (-not $script:AppProc.WaitForExit(8000)) { throw 'the app did not quit within 8 s of Alt+F4' }
         } -Forbid $UI.ExitTitle
     } finally {
-        $script:OpusProfile = $false
+        $script:ProfileFormat = ''
         Stop-App
         # The generated files are large: free the space at once, whatever happened.
+        Remove-Item -LiteralPath $recordings -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath $queueFile -Force -ErrorAction SilentlyContinue
+    }
+}
+
+# The files a recording in the Loopback profile left, after its conversion has ended.
+function Get-LoopbackFiles([string]$QueueFile) {
+    $null = Wait-Until 'the conversion queue to empty' { -not (Test-Path -LiteralPath $QueueFile) } 30
+    Start-Sleep -Milliseconds 500
+    $files = Get-RecordingFiles
+    $script:StepInfo.Add("files: $(Format-RecordingFiles $files)")
+    return $files
+}
+
+# A recording in a profile with the format "MP3 - standard" becomes an .mp3 file. Then the same as
+# on Windows N without the Media Feature Pack, which the switch $NoMp3Switch fakes: the conversion
+# fails at once, NVDA reads how to get the encoder, and the WAV is kept.
+function Invoke-Mp3Scenario {
+    $recordings = Join-Path $DataDir 'Recordings'
+    $queueFile = Join-Path $DataDir 'conversion-queue.json'
+    $script:ProfileFormat = 'Mp3Standard'
+    try {
+        Invoke-Step 'Start with an MP3 profile: the window opens with focus on the profile list' {
+            if (-not $script:PlaybackDeviceId) { throw 'Windows has no default playback device; this scenario records system audio and needs one' }
+            Remove-Item -LiteralPath $recordings -Recurse -Force -ErrorAction SilentlyContinue
+            Start-App
+        }
+
+        Invoke-Step "Alt+S starts a recording: NVDA says Recording started; focus moves to '$($UI.Pause)'" {
+            Send-Keys 'Alt+S'
+            $null = Wait-Until "the '$($UI.Pause)' button" { Find-ByName $UI.Pause }
+            Confirm-Focus $UI.Pause
+        } -Once $UI.Started -Expect $UI.Pause -Forbid $Unavailable, $PageNoise
+
+        Invoke-Step 'Alt+T stops it: NVDA says that the conversion to MP3 started and that it finished; an MP3 file and no WAV are left' {
+            Start-Sleep -Seconds 3
+            Send-Keys 'Alt+T'
+            $null = Wait-Until "the '$($UI.Start)' button" { Find-ByName $UI.Start }
+            $files = Get-LoopbackFiles $queueFile
+            $mp3 = @($files.Keys | Where-Object { $_ -like 'loopback_*.mp3' -and $files[$_] -gt 0 })
+            Add-Check 'the recording is an MP3 file now' ($mp3.Count -eq 1)
+            if ($mp3.Count -eq 1) {
+                $bytes = [IO.File]::ReadAllBytes((Join-Path $recordings $mp3[0]))
+                Add-Check 'the file starts with an MP3 frame' ($bytes.Length -gt 4 -and $bytes[0] -eq 0xFF -and ($bytes[1] -band 0xE0) -eq 0xE0)
+            }
+            $other = @($files.Keys | Where-Object { $_ -notlike '*.mp3' })
+            Add-Check 'no WAV file and no temporary file is left' ($other.Count -eq 0) ($other -join ', ')
+        } -Once $UI.Mp3Started, $UI.Converted -Forbid $UI.ConvertErrors, $Unavailable, $PageNoise
+
+        Invoke-Step 'Alt+F4: the app quits without asking' {
+            Send-Keys 'Alt+F4'
+            if (-not $script:AppProc.WaitForExit(8000)) { throw 'the app did not quit within 8 s of Alt+F4' }
+        } -Forbid $UI.ExitTitle
+
+        Invoke-Step "Start again as if Windows had no MP3 encoder ($NoMp3Switch=1)" {
+            Remove-Item -LiteralPath $recordings -Recurse -Force -ErrorAction SilentlyContinue
+            # The test copy gets the variable at its start; the test itself does not keep it.
+            Set-Item "Env:$NoMp3Switch" '1'
+            try { Start-App } finally { Remove-Item "Env:$NoMp3Switch" -ErrorAction SilentlyContinue }
+        }
+
+        Invoke-Step "Alt+S starts a recording: NVDA says Recording started" {
+            Send-Keys 'Alt+S'
+            $null = Wait-Until "the '$($UI.Pause)' button" { Find-ByName $UI.Pause }
+        } -Once $UI.Started
+
+        Invoke-Step 'Alt+T stops it: NVDA reads that Windows has no MP3 encoder and how to get it, then the end with errors; the WAV is kept' {
+            Start-Sleep -Seconds 2
+            Send-Keys 'Alt+T'
+            $null = Wait-Until "the '$($UI.Start)' button" { Find-ByName $UI.Start }
+            $files = Get-LoopbackFiles $queueFile
+            $wav = @($files.Keys | Where-Object { $_ -like 'loopback_*.wav' -and $files[$_] -gt 44 })
+            Add-Check 'the recording is kept as WAV' ($wav.Count -eq 1)
+            $other = @($files.Keys | Where-Object { $_ -notlike '*.wav' })
+            Add-Check 'no MP3 file and no temporary file is left' ($other.Count -eq 0) ($other -join ', ')
+        } -Expect $UI.NoEncoder, $UI.EndWithErrors -Forbid $UI.Converted
+
+        Invoke-Step 'Alt+F4 after the failure: the app quits without asking' {
+            Send-Keys 'Alt+F4'
+            if (-not $script:AppProc.WaitForExit(8000)) { throw 'the app did not quit within 8 s of Alt+F4' }
+        } -Forbid $UI.ExitTitle
+    } finally {
+        $script:ProfileFormat = ''
+        Remove-Item "Env:$NoMp3Switch" -ErrorAction SilentlyContinue
+        Stop-App
         Remove-Item -LiteralPath $recordings -Recurse -Force -ErrorAction SilentlyContinue
         Remove-Item -LiteralPath $queueFile -Force -ErrorAction SilentlyContinue
     }
@@ -1414,6 +1510,7 @@ function Invoke-Scenario([string]$Name) {
             'tray'    { Invoke-TrayScenario }
             'settings' { Invoke-SettingsScenario }
             'convert' { Invoke-ConvertScenario }
+            'mp3'     { Invoke-Mp3Scenario }
         }
     } finally {
         Stop-App
@@ -1545,7 +1642,7 @@ $script:RunClock = $null
 $script:FolderReady = $false
 $script:AppLogCopied = $false
 $script:PlaybackDeviceId = $null
-$script:OpusProfile = $false
+$script:ProfileFormat = ''
 try {
     if (-not (Test-Path -LiteralPath $Exe)) { Stop-Run "AudioCaptor.exe not found: $Exe. Build it first: just build" }
     $Exe = (Resolve-Path -LiteralPath $Exe).Path

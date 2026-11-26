@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Recordings can now be saved as MP3, the format that every player, phone and website opens. The Format list of a profile has three new entries: "MP3 — speech (mono, 64 kbps)", about 29 MB per hour; "MP3 — standard (128 kbps)", about 58 MB per hour; and "MP3 — high quality (320 kbps)", about 144 MB per hour, for music. As with Opus, the recording is written as WAV and converted in the background when you stop it (an hour takes about a quarter of a minute on a recent PC), and the WAV is deleted only after AudioCaptor has checked that the `.mp3` file is whole and lasts as long as the recording.
+- MP3 files are made by the MP3 encoder that comes with Windows, so AudioCaptor stays a single small file. The N and KN editions of Windows have no such encoder until the Media Feature Pack is installed: there a recording in an MP3 profile stays WAV, the warning sound plays and a message, which the screen reader reads, says how to install the Media Feature Pack. AudioCaptor itself starts and works as before on these editions.
+- MP3 works at every sample rate of a profile. At 16 and 8 kHz MP3 allows only lower bitrates, so "standard" and "high quality" give 80 kbit/s at 16 kHz and 32 kbit/s at 8 kHz, and "speech" 48 and 16 kbit/s.
+
+### Changed
+
+- Conversions to Opus and MP3 now run at a lower priority, so a recording that you make while an earlier one is being converted always comes first.
+- If you go back to AudioCaptor 0.2.0, a profile with an MP3 format records WAV there. The format works again after you update, unless you saved that profile in 0.2.0.
+
 ## [0.2.0] — 2026-11-26
 
 ### Added

@@ -39,11 +39,16 @@ anyhow = "1"
 log = "0.4"
 
 [target.'cfg(windows)'.dependencies]
+# Win32_Media_MediaFoundation: the MP3 encoder of Windows (decision-5). Its
+# functions are loaded at run time, never imported (convert/media_foundation.rs).
 windows = { version = "0.59", features = [
     "Win32_Globalization",
     "Win32_Media_Audio",
+    "Win32_Media_MediaFoundation",
     "Win32_System_Com",
+    "Win32_System_LibraryLoader",
     "Win32_System_SystemInformation",
+    "Win32_System_Threading",
     "Win32_Foundation",
 ] }
 windows-core = "0.59"

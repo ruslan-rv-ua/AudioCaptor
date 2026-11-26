@@ -554,7 +554,7 @@ impl QueueEvents for QueueToWindow {
 
     fn converted(&self, _job: &convert::Job, _output: &std::path::Path) {}
 
-    fn failed(&self, job: &convert::Job, _reason: &str) {
+    fn failed(&self, job: &convert::Job, error: &convert::ConvertError) {
         if let Ok(s) = self.0.state::<SharedState>().lock() {
             // Not while a recording runs: the sound would end up in it, and the
             // app keeps its own sounds out of recordings. The window still
@@ -568,6 +568,9 @@ impl QueueEvents for QueueToWindow {
             serde_json::json!({
                 "wav": job.wav.display().to_string(),
                 "format": job.format.family(),
+                // Windows lacks the encoder (an N edition without the Media
+                // Feature Pack): the window says how to get it.
+                "noEncoder": *error == convert::ConvertError::NoEncoder,
             }),
         );
     }

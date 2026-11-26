@@ -662,7 +662,7 @@ mod tests {
                 r#""mixFilename": "mix"
             },"#,
                 r#""mixFilename": "mix",
-                "outputFormat": "Mp3Standard"
+                "outputFormat": "AacStandard"
             },"#,
             );
         let dir = test_dir("newer");
@@ -672,12 +672,12 @@ mod tests {
         let s = loaded.settings;
         assert_eq!(s.version, 7);
         assert_eq!(s.profiles.len(), 2);
-        assert_eq!(s.profiles[0].output_format, "Mp3Standard");
+        assert_eq!(s.profiles[0].output_format, "AacStandard");
         assert_eq!(s.profiles[0].format(), OutputFormat::Wav);
         assert_eq!(s.profiles[1].format(), OutputFormat::Wav);
 
         let written = serde_json::to_string(&s).unwrap();
-        assert!(written.contains(r#""outputFormat":"Mp3Standard""#));
+        assert!(written.contains(r#""outputFormat":"AacStandard""#));
         let _ = fs::remove_dir_all(&dir);
     }
 

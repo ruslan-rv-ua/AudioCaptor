@@ -55,9 +55,12 @@
   // One list for format and quality (backlog decision-6): each entry stands for
   // encoder settings fixed in the backend.
   const outputFormats: { value: OutputFormat; label: string }[] = [
-    { value: "Wav",        label: m.format_wav() },
-    { value: "OpusSpeech", label: m.format_opus_speech() },
-    { value: "OpusMusic",  label: m.format_opus_music() },
+    { value: "Wav",         label: m.format_wav() },
+    { value: "OpusSpeech",  label: m.format_opus_speech() },
+    { value: "OpusMusic",   label: m.format_opus_music() },
+    { value: "Mp3Speech",   label: m.format_mp3_speech() },
+    { value: "Mp3Standard", label: m.format_mp3_standard() },
+    { value: "Mp3High",     label: m.format_mp3_high() },
   ];
 
   // Filename visibility depends on which streams are produced

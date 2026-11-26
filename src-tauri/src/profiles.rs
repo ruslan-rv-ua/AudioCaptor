@@ -176,14 +176,14 @@ mod tests {
             "outputFolder": "Recordings", "outputMode": "Mix", "sampleRate": 48000,
             "micVolume": 1.0, "loopbackVolume": 0.5,
             "micFilename": "mic", "loopbackFilename": "loopback", "mixFilename": "mix",
-            "outputFormat": "Mp3Standard"
+            "outputFormat": "AacStandard"
         }"#;
         let p: RecordingProfile = serde_json::from_str(json).unwrap();
         assert_eq!(p.format(), OutputFormat::Wav);
-        assert_eq!(p.output_format, "Mp3Standard");
+        assert_eq!(p.output_format, "AacStandard");
         let written = serde_json::to_string(&p).unwrap();
         assert!(
-            written.contains(r#""outputFormat":"Mp3Standard""#),
+            written.contains(r#""outputFormat":"AacStandard""#),
             "{written}"
         );
     }

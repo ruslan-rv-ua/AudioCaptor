@@ -27,7 +27,7 @@ pub trait QueueEvents: Send + Sync + 'static {
     /// A recording was converted: `output` now stands in for its WAV.
     fn converted(&self, job: &Job, output: &Path);
     /// A recording could not be converted. Its WAV is kept.
-    fn failed(&self, job: &Job, reason: &str);
+    fn failed(&self, job: &Job, error: &ConvertError);
 }
 
 /// Where the queue stands.
@@ -298,13 +298,15 @@ impl Inner {
 /// How one conversion ended.
 enum Outcome {
     Converted(PathBuf),
-    Failed(String),
+    /// `Failed` or `NoEncoder`.
+    Failed(ConvertError),
     /// The WAV is no longer there: the user moved or deleted it.
     Gone,
 }
 
 /// The worker thread: converts the first file of the queue until the app closes.
 fn work(inner: &Inner) {
+    give_way();
     loop {
         let (job, status) = {
             let mut state = inner.lock();
@@ -334,10 +336,12 @@ fn work(inner: &Inner) {
             let report = |done: f32| inner.progress(done);
             let control = Control::new(&inner.cancel, &report);
             match (inner.codecs)(job.format) {
-                None => Outcome::Failed("this format cannot be written".into()),
+                None => Outcome::Failed(ConvertError::failed("this format cannot be written")),
                 Some(codec) => match convert_file(&job, codec.as_ref(), &control) {
                     Ok(output) => Outcome::Converted(output),
-                    Err(ConvertError::Failed(reason)) => Outcome::Failed(reason),
+                    Err(e @ (ConvertError::Failed(_) | ConvertError::NoEncoder)) => {
+                        Outcome::Failed(e)
+                    }
                     Err(ConvertError::Cancelled) => {
                         // The app is closing: the job stays first in the queue.
                         inner.lock().current = None;
@@ -372,15 +376,28 @@ fn work(inner: &Inner) {
                 );
                 inner.events.converted(&job, &output);
             }
-            Outcome::Failed(reason) => {
-                log::error!("Could not convert {}: {reason}", job.wav.display());
-                inner.events.failed(&job, &reason);
+            Outcome::Failed(error) => {
+                log::error!("Could not convert {}: {error}", job.wav.display());
+                inner.events.failed(&job, &error);
             }
             Outcome::Gone => log::warn!("Not converted, the file is gone: {}", job.wav.display()),
         }
         if let Some(status) = now_empty {
             inner.events.status(&status);
         }
+    }
+}
+
+/// Puts the worker thread in the background mode of Windows: its processor
+/// and disk priority drop, so a recording that runs meanwhile comes first, also
+/// on a slow computer (TASK-29). An idle computer still gives it a whole core.
+fn give_way() {
+    use windows::Win32::System::Threading::{
+        GetCurrentThread, SetThreadPriority, THREAD_MODE_BACKGROUND_BEGIN,
+    };
+    // SAFETY: the pseudo-handle of the current thread needs no closing.
+    if let Err(e) = unsafe { SetThreadPriority(GetCurrentThread(), THREAD_MODE_BACKGROUND_BEGIN) } {
+        log::warn!("Conversions run at normal priority: {e}");
     }
 }
 
@@ -476,7 +493,7 @@ mod tests {
     enum Event {
         Status(Status),
         Converted(String),
-        Failed(String, String),
+        Failed(String, ConvertError),
     }
 
     /// Passes every event of the queue to the test.
@@ -493,17 +510,15 @@ mod tests {
         fn converted(&self, _: &Job, output: &Path) {
             let _ = self.0.send(Event::Converted(name(output)));
         }
-        fn failed(&self, job: &Job, reason: &str) {
-            let _ = self
-                .0
-                .send(Event::Failed(name(&job.wav), reason.to_string()));
+        fn failed(&self, job: &Job, error: &ConvertError) {
+            let _ = self.0.send(Event::Failed(name(&job.wav), error.clone()));
         }
     }
 
     /// A codec that waits in `encode` until the test says how it should end.
     struct Gated {
         started: Sender<String>,
-        proceed: Receiver<Result<(), String>>,
+        proceed: Receiver<Result<(), ConvertError>>,
     }
 
     impl Codec for Gated {
@@ -517,7 +532,7 @@ mod tests {
                 control.check()?;
                 match self.proceed.recv_timeout(Duration::from_millis(2)) {
                     Ok(Ok(())) => return Ok(()),
-                    Ok(Err(reason)) => return Err(ConvertError::Failed(reason)),
+                    Ok(Err(error)) => return Err(error),
                     Err(RecvTimeoutError::Timeout) => {}
                     Err(RecvTimeoutError::Disconnected) => {
                         return Err(ConvertError::failed("the test is over"))
@@ -536,7 +551,7 @@ mod tests {
         queue: ConversionQueue,
         events: Receiver<Event>,
         started: Receiver<String>,
-        proceed: Sender<Result<(), String>>,
+        proceed: Sender<Result<(), ConvertError>>,
     }
 
     impl Bench {
@@ -792,7 +807,10 @@ mod tests {
             .queue
             .enqueue([bench.recording("a.wav"), bench.recording("b.wav")]);
         assert_eq!(bench.next_started(), "a.wav");
-        bench.proceed.send(Err("the disk is full".into())).unwrap();
+        bench
+            .proceed
+            .send(Err(ConvertError::failed("the disk is full")))
+            .unwrap();
         assert_eq!(bench.next_started(), "b.wav");
         // The failed file has left the queue: it is not tried again.
         assert_eq!(bench.stored_wavs(), ["Recordings/b.wav"]);
@@ -801,13 +819,40 @@ mod tests {
         assert_eq!(
             bench.until_empty(),
             [
-                Event::Failed("a.wav".into(), "the disk is full".into()),
+                Event::Failed(
+                    "a.wav".into(),
+                    ConvertError::Failed("the disk is full".into())
+                ),
                 Event::Converted("b.opus".into()),
             ]
         );
         assert!(bench.exists("a.wav"));
         assert!(!bench.exists("a.opus") && !bench.exists("a.opus.tmp"));
         assert!(bench.exists("b.opus") && !bench.exists("b.wav"));
+    }
+
+    #[test]
+    fn a_missing_encoder_is_reported_as_such_and_the_wavs_stay() {
+        // As on Windows N without the Media Feature Pack: each file fails at
+        // once, and the window learns why, to say how to get the encoder.
+        let bench = Bench::new("no-encoder");
+        bench.queue.start();
+        bench
+            .queue
+            .enqueue([bench.recording("mic.wav"), bench.recording("loopback.wav")]);
+        for name in ["mic.wav", "loopback.wav"] {
+            assert_eq!(bench.next_started(), name);
+            bench.proceed.send(Err(ConvertError::NoEncoder)).unwrap();
+        }
+        assert_eq!(
+            bench.until_empty(),
+            [
+                Event::Failed("mic.wav".into(), ConvertError::NoEncoder),
+                Event::Failed("loopback.wav".into(), ConvertError::NoEncoder),
+            ]
+        );
+        assert!(bench.exists("mic.wav") && bench.exists("loopback.wav"));
+        assert!(bench.stored().is_none());
     }
 
     #[test]
@@ -853,7 +898,7 @@ mod tests {
         let stored = serde_json::json!({
             "version": 1,
             "jobs": [
-                {"wav": "Recordings/newer.wav", "frames": 800, "sampleRate": 8000, "channels": 2, "format": "Mp3Standard"},
+                {"wav": "Recordings/newer.wav", "frames": 800, "sampleRate": 8000, "channels": 2, "format": "AacStandard"},
                 {"wav": "Recordings/gone.wav", "frames": 800, "sampleRate": 8000, "channels": 2, "format": "OpusSpeech"},
                 {"wav": outside, "frames": 800, "sampleRate": 8000, "channels": 2, "format": "OpusMusic"},
                 {"wav": "Recordings/kept.wav", "frames": 4000, "sampleRate": 8000, "channels": 2, "format": "OpusSpeech"},

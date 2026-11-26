@@ -6,6 +6,8 @@
 //! If a step fails, the temporary file is removed and the WAV stays. A format
 //! adds only its `Codec`; `queue` runs the conversions one file at a time.
 
+pub mod media_foundation;
+pub mod mp3;
 pub mod ogg_opus;
 pub mod queue;
 pub mod wav;
@@ -49,12 +51,25 @@ impl Job {
 pub enum ConvertError {
     /// The app is closing; the job is done again the next time it starts.
     Cancelled,
+    /// Windows has no encoder for the format: an N edition without the Media
+    /// Feature Pack has no MP3 encoder. The window says how to get it.
+    NoEncoder,
     Failed(String),
 }
 
 impl ConvertError {
     pub fn failed(reason: impl std::fmt::Display) -> Self {
         ConvertError::Failed(reason.to_string())
+    }
+}
+
+impl std::fmt::Display for ConvertError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ConvertError::Cancelled => f.write_str("the app is closing"),
+            ConvertError::NoEncoder => f.write_str("Windows has no encoder for this format"),
+            ConvertError::Failed(reason) => f.write_str(reason),
+        }
     }
 }
 
@@ -114,6 +129,11 @@ pub trait Codec: Send {
     /// Extension of the compressed file, without the dot.
     fn extension(&self) -> &'static str;
 
+    /// The share of a conversion that encoding takes; the check takes the rest.
+    fn encode_share(&self) -> f32 {
+        ENCODE_SHARE
+    }
+
     /// Encodes the job's WAV into `output`.
     fn encode(&self, job: &Job, output: &Path, control: &Control) -> Result<(), ConvertError>;
 
@@ -124,16 +144,21 @@ pub trait Codec: Send {
 
 /// The codec of a format, or `None` for WAV: a WAV recording needs no conversion.
 pub fn codec_for(format: OutputFormat) -> Option<Box<dyn Codec>> {
-    use ogg_opus::{OpusCodec, Variant};
+    use mp3::Mp3Codec;
+    use ogg_opus::OpusCodec;
     match format {
         OutputFormat::Wav => None,
-        OutputFormat::OpusSpeech => Some(Box::new(OpusCodec::new(Variant::Speech))),
-        OutputFormat::OpusMusic => Some(Box::new(OpusCodec::new(Variant::Music))),
+        OutputFormat::OpusSpeech => Some(Box::new(OpusCodec::new(ogg_opus::Variant::Speech))),
+        OutputFormat::OpusMusic => Some(Box::new(OpusCodec::new(ogg_opus::Variant::Music))),
+        OutputFormat::Mp3Speech => Some(Box::new(Mp3Codec::new(mp3::Variant::Speech))),
+        OutputFormat::Mp3Standard => Some(Box::new(Mp3Codec::new(mp3::Variant::Standard))),
+        OutputFormat::Mp3High => Some(Box::new(Mp3Codec::new(mp3::Variant::High))),
     }
 }
 
-/// The share of a conversion that encoding takes; the check takes the rest.
-/// An hour of audio took 18-23 s to encode and 3-7 s to decode (TASK-27).
+/// The share of a conversion that encoding takes, unless a codec says
+/// otherwise; the check takes the rest. An hour of audio took 18-23 s to
+/// encode and 3-7 s to decode in Opus (TASK-27).
 const ENCODE_SHARE: f32 = 0.8;
 
 /// Converts the job's WAV with `codec` and returns the path of the new file,
@@ -170,8 +195,9 @@ fn write_checked(
     temp: &Path,
 ) -> Result<(), ConvertError> {
     control.check()?;
-    codec.encode(job, temp, &control.stage(0.0, ENCODE_SHARE))?;
-    codec.verify(job, temp, &control.stage(ENCODE_SHARE, 1.0 - ENCODE_SHARE))?;
+    let share = codec.encode_share();
+    codec.encode(job, temp, &control.stage(0.0, share))?;
+    codec.verify(job, temp, &control.stage(share, 1.0 - share))?;
     control.check()?;
     std::fs::rename(temp, output)?;
     Ok(())
@@ -317,14 +343,15 @@ mod tests {
     #[test]
     fn wav_format_has_no_codec() {
         assert!(codec_for(OutputFormat::Wav).is_none());
-        assert_eq!(
-            codec_for(OutputFormat::OpusSpeech).unwrap().extension(),
-            "opus"
-        );
-        assert_eq!(
-            codec_for(OutputFormat::OpusMusic).unwrap().extension(),
-            "opus"
-        );
+        for (format, extension) in [
+            (OutputFormat::OpusSpeech, "opus"),
+            (OutputFormat::OpusMusic, "opus"),
+            (OutputFormat::Mp3Speech, "mp3"),
+            (OutputFormat::Mp3Standard, "mp3"),
+            (OutputFormat::Mp3High, "mp3"),
+        ] {
+            assert_eq!(codec_for(format).unwrap().extension(), extension);
+        }
     }
 
     #[test]

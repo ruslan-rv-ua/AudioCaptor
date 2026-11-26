@@ -46,27 +46,36 @@ pub enum OutputFormat {
     Wav,
     OpusSpeech,
     OpusMusic,
+    Mp3Speech,
+    Mp3Standard,
+    Mp3High,
 }
 
 impl OutputFormat {
+    const ALL: [OutputFormat; 6] = [
+        OutputFormat::Wav,
+        OutputFormat::OpusSpeech,
+        OutputFormat::OpusMusic,
+        OutputFormat::Mp3Speech,
+        OutputFormat::Mp3Standard,
+        OutputFormat::Mp3High,
+    ];
+
     /// The id stored in `settings.json`.
     pub fn id(self) -> &'static str {
         match self {
             OutputFormat::Wav => "Wav",
             OutputFormat::OpusSpeech => "OpusSpeech",
             OutputFormat::OpusMusic => "OpusMusic",
+            OutputFormat::Mp3Speech => "Mp3Speech",
+            OutputFormat::Mp3Standard => "Mp3Standard",
+            OutputFormat::Mp3High => "Mp3High",
         }
     }
 
     /// The format with this id, or `None` for an id this version does not know.
     pub fn from_id(id: &str) -> Option<Self> {
-        [
-            OutputFormat::Wav,
-            OutputFormat::OpusSpeech,
-            OutputFormat::OpusMusic,
-        ]
-        .into_iter()
-        .find(|format| format.id() == id)
+        Self::ALL.into_iter().find(|format| format.id() == id)
     }
 
     /// The name of the format in messages, e.g. "Converting to Opus".
@@ -74,6 +83,7 @@ impl OutputFormat {
         match self {
             OutputFormat::Wav => "WAV",
             OutputFormat::OpusSpeech | OutputFormat::OpusMusic => "Opus",
+            OutputFormat::Mp3Speech | OutputFormat::Mp3Standard | OutputFormat::Mp3High => "MP3",
         }
     }
 }
@@ -96,6 +106,20 @@ pub enum RecordingState {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn every_format_is_found_by_its_id() {
+        for format in OutputFormat::ALL {
+            assert_eq!(OutputFormat::from_id(format.id()), Some(format));
+        }
+        assert_eq!(
+            OutputFormat::from_id("Mp3Standard"),
+            Some(OutputFormat::Mp3Standard)
+        );
+        assert_eq!(OutputFormat::Mp3High.family(), "MP3");
+        assert_eq!(OutputFormat::from_id("mp3standard"), None);
+        assert_eq!(OutputFormat::from_id("AacStandard"), None);
+    }
 
     #[test]
     fn output_mode_mix_plus_microphone_serializes() {

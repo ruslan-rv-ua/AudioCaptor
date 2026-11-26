@@ -8,6 +8,7 @@
     getRecording,
     initRecordingListener,
     startRecording,
+    showError,
     pauseRecording,
     resumeRecording,
     stopRecording,
@@ -317,6 +318,10 @@
         await appWindow.show();
       }
       initLanguage(appSettings.language);
+      try {
+        const keptAt = await api.takeSettingsNotice();
+        if (keptAt) showError(m.error_settings_unreadable({ path: keptAt }));
+      } catch { /* no notice */ }
       await loadSettingsIntoStore();
       await loadProfiles();
       const active = profileStore.active;

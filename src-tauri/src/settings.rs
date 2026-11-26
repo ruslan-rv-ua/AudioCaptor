@@ -1,7 +1,8 @@
 use crate::audio::types::OutputMode;
 use crate::profiles::RecordingProfile;
 use std::fs;
-use std::path::PathBuf;
+use std::io::Write;
+use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase", default)]
@@ -134,10 +135,118 @@ pub fn read_settings() -> Settings {
     migrate_settings(settings)
 }
 
+/// What the app found in `settings.json` at startup.
+pub struct StartupSettings {
+    pub settings: Settings,
+    /// Set when the file existed but could not be read. Holds where the old file
+    /// is kept: the copy next to it, or the file itself when the copy failed.
+    pub unreadable_kept_at: Option<PathBuf>,
+    /// False when the old file must stay untouched (the copy failed).
+    pub write_back: bool,
+}
+
+/// Reads the settings at startup. An unreadable file (corrupt JSON, an empty
+/// file, a field of an unexpected type) is copied to `settings.unreadable.json`
+/// before the caller writes the defaults over it. An existing copy is never
+/// overwritten: the next ones are `settings.unreadable-2.json`, `-3` and so on.
+pub fn read_settings_at_startup() -> StartupSettings {
+    match crate::portable::data_dir() {
+        Ok(dir) => read_settings_from(&dir),
+        Err(_) => StartupSettings {
+            settings: Settings::default(),
+            unreadable_kept_at: None,
+            write_back: false,
+        },
+    }
+}
+
+fn read_settings_from(dir: &Path) -> StartupSettings {
+    let path = dir.join("settings.json");
+    let parsed = match fs::read(&path) {
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            return StartupSettings {
+                settings: Settings::default(),
+                unreadable_kept_at: None,
+                write_back: true,
+            };
+        }
+        Err(e) => Err(e.to_string()),
+        Ok(bytes) => String::from_utf8(bytes)
+            .map_err(|e| e.to_string())
+            .and_then(|text| serde_json::from_str::<Settings>(&text).map_err(|e| e.to_string())),
+    };
+    match parsed {
+        Ok(settings) => StartupSettings {
+            settings: migrate_settings(settings),
+            unreadable_kept_at: None,
+            write_back: true,
+        },
+        Err(reason) => {
+            log::error!("Could not read settings.json: {reason}");
+            let settings = Settings {
+                language: crate::portable::detect_language().to_string(),
+                ..Settings::default()
+            };
+            match keep_unreadable_copy(dir, &path) {
+                Ok(copy) => {
+                    log::warn!("Kept the unreadable settings as {}", copy.display());
+                    StartupSettings {
+                        settings,
+                        unreadable_kept_at: Some(copy),
+                        write_back: true,
+                    }
+                }
+                Err(e) => {
+                    log::error!("Could not copy the unreadable settings.json: {e}");
+                    StartupSettings {
+                        settings,
+                        unreadable_kept_at: Some(path),
+                        write_back: false,
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn keep_unreadable_copy(dir: &Path, path: &Path) -> std::io::Result<PathBuf> {
+    let mut n = 1;
+    let target = loop {
+        let name = if n == 1 {
+            "settings.unreadable.json".to_string()
+        } else {
+            format!("settings.unreadable-{n}.json")
+        };
+        let candidate = dir.join(name);
+        if !candidate.exists() {
+            break candidate;
+        }
+        n += 1;
+    };
+    fs::copy(path, &target)?;
+    Ok(target)
+}
+
+/// Writes `contents` to a temporary file next to `path` and replaces `path`
+/// with it, so an interrupted write never leaves a half-written file.
+pub(crate) fn write_atomic(path: &Path, contents: &str) -> std::io::Result<()> {
+    let mut tmp = path.as_os_str().to_owned();
+    tmp.push(".tmp");
+    let tmp = PathBuf::from(tmp);
+    {
+        let mut file = fs::File::create(&tmp)?;
+        file.write_all(contents.as_bytes())?;
+        file.sync_all()?;
+    }
+    fs::rename(&tmp, path).inspect_err(|_| {
+        let _ = fs::remove_file(&tmp);
+    })
+}
+
 pub fn write_settings(settings: &Settings) -> anyhow::Result<()> {
     let path = settings_path()?;
     let json = serde_json::to_string_pretty(settings)?;
-    fs::write(&path, json)?;
+    write_atomic(&path, &json)?;
     Ok(())
 }
 
@@ -145,6 +254,83 @@ pub fn write_settings(settings: &Settings) -> anyhow::Result<()> {
 mod tests {
     use super::*;
     use crate::profiles::RecordingProfile;
+
+    fn test_dir(name: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!(
+            "audiocaptor-settings-test-{}-{name}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    fn assert_unreadable_is_kept(name: &str, contents: &str) {
+        let dir = test_dir(name);
+        fs::write(dir.join("settings.json"), contents).unwrap();
+        let loaded = read_settings_from(&dir);
+        let kept = loaded.unreadable_kept_at.expect("file reported unreadable");
+        assert_eq!(kept, dir.join("settings.unreadable.json"));
+        assert_eq!(fs::read_to_string(&kept).unwrap(), contents);
+        assert!(loaded.write_back);
+        assert_eq!(loaded.settings.profiles.len(), 1);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn corrupt_json_is_kept_before_reset() {
+        assert_unreadable_is_kept("corrupt", "{ \"version\": 5, \"profiles\": [");
+    }
+
+    #[test]
+    fn empty_file_is_kept_before_reset() {
+        assert_unreadable_is_kept("empty", "");
+    }
+
+    #[test]
+    fn field_with_unexpected_type_is_kept_before_reset() {
+        assert_unreadable_is_kept("type", r#"{"version": 5, "soundEnabled": "yes"}"#);
+    }
+
+    #[test]
+    fn existing_copy_is_never_overwritten() {
+        let dir = test_dir("second");
+        fs::write(dir.join("settings.unreadable.json"), "first").unwrap();
+        fs::write(dir.join("settings.json"), "broken").unwrap();
+        let loaded = read_settings_from(&dir);
+        assert_eq!(
+            loaded.unreadable_kept_at,
+            Some(dir.join("settings.unreadable-2.json"))
+        );
+        assert_eq!(
+            fs::read_to_string(dir.join("settings.unreadable.json")).unwrap(),
+            "first"
+        );
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn readable_and_missing_files_make_no_copy() {
+        let dir = test_dir("fine");
+        assert!(read_settings_from(&dir).unreadable_kept_at.is_none());
+        let json = serde_json::to_string(&Settings::default()).unwrap();
+        fs::write(dir.join("settings.json"), json).unwrap();
+        let loaded = read_settings_from(&dir);
+        assert!(loaded.unreadable_kept_at.is_none());
+        assert!(!dir.join("settings.unreadable.json").exists());
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn write_atomic_replaces_file_and_leaves_no_temp_file() {
+        let dir = test_dir("atomic");
+        let path = dir.join("settings.json");
+        fs::write(&path, "old").unwrap();
+        write_atomic(&path, "new").unwrap();
+        assert_eq!(fs::read_to_string(&path).unwrap(), "new");
+        assert!(!dir.join("settings.json.tmp").exists());
+        let _ = fs::remove_dir_all(&dir);
+    }
 
     #[test]
     fn settings_serialization_roundtrip() {

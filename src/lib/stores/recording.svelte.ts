@@ -69,6 +69,11 @@ export async function initRecordingListener() {
   });
 }
 
+// Shows a message in the error block, which is a live region that NVDA reads.
+export function showError(message: string) {
+  recordingError = message;
+}
+
 export async function startRecording() {
   recordingError = null;
   try {

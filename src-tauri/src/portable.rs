@@ -17,7 +17,7 @@ pub fn data_dir() -> anyhow::Result<PathBuf> {
 /// Returns the best-matching supported app language code for the current
 /// Windows UI locale. Falls back to `"en"` on any error or unsupported locale.
 #[cfg(target_os = "windows")]
-fn detect_language() -> &'static str {
+pub(crate) fn detect_language() -> &'static str {
     use windows::Win32::Globalization::GetUserDefaultLocaleName;
 
     let mut buf = [0u16; 85]; // LOCALE_NAME_MAX_LENGTH = 85
@@ -36,7 +36,7 @@ fn detect_language() -> &'static str {
 }
 
 #[cfg(not(target_os = "windows"))]
-fn detect_language() -> &'static str {
+pub(crate) fn detect_language() -> &'static str {
     "en"
 }
 
@@ -59,7 +59,7 @@ pub fn ensure_dirs() -> anyhow::Result<()> {
         let mut defaults = crate::settings::migrate_settings(crate::settings::Settings::default());
         defaults.language = detect_language().to_string();
         let json = serde_json::to_string_pretty(&defaults)?;
-        fs::write(&settings_path, json)?;
+        crate::settings::write_atomic(&settings_path, &json)?;
         log::info!(
             "Created default settings.json with language={}",
             defaults.language

@@ -43,6 +43,10 @@ export async function loadSettings(): Promise<Settings> {
   return invoke<Settings>("load_settings");
 }
 
+export async function takeSettingsNotice(): Promise<string | null> {
+  return invoke<string | null>("take_settings_notice");
+}
+
 export async function saveSettings(settings: Settings): Promise<void> {
   return invoke("save_settings", { settings });
 }

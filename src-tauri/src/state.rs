@@ -28,6 +28,9 @@ pub struct AppState {
     pub emitter_running: Arc<AtomicBool>,
     pub device_monitor: Option<crate::device_monitor::DeviceMonitorHandle>,
     pub language: String,
+    /// Where the old `settings.json` is kept when it could not be read at startup.
+    /// The window takes it once it has loaded.
+    pub settings_notice: Option<String>,
 }
 
 impl Default for AppState {
@@ -54,6 +57,7 @@ impl Default for AppState {
             emitter_running: Arc::new(AtomicBool::new(false)),
             device_monitor: None,
             language: "en".to_string(),
+            settings_notice: None,
         }
     }
 }

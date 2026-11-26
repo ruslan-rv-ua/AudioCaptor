@@ -24,6 +24,13 @@ fn load_settings() -> settings::Settings {
     settings::read_settings()
 }
 
+/// Where the old `settings.json` is kept, if it could not be read at startup.
+/// Returned once: the window shows the message and the notice is cleared.
+#[tauri::command]
+fn take_settings_notice(state: tauri::State<'_, SharedState>) -> Option<String> {
+    state.lock().ok().and_then(|mut s| s.settings_notice.take())
+}
+
 #[tauri::command]
 fn save_settings(
     state: tauri::State<'_, SharedState>,
@@ -665,8 +672,11 @@ pub fn run() {
         .setup(|app| {
             portable::ensure_dirs().map_err(|e| e.to_string())?;
 
-            let settings = settings::read_settings();
-            let _ = settings::write_settings(&settings); // persist migration if version was bumped
+            let loaded = settings::read_settings_at_startup();
+            let settings = loaded.settings;
+            if loaded.write_back {
+                let _ = settings::write_settings(&settings); // persist migration if version was bumped
+            }
             if let Ok(mut s) = app.state::<SharedState>().lock() {
                 match sounds::SoundEngine::new() {
                     Ok(engine) => s.sound_engine = Some(engine),
@@ -683,6 +693,10 @@ pub fn run() {
                 }
                 s.active_profile_id = settings.active_profile_id.clone();
                 s.language = settings.language.clone();
+                if let Some(kept_at) = loaded.unreadable_kept_at {
+                    s.settings_notice = Some(kept_at.display().to_string());
+                    play_sound(&s, sounds::SoundKind::Warning);
+                }
             }
 
             // Register global hotkey (only if one is configured)
@@ -712,6 +726,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             load_settings,
+            take_settings_notice,
             save_settings,
             get_audio_devices,
             refresh_devices,

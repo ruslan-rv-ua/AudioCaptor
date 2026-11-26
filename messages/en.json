@@ -51,6 +51,7 @@
   "mode_mix_plus_loopback": "Mix + System audio (2 files)",
   "error_profile_name_required": "Profile name is required",
   "error_filename_invalid": "Filenames must not be empty or contain < > : \" / \\ | ? *",
+  "error_settings_unreadable": "Could not read your settings, so they were reset to defaults. The old settings file is kept at {path}",
   "btn_cancel": "Cancel",
   "btn_save": "Save",
   "btn_create": "Create",

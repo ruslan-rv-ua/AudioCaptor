@@ -6,13 +6,13 @@ title: >-
 status: Draft
 assignee: []
 created_date: '2026-11-24T17:38:48Z'
-updated_date: '2026-11-25T00:51:59Z'
+updated_date: '2026-11-26T08:04:37Z'
 labels:
   - a11y
   - testing
   - model-opus
   - effort-medium
-milestone: m-2
+milestone: m-4
 dependencies: []
 references:
   - doc-3
@@ -74,4 +74,6 @@ priority: medium
 - Окремий `just smoke record` о 02:50 пройшов: 11 кроків з 11, без зависань NVDA.
 - Відтепер тестова копія тримає профіль браузера поруч зі своїм exe (TASK-25). Порожнім на початку прогону він був і раніше (скрипт щоразу давав нову теку через `WEBVIEW2_USER_DATA_FOLDER`), тож умови прогону не змінилися.
 - Звіти: `task-25-smoke-full.txt` і `task-25-smoke-record.txt` у спільній теці нотаток.
+
+2026-11-26: етап 0.2.0 перестворено під Opus як m-4 (рішення decision-5), старий m-2 заархівовано; чернетку перенесено в m-4.
 <!-- SECTION:NOTES:END -->

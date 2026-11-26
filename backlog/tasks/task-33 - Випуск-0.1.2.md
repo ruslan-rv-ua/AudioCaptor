@@ -4,20 +4,13 @@ title: Випуск 0.1.2
 status: To Do
 assignee: []
 created_date: '2026-11-26T08:52:02Z'
-updated_date: '2026-11-26T14:30:41Z'
+updated_date: '2026-11-26T14:32:20Z'
 labels:
   - release
   - model-sonnet
   - effort-medium
 milestone: m-7
-dependencies:
-  - TASK-10
-  - TASK-24
-  - TASK-25
-  - TASK-26
-  - TASK-32
-  - TASK-19
-  - TASK-23
+dependencies: []
 references:
   - DEVELOPMENT.md
   - CHANGELOG.md
@@ -60,4 +53,6 @@ ordinal: 10080
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-26: у TASK-19 тест NVDA пропущено за рішенням власника. Перед випуском (або раніше, у TASK-23) повний `just smoke` має підтвердити, що NVDA читає назву кожного діалогу один раз (сценарій `dialogs`, перевірка `-Once`) і що Enter закриває «About». Запуск — лише з дозволу власника.
+
+2026-11-26: TASK-23 відкладено на невизначений термін, тож залежності випуску очищено: решта (TASK-10, TASK-24, TASK-25, TASK-26, TASK-32, TASK-19) уже виконані й заархівовані, а заархівовані задачі CLI не дозволяє лишати в списку залежностей.
 <!-- SECTION:NOTES:END -->

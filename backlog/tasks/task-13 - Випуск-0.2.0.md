@@ -4,16 +4,16 @@ title: Випуск 0.2.0
 status: To Do
 assignee: []
 created_date: '2026-11-23T11:32:40Z'
-updated_date: '2026-11-26T08:52:15Z'
+updated_date: '2026-11-26T18:31:06Z'
 labels:
   - release
   - model-sonnet
   - effort-medium
 milestone: m-4
 dependencies:
-  - TASK-33
   - TASK-28
   - TASK-34
+  - TASK-35
 references:
   - DEVELOPMENT.md
   - CHANGELOG.md
@@ -48,3 +48,9 @@ ordinal: 13000
 - [ ] #5 Документацію оновлено там, де змінилася поведінка чи порядок роботи (README.md, README_UK.md, DEVELOPMENT.md)
 - [ ] #6 CHANGELOG.md оновлено: лише зміни, помітні користувачам (без подробиць про інструменти, тести, CI чи збірку)
 <!-- DOD:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-26: додано залежність від TASK-35 (вибір власника: 0.2.0 виходить із виправленням повторного Alt+I). Залежність від TASK-33 (випуск 0.1.2, виконано й заархівовано) при цьому випала: CLI не приймає архівних задач у `--depends-on`.
+<!-- SECTION:NOTES:END -->

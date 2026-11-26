@@ -6,7 +6,7 @@ title: >-
 status: Draft
 assignee: []
 created_date: '2026-11-24T17:38:48Z'
-updated_date: '2026-11-26T08:04:37Z'
+updated_date: '2026-11-26T17:53:52Z'
 labels:
   - a11y
   - testing
@@ -76,4 +76,10 @@ priority: medium
 - Звіти: `task-25-smoke-full.txt` і `task-25-smoke-record.txt` у спільній теці нотаток.
 
 2026-11-26: етап 0.2.0 перестворено під Opus як m-4 (рішення decision-5), старий m-2 заархівовано; чернетку перенесено в m-4.
+
+Доповнення 2026-11-26, робоча сесія TASK-28.
+- Три повні прогони `just smoke` на exe TASK-28: о 19:33 (exe 18:27) сценарій `record` пройшов повністю; о 19:43 (той самий exe) і о 19:52 (exe 19:49) не пройшов лише крок 3 сценарію `record` з тим самим «Recording started | недоступно | документ | додаток | Recording controls, групування | Pause recording (Alt+P), кнопка». На старті `record` вікно обидва рази прочитано через UI Automation («tauri.localhost – веб-вміст, регіон»).
+- У журналі NVDA о 19:51:03 — `VBufBackend_t::terminate` для закритого процесу WebView2, «Starting freeze recovery after 0.50 seconds» і «Recovered from freeze after 0.70 seconds»: перехід між `launch` і `record`.
+- У новому сценарії `convert` програма закривається й одразу запускається знову (крок 6), і перша зміна фокуса після цього (Alt+S, крок 7) в усіх чотирьох запусках пройшла чисто.
+- Звіти: `task-28-smoke-full-1.txt`, `task-28-smoke-full-2.txt`, `task-28-smoke-full-3.txt` у спільній теці нотаток.
 <!-- SECTION:NOTES:END -->

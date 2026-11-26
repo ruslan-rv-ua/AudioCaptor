@@ -4,6 +4,7 @@ title: Запис можна автоматично зберегти в Opus
 status: To Do
 assignee: []
 created_date: '2026-11-26T08:02:11Z'
+updated_date: '2026-11-26T08:20:02Z'
 labels:
   - backend
   - frontend
@@ -14,6 +15,7 @@ labels:
 milestone: m-4
 dependencies:
   - TASK-27
+  - TASK-32
 references:
   - src-tauri/src/audio/writer.rs
   - src-tauri/src/profiles.rs

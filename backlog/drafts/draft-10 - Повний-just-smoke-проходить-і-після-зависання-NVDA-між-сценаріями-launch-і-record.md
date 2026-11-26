@@ -6,7 +6,7 @@ title: >-
 status: Draft
 assignee: []
 created_date: '2026-11-24T17:38:48Z'
-updated_date: '2026-11-26T17:53:52Z'
+updated_date: '2026-11-26T19:23:37Z'
 labels:
   - a11y
   - testing
@@ -82,4 +82,9 @@ priority: medium
 - У журналі NVDA о 19:51:03 — `VBufBackend_t::terminate` для закритого процесу WebView2, «Starting freeze recovery after 0.50 seconds» і «Recovered from freeze after 0.70 seconds»: перехід між `launch` і `record`.
 - У новому сценарії `convert` програма закривається й одразу запускається знову (крок 6), і перша зміна фокуса після цього (Alt+S, крок 7) в усіх чотирьох запусках пройшла чисто.
 - Звіти: `task-28-smoke-full-1.txt`, `task-28-smoke-full-2.txt`, `task-28-smoke-full-3.txt` у спільній теці нотаток.
+
+Доповнення 2026-11-26, робоча сесія TASK-13 (exe 0.2.0).
+- Повний `just smoke`: 50 кроків із 53. Не пройшли крок 4 сценарію `record` (після TASK-35 це колишній крок 3) з тим самим «Recording started | недоступно | документ | додаток | Recording controls, групування | Pause recording (Alt+P), кнопка» і, вперше, крок 2 сценарію `tray`: Escape не сховав вікно («timed out waiting for the window to hide», NVDA нічого не сказав). На старті `tray` вікно теж прочитано через UI Automation («tauri.localhost – веб-вміст, регіон | документ, http://tauri.localhost/ | …»), тож, імовірно, це та сама родина збоїв; не перевірено.
+- Повторний `just smoke record tray` одразу після нього пройшов: 15 кроків із 15.
+- Звіти: `task-13-smoke-full.txt` і `task-13-smoke-record-tray.txt` у спільній теці нотаток.
 <!-- SECTION:NOTES:END -->

@@ -4,15 +4,13 @@ title: Випуск 0.2.0
 status: To Do
 assignee: []
 created_date: '2026-11-23T11:32:40Z'
-updated_date: '2026-11-26T18:31:06Z'
+updated_date: '2026-11-26T19:01:41Z'
 labels:
   - release
   - model-sonnet
   - effort-medium
 milestone: m-4
 dependencies:
-  - TASK-28
-  - TASK-34
   - TASK-35
 references:
   - DEVELOPMENT.md
@@ -53,4 +51,6 @@ ordinal: 13000
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-26: додано залежність від TASK-35 (вибір власника: 0.2.0 виходить із виправленням повторного Alt+I). Залежність від TASK-33 (випуск 0.1.2, виконано й заархівовано) при цьому випала: CLI не приймає архівних задач у `--depends-on`.
+
+2026-11-26: TASK-34 скасовано (decision-9: програма не показує ліцензій сторонніх бібліотек), тож випуск 0.2.0 на неї не чекає. Залежність тепер лише одна, TASK-35. Виконана й заархівована TASK-28 із переліку випала, бо CLI не приймає архівних задач у `--depends-on`.
 <!-- SECTION:NOTES:END -->

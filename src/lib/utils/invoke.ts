@@ -1,5 +1,11 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { AudioDevice, OutputMode, RecordingProfile, Settings } from "../types";
+import type {
+  AudioDevice,
+  OutputMode,
+  QueuedConversion,
+  RecordingProfile,
+  Settings,
+} from "../types";
 
 export async function getAudioDevices(): Promise<AudioDevice[]> {
   return invoke<AudioDevice[]>("get_audio_devices");
@@ -27,8 +33,25 @@ export async function resumeRecording(): Promise<void> {
   return invoke("resume_recording");
 }
 
-export async function stopRecording(): Promise<void> {
-  return invoke("stop_recording");
+/** Resolves to what happens to the recording next: its conversion, if any. */
+export async function stopRecording(): Promise<QueuedConversion> {
+  return invoke<QueuedConversion>("stop_recording");
+}
+
+/**
+ * How many recordings the last run of the app left to convert. Answered once;
+ * later calls resolve to 0.
+ */
+export async function conversionsLeftOver(): Promise<number> {
+  return invoke<number>("conversions_left_over");
+}
+
+/**
+ * Tells the backend that the window listens to the conversion events, so
+ * conversions may run.
+ */
+export async function startConversions(): Promise<void> {
+  return invoke("start_conversions");
 }
 
 export async function setMicVolume(volume: number): Promise<void> {

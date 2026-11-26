@@ -4,11 +4,18 @@
 
   interface Props {
     open: boolean;
-    onstopandexit: () => void;
+    /**
+     * True when a recording runs: the dialog asks whether to stop it. False
+     * when only conversions are left: the dialog says that they will be
+     * finished at the next start.
+     */
+    recording: boolean;
+    /** Stops the recording, if one runs, and exits. */
+    onexit: () => void;
     oncancel: () => void;
   }
 
-  let { open, onstopandexit, oncancel }: Props = $props();
+  let { open, recording, onexit, oncancel }: Props = $props();
 
   function handleKeydown(e: KeyboardEvent) {
     if (e.key === "Escape") { e.stopPropagation(); oncancel(); return; }
@@ -39,14 +46,18 @@
       tabindex="-1"
       onkeydown={handleKeydown}
     >
-      <h2 id="confirm-exit-title">{m.confirm_exit_title()}</h2>
-      <p id="confirm-exit-body">{m.confirm_exit_body()}</p>
+      <h2 id="confirm-exit-title">
+        {recording ? m.confirm_exit_title() : m.confirm_exit_conversion_title()}
+      </h2>
+      <p id="confirm-exit-body">
+        {recording ? m.confirm_exit_body() : m.confirm_exit_conversion_body()}
+      </p>
       <div class="actions">
         <button id="confirm-exit-cancel" type="button" class="btn-secondary" onclick={oncancel}>
           {m.btn_cancel()}
         </button>
-        <button type="button" class="btn-danger" onclick={onstopandexit}>
-          {m.btn_stop_and_exit()}
+        <button type="button" class="btn-danger" onclick={onexit}>
+          {recording ? m.btn_stop_and_exit() : m.btn_exit()}
         </button>
       </div>
     </div>

@@ -531,17 +531,17 @@ fn quit_app(app: tauri::AppHandle) {
     app.exit(0);
 }
 
-/// The window listens to the conversion events now, so conversions may run.
-/// Returns how many recordings the last run left to convert (the first call
-/// only): the window says that it is finishing them.
+/// How many recordings the last run left to convert. Answered once: the window
+/// says that it is finishing them, then calls `start_conversions`.
 #[tauri::command]
-fn start_conversions(queue: tauri::State<'_, ConversionQueue>) -> usize {
-    queue.start()
+fn conversions_left_over(queue: tauri::State<'_, ConversionQueue>) -> usize {
+    queue.take_left_over()
 }
 
+/// The window listens to the conversion events now, so conversions may run.
 #[tauri::command]
-fn conversion_status(queue: tauri::State<'_, ConversionQueue>) -> Status {
-    queue.status()
+fn start_conversions(queue: tauri::State<'_, ConversionQueue>) {
+    queue.start();
 }
 
 /// Passes what the conversion queue reports on to the window.
@@ -808,8 +808,8 @@ pub fn run() {
             cmd_get_active_profile,
             get_recordings_dir,
             quit_app,
+            conversions_left_over,
             start_conversions,
-            conversion_status,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

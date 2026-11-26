@@ -655,6 +655,72 @@ mod tests {
     }
 
     #[test]
+    fn stopped_mixer_returns_each_file_with_the_frames_it_wrote() {
+        use crate::audio::writer::WavOutputWriter;
+        use ringbuf::traits::{Producer, Split};
+
+        let dir =
+            std::env::temp_dir().join(format!("audiocaptor-mixer-test-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+
+        // A tenth of a second from each source, already at the target rate.
+        let frames = 4800usize;
+        let (mut mic_tx, mic_rx) = ringbuf::HeapRb::<f32>::new(frames * 2).split();
+        let (mut loop_tx, loop_rx) = ringbuf::HeapRb::<f32>::new(frames * 2).split();
+        assert_eq!(mic_tx.push_slice(&vec![0.25; frames * 2]), frames * 2);
+        assert_eq!(loop_tx.push_slice(&vec![0.5; frames * 2]), frames * 2);
+        let (command_tx, command_rx) = crossbeam_channel::bounded(4);
+        let mut handle = start_mixer(MixerConfig {
+            mic_consumer: Some(mic_rx),
+            loopback_consumer: Some(loop_rx),
+            mic_sample_rate: 48000,
+            loopback_sample_rate: 48000,
+            mic_channels: 2,
+            loopback_channels: 2,
+            target_sample_rate: 48000,
+            target_channels: 2,
+            output_mode: OutputMode::MixPlusMicrophone,
+            mic_volume: 1.0,
+            loopback_volume: 1.0,
+            writer: Box::new(WavOutputWriter::new(dir.join("mix.wav"), 48000, 2).unwrap()),
+            secondary_writer: Some(Box::new(
+                WavOutputWriter::new(dir.join("mic.wav"), 48000, 2).unwrap(),
+            )),
+            command_rx,
+            warmup_discard_ms: 0,
+        })
+        .unwrap();
+
+        // Once the mixer has taken everything, stop it as the app does. The
+        // mixer writes what it took before it looks at the command.
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+        while !(mic_tx.is_empty() && loop_tx.is_empty()) {
+            assert!(std::time::Instant::now() < deadline, "the mixer reads");
+            std::thread::sleep(std::time::Duration::from_millis(1));
+        }
+        command_tx.send(AudioCommand::Stop).unwrap();
+        let files = handle.stop();
+
+        // Both files of the mode, the main one first, each with the number of
+        // frames that are really in it.
+        assert_eq!(files.len(), 2);
+        assert_eq!(files[0].path, dir.join("mix.wav"));
+        assert_eq!(files[1].path, dir.join("mic.wav"));
+        for file in &files {
+            assert_eq!(file.frames, frames as u64, "{}", file.path.display());
+            assert_eq!((file.sample_rate, file.channels), (48000, 2));
+            let wav = hound::WavReader::open(&file.path).unwrap();
+            assert_eq!(u64::from(wav.duration()), file.frames);
+        }
+        assert!(
+            handle.stop().is_empty(),
+            "nothing more after the first stop"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn mix_samples_handles_unequal_lengths() {
         let mic = vec![0.5, 0.5, 0.5, 0.5]; // 2 frames stereo
         let loopback = vec![0.3, 0.3]; // 1 frame stereo

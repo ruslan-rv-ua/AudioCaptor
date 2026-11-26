@@ -6,9 +6,15 @@
   interface Props {
     state: RecordingState;
     durationMs: number;
+    /**
+     * What to show while recordings are converted, e.g. "Converting to Opus:
+     * 45%"; empty otherwise. For the eye only: a screen reader gets the same
+     * from the announcements and from Alt+I.
+     */
+    conversion?: string;
   }
 
-  let { state, durationMs }: Props = $props();
+  let { state, durationMs, conversion = "" }: Props = $props();
 
   let formattedDuration = $derived(formatDuration(durationMs));
 
@@ -36,6 +42,9 @@
     role="timer"
     aria-label={m.recording_duration({ duration: formattedDuration })}
   >{formattedDuration}</span>
+  {#if conversion}
+    <span class="conversion">{conversion}</span>
+  {/if}
 </div>
 
 <style>
@@ -110,5 +119,10 @@
 
   .timer.timer-idle {
     color: var(--text-muted);
+  }
+
+  .conversion {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
   }
 </style>

@@ -83,7 +83,7 @@ struct State {
     jobs: VecDeque<Job>,
     /// Set while the first job is being converted.
     current: Option<Current>,
-    /// Files the last run left behind, until `start` reports them.
+    /// Files the last run left behind, until `take_left_over` reports them.
     left_over: usize,
     worker: Option<std::thread::JoinHandle<()>>,
     /// Seconds of work a second of audio took in the last file converted.
@@ -201,12 +201,15 @@ impl ConversionQueue {
         queued
     }
 
-    /// Lets the conversions run. The first call returns how many files the last
-    /// run left to convert; later calls return 0.
-    ///
-    /// The window calls this once it listens to the queue's events, so it does
-    /// not miss the end of a short conversion.
-    pub fn start(&self) -> usize {
+    /// How many files the last run left to convert. Answered once; later calls
+    /// return 0.
+    pub fn take_left_over(&self) -> usize {
+        std::mem::take(&mut self.inner.lock().left_over)
+    }
+
+    /// Lets the conversions run. The window calls this once it listens to the
+    /// queue's events, so it does not miss the end of a short conversion.
+    pub fn start(&self) {
         let mut state = self.inner.lock();
         if state.worker.is_none() && !self.inner.cancel.load(Ordering::SeqCst) {
             let inner = Arc::clone(&self.inner);
@@ -218,7 +221,6 @@ impl ConversionQueue {
                 Err(e) => log::error!("Could not start the conversion thread: {e}"),
             }
         }
-        std::mem::take(&mut state.left_over)
     }
 
     /// True while a file is being converted or waits for it.
@@ -324,6 +326,7 @@ fn work(inner: &Inner) {
         };
         inner.events.status(&status);
         log::info!("Converting {} to {:?}", job.wav.display(), job.format);
+        let started = Instant::now();
 
         let outcome = if !job.wav.exists() {
             Outcome::Gone
@@ -361,7 +364,12 @@ fn work(inner: &Inner) {
         };
         match outcome {
             Outcome::Converted(output) => {
-                log::info!("Converted: {}", output.display());
+                log::info!(
+                    "Converted: {} ({:.0} s of audio in {:.1} s)",
+                    output.display(),
+                    job.seconds(),
+                    started.elapsed().as_secs_f64()
+                );
                 inner.events.converted(&job, &output);
             }
             Outcome::Failed(reason) => {
@@ -642,7 +650,8 @@ mod tests {
             bench.recording("b.wav"),
             bench.recording("c.wav"),
         );
-        assert_eq!(bench.queue.start(), 0);
+        assert_eq!(bench.queue.take_left_over(), 0);
+        bench.queue.start();
         assert!(!bench.queue.is_busy());
 
         // One recording with two files, as "Mix + Microphone" gives.
@@ -707,7 +716,9 @@ mod tests {
         assert_eq!(status.eta_seconds, None);
         assert_eq!(bench.stored_wavs(), ["Recordings/a.wav"]);
 
-        assert_eq!(bench.queue.start(), 0);
+        // It was queued in this run, so it is not left over from the last one.
+        assert_eq!(bench.queue.take_left_over(), 0);
+        bench.queue.start();
         assert_eq!(bench.next_started(), "a.wav");
         bench.finish();
         assert_eq!(bench.until_empty(), [Event::Converted("a.opus".into())]);
@@ -749,12 +760,13 @@ mod tests {
         assert_eq!(stored["jobs"][0]["sampleRate"], 8000);
         assert_eq!(stored["jobs"][0]["format"], "OpusSpeech");
 
-        // The next start: the queue is read again, and `start` says what is left.
+        // The next start: the queue is read again and says what is left.
         let next = Bench::open(bench.data_dir.clone());
         assert!(next.queue.is_busy());
         assert!(next.nothing_started());
-        assert_eq!(next.queue.start(), 2);
-        assert_eq!(next.queue.start(), 0, "reported once");
+        assert_eq!(next.queue.take_left_over(), 2);
+        assert_eq!(next.queue.take_left_over(), 0, "reported once");
+        next.queue.start();
         assert_eq!(next.next_started(), "b.wav");
         next.finish();
         assert_eq!(next.next_started(), "c.wav");
@@ -851,7 +863,8 @@ mod tests {
 
         let next = Bench::open(bench.data_dir.clone());
         assert_eq!(next.queue.status().files, 2);
-        assert_eq!(next.queue.start(), 2);
+        assert_eq!(next.queue.take_left_over(), 2);
+        next.queue.start();
         assert_eq!(next.next_started(), "far.wav");
         next.finish();
         assert_eq!(next.next_started(), "kept.wav");
@@ -869,7 +882,7 @@ mod tests {
         std::fs::write(bench.data_dir.join(QUEUE_FILE), "{ \"jobs\": [").unwrap();
         let next = Bench::open(bench.data_dir.clone());
         assert!(!next.queue.is_busy());
-        assert_eq!(next.queue.start(), 0);
+        assert_eq!(next.queue.take_left_over(), 0);
     }
 
     #[test]

@@ -1,9 +1,19 @@
 import { listen } from "@tauri-apps/api/event";
-import type { RecordingState, RecordingStateEvent, OutputMode, RecordingProfile } from "../types";
+import type {
+  RecordingState,
+  RecordingStateEvent,
+  OutputMode,
+  QueuedConversion,
+  RecordingProfile,
+} from "../types";
 import * as api from "../utils/invoke";
 
 let recordingState = $state<RecordingState>("Idle");
 let durationMs = $state(0);
+// What the recording that stopped last is converted to: nothing for WAV. It is
+// set just before the state turns Idle, so the announcement of the stop can
+// say it.
+let stoppedConversion = $state<QueuedConversion>({ files: 0, ahead: 0, format: null });
 let selectedMic = $state<string | null>(null);
 let selectedLoopback = $state<string | null>(null);
 let micVolume = $state(1.0);
@@ -16,6 +26,7 @@ export function getRecording() {
   return {
     get state() { return recordingState; },
     get durationMs() { return durationMs; },
+    get stoppedConversion() { return stoppedConversion; },
     get selectedMic() { return selectedMic; },
     set selectedMic(v: string | null) { selectedMic = v; },
     get selectedLoopback() { return selectedLoopback; },
@@ -59,6 +70,8 @@ export function getRecording() {
 
 export async function initRecordingListener() {
   await listen<RecordingStateEvent>("recording-state-changed", (event) => {
+    // A stop by the global hotkey or the tray menu is known only from here.
+    if (event.payload.conversion) stoppedConversion = event.payload.conversion;
     recordingState = event.payload.state;
     durationMs = event.payload.durationMs;
   });
@@ -104,7 +117,7 @@ export async function resumeRecording() {
 
 export async function stopRecording() {
   try {
-    await api.stopRecording();
+    stoppedConversion = await api.stopRecording();
     recordingState = "Idle";
     durationMs = 0;
   } catch (e) {

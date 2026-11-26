@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount, tick } from "svelte";
+  import { onMount, tick, untrack } from "svelte";
   import { getCurrentWindow } from "@tauri-apps/api/window";
   import { listen } from "@tauri-apps/api/event";
   import type { RecordingProfile, RecordingState } from "./lib/types";
@@ -24,6 +24,8 @@
     deleteProfile,
     selectProfile,
   } from "./lib/stores/profiles.svelte";
+  import { getConversion, initConversionListener } from "./lib/stores/conversion.svelte";
+  import { conversionInfo } from "./lib/utils/conversionText";
   import { saveSettings, loadSettings } from "./lib/utils/invoke";
   import * as api from "./lib/utils/invoke";
   import { initLanguage } from "./lib/i18n";
@@ -51,6 +53,7 @@
   const devices = getDevices();
   const recording = getRecording();
   const profileStore = getProfiles();
+  const conversion = getConversion();
 
   let initialized = $state(false);
   const appSettings = getSettings();
@@ -60,6 +63,9 @@
   let editingProfile = $state<RecordingProfile | null>(null);
   let settingsOpen = $state(false);
   let confirmExitOpen = $state(false);
+  // What the exit confirmation asks about: a running recording, or only the
+  // conversions that are not finished. Set when the dialog opens.
+  let confirmExitRecording = $state(false);
   let deleteConfirmOpen = $state(false);
   let aboutOpen = $state(false);
   let deletingProfileId = $state<string | null>(null);
@@ -70,6 +76,19 @@
   );
 
   let isRecording = $derived(recording.state !== "Idle");
+
+  // The line under the timer while recordings are converted. Sighted users see
+  // it; a screen reader gets the same from the announcements and Alt+I.
+  let conversionLine = $derived.by(() => {
+    if (!conversion.busy || !conversion.format) return "";
+    const line = m.conversion_progress({
+      format: conversion.format,
+      percent: Math.floor(conversion.progress * 100),
+    });
+    return conversion.waiting > 0
+      ? `${line}. ${m.conversion_files_waiting({ count: conversion.waiting })}`
+      : line;
+  });
 
   let liveRegionText = $state("");
   let saveTimeout: ReturnType<typeof setTimeout> | undefined;
@@ -105,7 +124,32 @@
     if (state === "Recording" && previous === "Paused") liveRegionText = m.live_recording_resumed();
     else if (state === "Recording") liveRegionText = m.live_recording_started();
     else if (state === "Paused") liveRegionText = m.live_recording_paused();
-    else if (state === "Idle") liveRegionText = m.live_recording_stopped();
+    else if (state === "Idle") {
+      // With a compressed format the same announcement says what happens to
+      // the recording next: two announcements in a row could lose the first.
+      const next = untrack(() => recording.stoppedConversion);
+      if (previous !== undefined && next.files > 0 && next.format) {
+        liveRegionText = next.ahead > 0
+          ? m.live_recording_stopped_conversion_waiting({ format: next.format })
+          : m.live_recording_stopped_conversion_started({ format: next.format });
+      } else {
+        liveRegionText = m.live_recording_stopped();
+      }
+    }
+  });
+
+  // Announces that the queue of conversions has emptied. A recording that
+  // could not be converted has been reported in the error block by then.
+  let wasConverting = false;
+  $effect(() => {
+    const busy = conversion.busy;
+    if (!initialized) return;
+    if (wasConverting && !busy) {
+      liveRegionText = untrack(() => conversion.failed) > 0
+        ? m.live_conversion_finished_with_errors()
+        : m.live_conversion_finished();
+    }
+    wasConverting = busy;
   });
 
   // Focus that a recording state change takes away (backlog doc-3): starting a
@@ -171,6 +215,7 @@
   function openConfirmExit() {
     if (confirmExitOpen) return;
     rememberFocus("exit");
+    confirmExitRecording = isRecording;
     confirmExitOpen = true;
   }
 
@@ -197,17 +242,21 @@
       case "t":
         if (recording.state !== "Idle") { e.preventDefault(); stopRecording(); }
         break;
-      case "i":
+      case "i": {
         e.preventDefault();
-        if (recording.state !== "Idle") {
-          liveRegionText = m.live_status_info({
-            state: recording.state === "Paused" ? m.status_paused() : m.status_recording(),
-            duration: formatDuration(recording.durationMs),
-          });
-        } else {
-          liveRegionText = m.status_ready();
-        }
+        const status = recording.state !== "Idle"
+          ? m.live_status_info({
+              state: recording.state === "Paused" ? m.status_paused() : m.status_recording(),
+              duration: formatDuration(recording.durationMs),
+            })
+          : m.status_ready();
+        // While recordings are converted: that it goes on, about how long all
+        // of it will take, and how many files wait.
+        liveRegionText = conversion.busy && conversion.format
+          ? `${status}. ${conversionInfo(conversion.format, conversion.etaSeconds, conversion.waiting)}`
+          : status;
         break;
+      }
       case "f4":
         // WebView2 may consume WM_SYSKEYDOWN before it reaches the native
         // window proc, preventing the OS from generating WM_CLOSE for Alt+F4.
@@ -297,10 +346,27 @@
     scheduleSave();          // persists to Tauri backend
   }
 
-  async function handleStopAndExit() {
+  // Exits the app. A running recording is stopped first. Recordings that are
+  // not converted yet stay in the queue and are converted at the next start.
+  async function exitNow() {
     confirmExitOpen = false;
-    try { await stopRecording(); } catch { /* already stopped */ }
+    if (isRecording) {
+      try { await stopRecording(); } catch { /* already stopped */ }
+    }
     await api.quitApp();
+  }
+
+  // The close button, Alt+F4 and Quit in the tray menu. While a recording runs
+  // or recordings are still converted the user is asked first, unless the
+  // confirmation is turned off in the settings.
+  async function requestExit() {
+    if (!isRecording && !conversion.busy) {
+      void api.quitApp();
+    } else if (appSettings.confirmExitDuringRecording) {
+      openConfirmExit();
+    } else {
+      await exitNow();
+    }
   }
 
   onMount(() => {
@@ -329,18 +395,13 @@
       await refreshDevices();
       await initRecordingListener();
       await initDeviceListener();
+      await initConversionListener((failure) => {
+        showError(m.error_conversion_failed({ format: failure.format, path: failure.wav }));
+      });
 
       await appWindow.onCloseRequested(async (event) => {
         event.preventDefault();
-        if (isRecording) {
-          if (appSettings.confirmExitDuringRecording) {
-            openConfirmExit();
-          } else {
-            await handleStopAndExit();
-          }
-        } else {
-          void api.quitApp();
-        }
+        await requestExit();
       });
 
       unlistenFocus = await appWindow.onFocusChanged(({ payload: focused }) => {
@@ -353,21 +414,20 @@
 
       await listen("tray-about-requested", () => openAbout());
 
-      unlistenTrayQuit = await listen("tray-quit-requested", async () => {
-        if (isRecording) {
-          if (appSettings.confirmExitDuringRecording) {
-            openConfirmExit();
-          } else {
-            await handleStopAndExit();
-          }
-        } else {
-          void api.quitApp();
-        }
-      });
+      unlistenTrayQuit = await listen("tray-quit-requested", () => requestExit());
 
       initialized = true;
       await tick();
       document.querySelector<HTMLSelectElement>('.profile-controls select')?.focus();
+
+      // The window listens to the conversion events now, so conversions may
+      // run. Recordings the last run left unconverted come first; the user is
+      // told before they start, so "finished" cannot come before it.
+      try {
+        const leftOver = await api.conversionsLeftOver();
+        if (leftOver > 0) liveRegionText = m.live_conversion_resumed({ count: leftOver });
+        await api.startConversions();
+      } catch { /* the recordings stay in the queue as WAV files */ }
     })();
     window.addEventListener("keydown", handleMnemonic);
     return () => {
@@ -407,7 +467,11 @@
     </div>
   </div>
 
-  <StatusIndicator state={recording.state} durationMs={recording.durationMs} />
+  <StatusIndicator
+    state={recording.state}
+    durationMs={recording.durationMs}
+    conversion={conversionLine}
+  />
 
   <div class="section-card">
     <h2 class="sec-label">{m.profile_label()}</h2>
@@ -502,7 +566,8 @@
 
   <ConfirmExitDialog
     open={confirmExitOpen}
-    onstopandexit={handleStopAndExit}
+    recording={confirmExitRecording}
+    onexit={exitNow}
     oncancel={async () => { confirmExitOpen = false; await returnFocus("exit"); }}
   />
 

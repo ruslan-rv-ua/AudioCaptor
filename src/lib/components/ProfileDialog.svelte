@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { RecordingProfile, OutputMode } from "../types";
+  import type { RecordingProfile, OutputMode, OutputFormat } from "../types";
   import * as m from "../../paraglide/messages";
   import { open as openDialog } from "@tauri-apps/plugin-dialog";
   import { getRecordingsDir } from "../utils/invoke";
@@ -19,6 +19,7 @@
   let outputFolder = $state("Recordings");
   let outputMode   = $state<OutputMode>("Mix");
   let sampleRate   = $state(48000);
+  let outputFormat = $state<OutputFormat>("Wav");
   let micVolume    = $state(1.0);
   let loopbackVolume = $state(0.5);
   let micFilename      = $state("mic");
@@ -51,6 +52,13 @@
     { value: "MixPlusLoopback",   label: m.mode_mix_plus_loopback() },
   ];
   const sampleRates = [8000, 16000, 44100, 48000];
+  // One list for format and quality (backlog decision-6): each entry stands for
+  // encoder settings fixed in the backend.
+  const outputFormats: { value: OutputFormat; label: string }[] = [
+    { value: "Wav",        label: m.format_wav() },
+    { value: "OpusSpeech", label: m.format_opus_speech() },
+    { value: "OpusMusic",  label: m.format_opus_music() },
+  ];
 
   // Filename visibility depends on which streams are produced
   let showMicFilename = $derived(
@@ -74,6 +82,9 @@
       outputFolder     = profile.outputFolder;
       outputMode       = profile.outputMode;
       sampleRate       = profile.sampleRate;
+      // A format from a newer version shows as WAV: that is what this version
+      // records for it. Saving the dialog then stores WAV.
+      outputFormat     = outputFormats.find(f => f.value === profile.outputFormat)?.value ?? "Wav";
       micVolume        = profile.micVolume;
       loopbackVolume   = profile.loopbackVolume;
       micFilename      = profile.micFilename;
@@ -81,7 +92,8 @@
       mixFilename      = profile.mixFilename;
     } else if (open && !profile) {
       editId = null; name = ""; description = ""; outputFolder = "Recordings";
-      outputMode = "Mix"; sampleRate = 48000; micVolume = 1.0; loopbackVolume = 0.5;
+      outputMode = "Mix"; sampleRate = 48000; outputFormat = "Wav";
+      micVolume = 1.0; loopbackVolume = 0.5;
       micFilename = "mic"; loopbackFilename = "loopback"; mixFilename = "mix";
     }
     error = "";
@@ -104,7 +116,7 @@
     onsave({
       id: editId ?? crypto.randomUUID(),
       name: name.trim(), description: description.trim(),
-      outputFolder, outputMode, sampleRate,
+      outputFolder, outputMode, sampleRate, outputFormat,
       micVolume, loopbackVolume,
       micFilename: micFilename.trim(),
       loopbackFilename: loopbackFilename.trim(),
@@ -198,6 +210,14 @@
             {/each}
           </select>
         </div>
+        <div class="field col-span">
+          <label for="profile-format">{m.field_output_format()}</label>
+          <select id="profile-format" bind:value={outputFormat}>
+            {#each outputFormats as format}
+              <option value={format.value}>{format.label}</option>
+            {/each}
+          </select>
+        </div>
         <div class="field">
           <label for="profile-mic-vol">
             {m.field_mic_volume()}
@@ -275,7 +295,7 @@
     border-radius: 10px;
     padding: 20px 20px 18px;
     width: 400px;
-    /* No max-height / overflow — all fields fit in ~430px */
+    /* No max-height / overflow — all fields fit in ~480px */
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
     color: var(--text-primary);
   }

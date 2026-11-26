@@ -49,6 +49,7 @@
 AudioCaptor.exe
 AudioCaptor-data/
 ├── settings.json      # Ваші налаштування (зберігаються автоматично)
+├── settings.unreadable.json  # Лише якщо settings.json не вдалося прочитати: копія старого файлу
 ├── logs/              # Діагностичні логи
 └── Recordings/        # Папка для записів за замовчуванням
 AudioCaptor-webview/   # Кеш вбудованого браузера

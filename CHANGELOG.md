@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- If AudioCaptor cannot read `settings.json` (for example, it is damaged or empty), it no longer erases your settings without a word: it keeps the old file next to the new one as `settings.unreadable.json` (never overwriting an earlier copy), plays the warning sound and shows a message, which the screen reader reads, saying that the settings were reset to defaults and where the old file is. Settings are also saved through a temporary file now, so a power cut while saving cannot leave a damaged `settings.json`.
+
 ### Changed
 
 - AudioCaptor now keeps the data of its built-in browser (Microsoft Edge WebView2, which draws the window) in a new `AudioCaptor-webview` folder next to `AudioCaptor.exe` instead of `%LOCALAPPDATA%\com.audiocaptor.app\EBWebView`, so copies in different folders no longer share it. The folder holds only the browser's cache and its own state, none of your settings or recordings; if you delete it while AudioCaptor is closed, the app creates it again. With Scoop it lies in the folder of each version, so after an update the browser starts with an empty cache. This version neither uses nor deletes the old `EBWebView` folder, so an older copy still works; you can delete it once you no longer need AudioCaptor 0.1.1 or older.

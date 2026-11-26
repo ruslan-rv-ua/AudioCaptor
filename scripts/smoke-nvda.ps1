@@ -22,6 +22,9 @@
                Settings opens About on top of Settings: UI Automation finds About in the middle
                of the window, and Settings again once About is closed.
       tray     Escape hides the window; starting the exe again shows it and NVDA announces it.
+      settings Start with an unreadable settings.json: the app keeps a copy next to it
+               (settings.unreadable.json), NVDA reads the message that the settings were reset
+               and where the old file is kept.
 
     Exit code: 0 everything passed; 1 a step or an NVDA check failed, or the test copy wrote to
     %LOCALAPPDATA%\com.audiocaptor.app; 2 the test could not run or stopped early (no exe, NVDA
@@ -94,7 +97,7 @@ param(
 $ErrorActionPreference = 'Stop'
 
 # --- Arguments ---------------------------------------------------------------------------------
-$AllScenarios = @('launch', 'record', 'dialogs', 'tray')
+$AllScenarios = @('launch', 'record', 'dialogs', 'tray', 'settings')
 $Selected = @($Scenario | Where-Object { $_ } | ForEach-Object { $_.ToLowerInvariant() })
 if ($Selected.Count -eq 0 -or $Selected -contains 'all') { $Selected = $AllScenarios }
 $unknown = @($Selected | Where-Object { $AllScenarios -notcontains $_ })
@@ -460,6 +463,11 @@ function Wait-ShownQuietly([int]$Seconds = 20, [int]$ReadMs = 1500) {
 # playback device selected for system audio. No BOM: serde_json rejects it, and the app then
 # silently falls back to its defaults.
 function Write-TestSettings {
+    if ($script:BrokenSettings) {
+        # Cut off in the middle, as after a power loss while saving: not valid JSON.
+        [IO.File]::WriteAllText($SettingsFile, '{ "version": 5, "profiles": [', (New-Object Text.UTF8Encoding $false))
+        return
+    }
     $newProfile = {
         param([string]$Id, [string]$Name, [string]$Mode)
         [ordered]@{ id = $Id; name = $Name; description = ''; outputFolder = 'Recordings'; outputMode = $Mode
@@ -1080,6 +1088,24 @@ function Invoke-TrayScenario {
     } -Expect $AppTitle
 }
 
+function Invoke-SettingsScenario {
+    $copy = Join-Path $DataDir 'settings.unreadable.json'
+    Remove-Item -LiteralPath $copy -Force -ErrorAction SilentlyContinue
+    $script:BrokenSettings = $true
+    try {
+        # The message is a role=alert block: NVDA reads it when the window has loaded. Its language
+        # follows the Windows UI language (the reset settings carry it), so both are accepted.
+        Invoke-Step 'Start with an unreadable settings.json: NVDA reads that the settings were reset and where the old file is kept' {
+            Start-App
+            Add-Check 'the old file is kept as settings.unreadable.json' (Test-Path -LiteralPath $copy)
+            Add-Check 'the kept copy is the broken file, unchanged' ((Test-Path -LiteralPath $copy) -and ([IO.File]::ReadAllText($copy) -eq '{ "version": 5, "profiles": [')) 
+            Add-Check 'settings.json is readable again' ($null -ne ([IO.File]::ReadAllText($SettingsFile) | ConvertFrom-Json -ErrorAction SilentlyContinue))
+        } -ExpectAny ('Could not read your settings|' + [regex]::Unescape('\u041d\u0435 \u0432\u0434\u0430\u043b\u043e\u0441\u044f \u043f\u0440\u043e\u0447\u0438\u0442\u0430\u0442\u0438 \u043d\u0430\u043b\u0430\u0448\u0442\u0443\u0432\u0430\u043d\u043d\u044f')), 'settings.unreadable.json'
+    } finally {
+        $script:BrokenSettings = $false
+    }
+}
+
 function Invoke-Scenario([string]$Name) {
     $script:CurrentScenario = $Name
     $script:StepNumber = 0
@@ -1091,6 +1117,7 @@ function Invoke-Scenario([string]$Name) {
             'record'  { Invoke-RecordScenario }
             'dialogs' { Invoke-DialogsScenario }
             'tray'    { Invoke-TrayScenario }
+            'settings' { Invoke-SettingsScenario }
         }
     } finally {
         Stop-App

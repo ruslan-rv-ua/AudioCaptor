@@ -49,6 +49,7 @@ On first launch, AudioCaptor creates the following alongside the exe:
 AudioCaptor.exe
 AudioCaptor-data/
 ├── settings.json      # Your preferences (auto-saved)
+├── settings.unreadable.json  # Only if settings.json could not be read: a copy of the old file
 ├── logs/              # Diagnostic logs
 └── Recordings/        # Default recordings folder
 AudioCaptor-webview/   # Cache of the built-in browser

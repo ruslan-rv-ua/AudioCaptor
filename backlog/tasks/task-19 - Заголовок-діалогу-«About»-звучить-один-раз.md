@@ -4,19 +4,19 @@ title: Заголовок діалогу «About» звучить один ра�
 status: To Do
 assignee: []
 created_date: '2026-11-23T18:19:58Z'
-updated_date: '2026-11-24T21:35:20Z'
+updated_date: '2026-11-26T08:52:02Z'
 labels:
   - frontend
   - a11y
   - model-sonnet
   - effort-low
-milestone: m-3
+milestone: m-7
 dependencies: []
 references:
   - doc-3
 priority: low
 type: bug
-ordinal: 90500
+ordinal: 10060
 ---
 
 ## Description

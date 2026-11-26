@@ -4,13 +4,14 @@ title: Нечитабельний settings.json не стирається мов
 status: To Do
 assignee: []
 created_date: '2026-11-26T08:19:57Z'
+updated_date: '2026-11-26T08:52:02Z'
 labels:
   - backend
   - frontend
   - a11y
   - model-sonnet
   - effort-medium
-milestone: m-4
+milestone: m-7
 dependencies: []
 references:
   - src-tauri/src/settings.rs

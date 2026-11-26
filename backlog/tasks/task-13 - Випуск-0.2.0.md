@@ -4,18 +4,16 @@ title: Випуск 0.2.0
 status: To Do
 assignee: []
 created_date: '2026-11-23T11:32:40Z'
-updated_date: '2026-11-26T08:03:31Z'
+updated_date: '2026-11-26T08:52:15Z'
 labels:
   - release
   - model-sonnet
   - effort-medium
 milestone: m-4
 dependencies:
-  - TASK-10
-  - TASK-24
-  - TASK-25
-  - TASK-26
+  - TASK-33
   - TASK-28
+  - TASK-34
 references:
   - DEVELOPMENT.md
   - CHANGELOG.md
@@ -29,7 +27,7 @@ ordinal: 13000
 <!-- SECTION:DESCRIPTION:BEGIN -->
 Випуск із новою можливістю: записи можна автоматично зберігати в Opus (TASK-28). Формат `settings.json` переходить на версію 6, тому в `CHANGELOG.md` має бути сказано, що відбувається з налаштуваннями під час оновлення і чи можна повернутися до 0.1.x з тим самим файлом.
 
-Порядок випуску — у `DEVELOPMENT.md`, так само як для 0.1.1 (TASK-10). Push і запуск workflow потребують дозволу власника.
+Порядок випуску — у `DEVELOPMENT.md`, так само як для 0.1.2 (TASK-33). Push і запуск workflow потребують дозволу власника.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria

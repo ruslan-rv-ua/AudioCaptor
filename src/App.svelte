@@ -91,6 +91,15 @@
   });
 
   let liveRegionText = $state("");
+
+  // A screen reader speaks the announcement region only when its text changes,
+  // so the same text twice in a row (Alt+I pressed again in the same state)
+  // gets an invisible zero-width space at the end, and the next same text
+  // drops it again.
+  function announce(text: string) {
+    liveRegionText = untrack(() => liveRegionText) === text ? `${text}​` : text;
+  }
+
   let saveTimeout: ReturnType<typeof setTimeout> | undefined;
 
   function scheduleSave() {
@@ -121,19 +130,19 @@
     const state = recording.state;
     const previous = announcedState;
     announcedState = state;
-    if (state === "Recording" && previous === "Paused") liveRegionText = m.live_recording_resumed();
-    else if (state === "Recording") liveRegionText = m.live_recording_started();
-    else if (state === "Paused") liveRegionText = m.live_recording_paused();
+    if (state === "Recording" && previous === "Paused") announce(m.live_recording_resumed());
+    else if (state === "Recording") announce(m.live_recording_started());
+    else if (state === "Paused") announce(m.live_recording_paused());
     else if (state === "Idle") {
       // With a compressed format the same announcement says what happens to
       // the recording next: two announcements in a row could lose the first.
       const next = untrack(() => recording.stoppedConversion);
       if (previous !== undefined && next.files > 0 && next.format) {
-        liveRegionText = next.ahead > 0
+        announce(next.ahead > 0
           ? m.live_recording_stopped_conversion_waiting({ format: next.format })
-          : m.live_recording_stopped_conversion_started({ format: next.format });
+          : m.live_recording_stopped_conversion_started({ format: next.format }));
       } else {
-        liveRegionText = m.live_recording_stopped();
+        announce(m.live_recording_stopped());
       }
     }
   });
@@ -149,9 +158,9 @@
     if (!initialized) return;
     if (wasConverting && !busy) {
       const failed = untrack(() => conversion.failed);
-      liveRegionText = failed > 0
+      announce(failed > 0
         ? m.live_conversion_finished_with_errors({ count: failed })
-        : m.live_conversion_finished();
+        : m.live_conversion_finished());
     }
     wasConverting = busy;
   });
@@ -256,9 +265,9 @@
           : m.status_ready();
         // While recordings are converted: that it goes on, about how long all
         // of it will take, and how many files wait.
-        liveRegionText = conversion.busy && conversion.format
+        announce(conversion.busy && conversion.format
           ? `${status}. ${conversionInfo(conversion.format, conversion.etaSeconds, conversion.waiting)}`
-          : status;
+          : status);
         break;
       }
       case "f4":
@@ -429,7 +438,7 @@
       // told before they start, so "finished" cannot come before it.
       try {
         const leftOver = await api.conversionsLeftOver();
-        if (leftOver > 0) liveRegionText = m.live_conversion_resumed({ count: leftOver });
+        if (leftOver > 0) announce(m.live_conversion_resumed({ count: leftOver }));
         await api.startConversions();
       } catch { /* the recordings stay in the queue as WAV files */ }
     })();

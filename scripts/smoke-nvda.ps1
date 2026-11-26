@@ -11,7 +11,8 @@
     Scenarios; each one starts the app afresh and quits it at the end:
       launch   NVDA names the window once (AudioCaptor) and then the profile list; Tab goes
                round every control, each one has a name and NVDA reads it.
-      record   Alt+S, Alt+P, Alt+R and Alt+T announce the new state, Alt+I the current one.
+      record   Alt+S, Alt+P, Alt+R and Alt+T announce the new state once, Alt+I the current one,
+               and a second Alt+I in the same state says it again.
                When the control with focus is disabled or goes away (Alt+S on the profile list,
                Alt+P on Pause, Alt+R on Resume, Alt+T on Stop), focus moves to the button of the
                new state and NVDA names it, without "unavailable"; focus on Stop stays there
@@ -29,7 +30,8 @@
                and where the old file is kept.
       convert  Recordings left to convert to Opus by the last run (two generated WAV files, the
                first one large enough to take about half a minute): NVDA says that the app is
-               finishing them, Alt+I says about how long is left and how many files wait,
+               finishing them, Alt+I says about how long is left and how many files wait
+               (and says it again when pressed again a moment later),
                Alt+F4 asks before it exits, Exit leaves the WAV files whole and no half-written
                Opus file, and the next start finishes the job. While it runs a new recording
                starts and stops (it joins the queue), and NVDA says when all is converted. Last,
@@ -1028,6 +1030,9 @@ function Invoke-RecordScenario {
 
     Invoke-Step 'Alt+I while idle: NVDA says Ready' { Send-Keys 'Alt+I' } -Expect $UI.Ready
 
+    # The announcement region speaks only a changed text; the app makes a repeated one differ.
+    Invoke-Step 'Alt+I again in the same state: NVDA says Ready again' { Send-Keys 'Alt+I' } -Once $UI.Ready
+
     # Each state has its own record buttons, and the profile list is disabled while recording.
     # When the control with focus goes away or is disabled, focus moves to the first button of the
     # new state, and NVDA names it: not "unavailable", not the page (the app name, its document or
@@ -1036,7 +1041,7 @@ function Invoke-RecordScenario {
         Send-Keys 'Alt+S'
         $null = Wait-Until "the '$($UI.Pause)' button" { Find-ByName $UI.Pause }
         Confirm-Focus $UI.Pause
-    } -Expect $UI.Started, $UI.Pause -Forbid $Unavailable, $PageNoise
+    } -Once $UI.Started -Expect $UI.Pause -Forbid $Unavailable, $PageNoise
 
     Invoke-Step 'Alt+I while recording: NVDA says Recording and the time' {
         Start-Sleep -Seconds 1  # past 00:00:00
@@ -1047,7 +1052,7 @@ function Invoke-RecordScenario {
         Send-Keys 'Alt+P'
         $null = Wait-Until "the '$($UI.Resume)' button" { Find-ByName $UI.Resume }
         Confirm-Focus $UI.Resume
-    } -Expect $UI.Paused, $UI.Resume -Forbid $Unavailable, $PageNoise
+    } -Once $UI.Paused -Expect $UI.Resume -Forbid $Unavailable, $PageNoise
 
     Invoke-Step 'Alt+I while paused: NVDA says Paused and the time' { Send-Keys 'Alt+I' } -Expect $UI.PausedInfo
 
@@ -1056,7 +1061,7 @@ function Invoke-RecordScenario {
         Send-Keys 'Alt+R'
         $null = Wait-Until "the '$($UI.Pause)' button" { Find-ByName $UI.Pause }
         Confirm-Focus $UI.Pause
-    } -Expect $UI.Resumed, $UI.Pause -Forbid $UI.Started, $Unavailable, $PageNoise
+    } -Once $UI.Resumed -Expect $UI.Pause -Forbid $UI.Started, $Unavailable, $PageNoise
 
     Invoke-Step "Tab to the '$($UI.Stop)' button" { Move-Focus $UI.Stop } -Expect $UI.Stop
 
@@ -1065,13 +1070,13 @@ function Invoke-RecordScenario {
         Send-Keys 'Alt+P'
         $null = Wait-Until "the '$($UI.Resume)' button" { Find-ByName $UI.Resume }
         Confirm-Focus $UI.Stop
-    } -Expect $UI.Paused -Forbid $Unavailable, $PageNoise
+    } -Once $UI.Paused -Forbid $Unavailable, $PageNoise
 
     Invoke-Step "Alt+T on '$($UI.Stop)' stops: NVDA says Recording stopped; focus moves to '$($UI.Start)'" {
         Send-Keys 'Alt+T'
         $null = Wait-Until "the '$($UI.Start)' button" { Find-ByName $UI.Start }
         Confirm-Focus $UI.Start
-    } -Expect $UI.Stopped, $UI.Start -Forbid $Unavailable, $PageNoise
+    } -Once $UI.Stopped -Expect $UI.Start -Forbid $Unavailable, $PageNoise
 
     Invoke-Step 'Alt+I after stopping: NVDA says Ready' { Send-Keys 'Alt+I' } -Expect $UI.Ready
 }
@@ -1276,6 +1281,11 @@ function Invoke-ConvertScenario {
             Send-Keys 'Alt+I'
         } -Expect $UI.ReadyConverting, $UI.Waiting1 -ExpectAny $UI.TimeLeft
 
+        Invoke-Step 'Alt+I again a moment later: NVDA says it all again' {
+            Assert-Converting 'the repeated Alt+I'
+            Send-Keys 'Alt+I'
+        } -Once $UI.ReadyConverting -Expect $UI.Waiting1 -ExpectAny $UI.TimeLeft
+
         Invoke-Step 'Alt+F4 during the conversion asks first: focus on Cancel, NVDA reads the question' {
             Assert-Converting 'Alt+F4'
             Send-Keys 'Alt+F4'
@@ -1317,7 +1327,7 @@ function Invoke-ConvertScenario {
             Send-Keys 'Alt+S'
             $null = Wait-Until "the '$($UI.Pause)' button" { Find-ByName $UI.Pause }
             Confirm-Focus $UI.Pause
-        } -Expect $UI.Started, $UI.Pause -Forbid $Unavailable, $PageNoise
+        } -Once $UI.Started -Expect $UI.Pause -Forbid $Unavailable, $PageNoise
 
         Invoke-Step "Alt+T stops it: NVDA says that the recording waits to be converted; focus moves to '$($UI.Start)'" {
             Start-Sleep -Seconds 2
@@ -1325,7 +1335,7 @@ function Invoke-ConvertScenario {
             Send-Keys 'Alt+T'
             $null = Wait-Until "the '$($UI.Start)' button" { Find-ByName $UI.Start }
             Confirm-Focus $UI.Start
-        } -Expect $UI.StoppedWaiting, $UI.Start -Forbid $Unavailable, $PageNoise
+        } -Once $UI.StoppedWaiting -Expect $UI.Start -Forbid $Unavailable, $PageNoise
 
         Invoke-Step 'Alt+I: NVDA says that two files wait now' {
             Assert-Converting 'the second Alt+I'
@@ -1343,7 +1353,7 @@ function Invoke-ConvertScenario {
             Add-Check 'both left-over recordings are Opus files now' (($opus -contains 'smoke-long.opus') -and ($opus -contains 'smoke-short.opus'))
             Add-Check 'the new recording is an Opus file too' (@($opus | Where-Object { $_ -like 'loopback_*.opus' }).Count -eq 1)
             Add-Check 'no WAV file and no temporary file is left' ($other.Count -eq 0) ($other -join ', ')
-        } -Expect $UI.Converted -Forbid $UI.ConvertErrors
+        } -Once $UI.Converted -Forbid $UI.ConvertErrors
 
         Invoke-Step 'Alt+I after the conversion: NVDA says Ready and nothing about a conversion' {
             Send-Keys 'Alt+I'

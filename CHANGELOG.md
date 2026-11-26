@@ -19,6 +19,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - If you go back to AudioCaptor 0.1.2 or older, your profiles stay, but the older version does not know the Format and records WAV; after you update again, choose the format once more.
 
+### Fixed
+
+- Pressing `Alt+I` again in the same state now announces the status again. Before, the screen reader stayed silent the second time: "Ready" twice in a row, or the conversion status pressed twice within a few seconds.
+
 ## [0.1.2] — 2026-11-26
 
 ### Fixed

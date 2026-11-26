@@ -13,14 +13,13 @@
 
   let appVersion = $state("…");
   let dialogEl   = $state<HTMLDivElement | undefined>();
-  let headingEl  = $state<HTMLHeadingElement | undefined>();
 
   $effect(() => {
     if (open) {
       getVersion().then(v => { appVersion = v; });
-      // APG: for dialogs with semantic structure (dl, ol), focus a static
-      // element at content start so screen readers can navigate naturally.
-      requestAnimationFrame(() => headingEl?.focus());
+      // Focus the Close button: with focus on the heading NVDA read the title
+      // three times (focus, dialog name, browse cursor) and Enter on it did not close About.
+      requestAnimationFrame(() => document.getElementById("about-dialog-close")?.focus());
     }
   });
 
@@ -28,7 +27,7 @@
     if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); onclose(); return; }
     if (e.key === "Enter")  { e.preventDefault(); e.stopPropagation(); onclose(); return; }
     if (e.key === "Tab") {
-      // Tab cycle only over tabbable elements (not tabindex="-1" heading)
+      // Tab cycle only over tabbable elements 
       const focusable = dialogEl?.querySelectorAll<HTMLElement>(
         'button:not([disabled]), [tabindex="0"]'
       );
@@ -56,9 +55,7 @@
            even after programmatic focus inside role="dialog".
            The heading stays tabindex="-1": focusable by JS, not by Tab. -->
       <div role="document">
-        <!-- tabindex="-1": programmatically focusable but not in Tab cycle -->
-        <!-- APG: focus static heading so screen readers announce dialog context first -->
-        <h2 id="about-dialog-title" tabindex="-1" bind:this={headingEl}>{m.about_title()}</h2>
+        <h2 id="about-dialog-title">{m.about_title()}</h2>
 
         <div class="version-row">
           <span class="app-name">AudioCaptor</span>
@@ -109,7 +106,7 @@
       </div>
 
       <div class="actions">
-        <button type="button" class="btn-close btn-primary" onclick={onclose}>
+        <button type="button" id="about-dialog-close" class="btn-close btn-primary" onclick={onclose}>
           {m.btn_close()}
         </button>
       </div>

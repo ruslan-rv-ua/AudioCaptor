@@ -1003,13 +1003,13 @@ function Invoke-RecordScenario {
 function Invoke-DialogsScenario {
     Invoke-Step 'Start: the window opens with focus on the profile list' { Start-App }
 
-    Invoke-Step 'F1 opens About AudioCaptor: focus on its heading, NVDA reads the dialog' {
+    Invoke-Step 'F1 opens About AudioCaptor: focus on Close, NVDA reads the title once' {
         Send-Keys 'F1'
-        $null = Wait-Until 'focus on the About heading' { (Get-Focus).Id -eq 'about-dialog-title' }
-    } -Expect $UI.About -ExpectAny $Role.Dialog
+        $null = Wait-Until 'focus on About's Close button' { (Get-Focus).Id -eq 'about-dialog-close' }
+    } -Once $UI.About -ExpectAny $Role.Dialog
 
     Invoke-Step "Escape closes About: focus back on the '$($UI.ProfileList)' list where F1 was pressed" {
-        Close-Dialog 'about-dialog-title' $UI.ProfileList
+        Close-Dialog 'about-dialog-close' $UI.ProfileList
     } -Expect $UI.ProfileList
 
     Invoke-Step "Tab to the '$($UI.OpenSettings)' button" { Move-Focus $UI.OpenSettings } -Expect $UI.OpenSettings
@@ -1017,17 +1017,17 @@ function Invoke-DialogsScenario {
     Invoke-Step 'Space opens Settings: focus on the hotkey field, NVDA reads the dialog' {
         Send-Keys 'Space'
         $null = Wait-Until 'focus on the hotkey field' { (Get-Focus).Id -eq 'settings-hotkey-display' }
-    } -Expect $UI.Settings, $UI.CurrentHotkey -ExpectAny $Role.Dialog
+    } -Once $UI.Settings -Expect $UI.CurrentHotkey -ExpectAny $Role.Dialog
 
     # F1 works anywhere: About opens over Settings and must be drawn on top of it, since it has focus.
-    Invoke-Step 'F1 in Settings opens About on top of Settings: focus on its heading, NVDA reads the dialog' {
+    Invoke-Step 'F1 in Settings opens About on top of Settings: focus on Close, NVDA reads the title once' {
         Send-Keys 'F1'
-        $null = Wait-Until 'focus on the About heading' { (Get-Focus).Id -eq 'about-dialog-title' }
+        $null = Wait-Until 'focus on About's Close button' { (Get-Focus).Id -eq 'about-dialog-close' }
         Test-OnTop $UI.About $UI.Settings
-    } -Expect $UI.About -ExpectAny $Role.Dialog
+    } -Once $UI.About -ExpectAny $Role.Dialog
 
     Invoke-Step 'Escape closes About: Settings on top again, focus back on the hotkey field' {
-        Close-Dialog 'about-dialog-title' $UI.CurrentHotkey
+        Close-Dialog 'about-dialog-close' $UI.CurrentHotkey
         Test-OnTop $UI.Settings $UI.About
     } -Expect $UI.CurrentHotkey
 
@@ -1040,7 +1040,7 @@ function Invoke-DialogsScenario {
     Invoke-Step 'Space opens New Profile: focus on the Name field, NVDA reads the dialog' {
         Send-Keys 'Space'
         $null = Wait-Until 'focus on the Name field' { (Get-Focus).Id -eq 'profile-name' }
-    } -Expect $UI.NewProfile -ExpectAny $Role.Dialog
+    } -Once $UI.NewProfile -ExpectAny $Role.Dialog
 
     Invoke-Step "Escape closes New Profile: focus back on the '$($UI.CreateProfile)' button" {
         Close-Dialog 'profile-name' $UI.CreateProfile
@@ -1051,7 +1051,7 @@ function Invoke-DialogsScenario {
     Invoke-Step 'Space opens the delete confirmation: focus on Cancel, NVDA reads the dialog' {
         Send-Keys 'Space'
         $null = Wait-Until 'focus on Cancel' { (Get-Focus).Id -eq 'confirm-delete-cancel' }
-    } -Expect $UI.DeleteTitle, $UI.Cancel -ExpectAny $Role.Dialog
+    } -Once $UI.DeleteTitle -Expect $UI.Cancel -ExpectAny $Role.Dialog
 
     Invoke-Step "Escape closes the confirmation: focus back on the '$($UI.DeleteProfile)' button, both profiles kept" {
         Close-Dialog 'confirm-delete-cancel' $UI.DeleteProfile

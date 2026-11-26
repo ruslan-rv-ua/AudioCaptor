@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- NVDA now reads the title of the About dialog once instead of three times when it opens, and Enter closes About, as Escape and Close already did.
 - If AudioCaptor cannot read `settings.json` (for example, it is damaged or empty), it no longer erases your settings without a word: it keeps the old file next to the new one as `settings.unreadable.json` (never overwriting an earlier copy), plays the warning sound and shows a message, which the screen reader reads, saying that the settings were reset to defaults and where the old file is. Settings are also saved through a temporary file now, so a power cut while saving cannot leave a damaged `settings.json`.
 
 ### Changed

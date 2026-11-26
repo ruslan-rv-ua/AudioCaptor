@@ -102,7 +102,7 @@
   "live_recording_stopped_conversion_started": "Recording stopped. Conversion to {format} started.",
   "live_recording_stopped_conversion_waiting": "Recording stopped. The recording is waiting to be converted to {format}.",
   "live_conversion_finished": "Conversion finished.",
-  "live_conversion_finished_with_errors": "Conversion finished with errors.",
+  "live_conversion_finished_with_errors": "Conversion finished with errors. Recordings kept as WAV: {count}.",
   "live_conversion_resumed": "Finishing the conversion of recordings from last time. Files: {count}.",
   "conversion_time_left": "Converting to {format}: {time} left.",
   "conversion_in_progress": "Converting to {format}.",

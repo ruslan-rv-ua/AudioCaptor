@@ -102,7 +102,7 @@
   "live_recording_stopped_conversion_started": "Запис зупинено. Конвертацію в {format} розпочато.",
   "live_recording_stopped_conversion_waiting": "Запис зупинено. Запис чекає на конвертацію в {format}.",
   "live_conversion_finished": "Конвертацію завершено.",
-  "live_conversion_finished_with_errors": "Конвертацію завершено з помилками.",
+  "live_conversion_finished_with_errors": "Конвертацію завершено з помилками. Записів, що лишилися у WAV: {count}.",
   "live_conversion_resumed": "Завершую конвертацію записів з минулого разу. Файлів: {count}.",
   "conversion_time_left": "Конвертація в {format}: лишилося {time}.",
   "conversion_in_progress": "Триває конвертація в {format}.",

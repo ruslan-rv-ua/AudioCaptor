@@ -32,8 +32,10 @@
                finishing them, Alt+I says about how long is left and how many files wait,
                Alt+F4 asks before it exits, Exit leaves the WAV files whole and no half-written
                Opus file, and the next start finishes the job. While it runs a new recording
-               starts and stops (it joins the queue), and NVDA says when all is converted. The
-               generated files need -ConvertMB megabytes of free space in the temp folder.
+               starts and stops (it joins the queue), and NVDA says when all is converted. Last,
+               a recording that cannot be converted: NVDA reads the message that says where its
+               WAV is kept, and the WAV is still there. The generated files need -ConvertMB
+               megabytes of free space in the temp folder.
 
     Exit code: 0 everything passed; 1 a step or an NVDA check failed, or the test copy wrote to
     %LOCALAPPDATA%\com.audiocaptor.app; 2 the test could not run or stopped early (no exe, NVDA
@@ -188,6 +190,9 @@ $UI = @{
     ExitTitle      = 'Exit AudioCaptor?'        # confirm_exit_conversion_title
     ExitBody       = 'Recordings are still being converted. If you exit now, AudioCaptor will finish converting them the next time it starts.'  # confirm_exit_conversion_body
     Resumed2       = 'Finishing the conversion of recordings from last time. Files: 2.'  # live_conversion_resumed
+    Resumed1       = 'Finishing the conversion of recordings from last time. Files: 1.'  # live_conversion_resumed
+    NotConverted   = 'Could not finish the conversion to Opus. The recording is kept as WAV:'  # error_conversion_failed
+    EndWithErrors  = 'Conversion finished with errors. Recordings kept as WAV: 1.'  # live_conversion_finished_with_errors
     ReadyConverting = 'Ready. Converting to Opus'    # status_ready, then conversion_time_left or conversion_in_progress
     TimeLeft       = 'seconds left|minute left|minutes left'  # time_about_* inside conversion_time_left
     Waiting1       = 'Files waiting: 1.'        # conversion_files_waiting
@@ -1245,6 +1250,8 @@ function Invoke-ConvertScenario {
     $queueFile = Join-Path $DataDir 'conversion-queue.json'
     $long = 'smoke-long.wav'
     $short = 'smoke-short.wav'
+    $broken = 'smoke-broken.wav'
+    $job = { param([string]$Name, [long]$Frames) [ordered]@{ wav = "Recordings/$Name"; frames = $Frames; sampleRate = 48000; channels = 2; format = 'OpusMusic' } }
     $script:OpusProfile = $true
     try {
         # What the last run would have left behind: two recordings stopped but not yet converted.
@@ -1258,7 +1265,6 @@ function Invoke-ConvertScenario {
             $shortFrames = 48000L * 3
             $null = [AcSmokeNative]::WriteNoiseWav((Join-Path $recordings $long), $longFrames)
             $null = [AcSmokeNative]::WriteNoiseWav((Join-Path $recordings $short), $shortFrames)
-            $job = { param([string]$Name, [long]$Frames) [ordered]@{ wav = "Recordings/$Name"; frames = $Frames; sampleRate = 48000; channels = 2; format = 'OpusMusic' } }
             $queue = [ordered]@{ version = 1; jobs = @((& $job $long $longFrames), (& $job $short $shortFrames)) }
             [IO.File]::WriteAllText($queueFile, ($queue | ConvertTo-Json -Depth 5), (New-Object Text.UTF8Encoding $false))
             $script:StepInfo.Add(('generated {0} in {1:0.0} s' -f (Format-RecordingFiles (Get-RecordingFiles)), $clock.Elapsed.TotalSeconds))
@@ -1344,6 +1350,35 @@ function Invoke-ConvertScenario {
         } -Expect $UI.Ready -Forbid 'Converting'
 
         Invoke-Step 'Alt+F4 with nothing left to convert: the app quits without asking' {
+            Send-Keys 'Alt+F4'
+            if (-not $script:AppProc.WaitForExit(8000)) { throw 'the app did not quit within 8 s of Alt+F4' }
+        } -Forbid $UI.ExitTitle
+
+        # A recording that cannot be converted: its WAV holds half the frames the queue says, so the
+        # conversion fails at the end of the file, some seconds after the start. (An alert that
+        # comes among the focus changes of the start is one NVDA does not read.)
+        Invoke-Step 'Start with a recording that cannot be converted: NVDA says that the app is finishing it' {
+            Remove-Item -LiteralPath $recordings -Recurse -Force -ErrorAction SilentlyContinue
+            $null = New-Item -ItemType Directory -Force -Path $recordings
+            $frames = [long]$ConvertMB * 1MB / 16
+            $null = [AcSmokeNative]::WriteNoiseWav((Join-Path $recordings $broken), $frames)
+            $queue = [ordered]@{ version = 1; jobs = @((& $job $broken ($frames * 2))) }
+            [IO.File]::WriteAllText($queueFile, ($queue | ConvertTo-Json -Depth 5), (New-Object Text.UTF8Encoding $false))
+            Start-App
+        } -Expect $UI.Resumed1, $UI.ProfileList
+
+        Invoke-Step 'The conversion fails: NVDA reads the message with the WAV, then the end with errors; the WAV is kept and nothing else is left' {
+            $before = (Get-RecordingFiles)[$broken]
+            $null = Wait-Until 'the conversion queue to empty' { -not (Test-Path -LiteralPath $queueFile) } 120
+            Start-Sleep -Milliseconds 500
+            $files = Get-RecordingFiles
+            $script:StepInfo.Add("files: $(Format-RecordingFiles $files)")
+            Add-Check 'the WAV is kept with the size it had' (($files[$broken] -eq $before) -and $before -gt 0)
+            $extra = @($files.Keys | Where-Object { $_ -ne $broken })
+            Add-Check 'no Opus file and no temporary file is left' ($extra.Count -eq 0) ($extra -join ', ')
+        } -Expect $UI.NotConverted, $broken, $UI.EndWithErrors
+
+        Invoke-Step 'Alt+F4 after the failure: the app quits without asking' {
             Send-Keys 'Alt+F4'
             if (-not $script:AppProc.WaitForExit(8000)) { throw 'the app did not quit within 8 s of Alt+F4' }
         } -Forbid $UI.ExitTitle

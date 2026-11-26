@@ -139,14 +139,18 @@
   });
 
   // Announces that the queue of conversions has emptied. A recording that
-  // could not be converted has been reported in the error block by then.
+  // could not be converted has been reported in the error block by then, but
+  // NVDA drops that alert when it arrives among focus changes (a failure right
+  // after the window opens), so this announcement says by itself that the
+  // recordings are kept.
   let wasConverting = false;
   $effect(() => {
     const busy = conversion.busy;
     if (!initialized) return;
     if (wasConverting && !busy) {
-      liveRegionText = untrack(() => conversion.failed) > 0
-        ? m.live_conversion_finished_with_errors()
+      const failed = untrack(() => conversion.failed);
+      liveRegionText = failed > 0
+        ? m.live_conversion_finished_with_errors({ count: failed })
         : m.live_conversion_finished();
     }
     wasConverting = busy;

@@ -4,13 +4,13 @@ title: Залежності переведено на нові мажорні в
 status: Draft
 assignee: []
 created_date: '2026-11-23T11:30:22Z'
-updated_date: '2026-11-25T01:05:59Z'
+updated_date: '2026-11-27T19:21:50Z'
 labels:
   - backend
   - frontend
   - model-opus
   - effort-high
-milestone: m-3
+milestone: m-11
 dependencies: []
 priority: low
 type: chore
@@ -50,4 +50,6 @@ Rust: `rodio` 0.20.1 → 0.23.0 (звукові сигнали), `rubato` 0.16.2
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-25, стан версій (поточна → остання): `@inlang/paraglide-js` 2.29.3 → 3.2.2, `typescript` 5.8.3 → 7.0.2 (є й 6.0.3), `@types/node` 20 → 26, `wasapi` 0.17.0 → 0.27.0, `rubato` 0.16.2 → 5.1.0, `ringbuf` 0.5.3 → 0.6.0 (0.4 → 0.5 зробила TASK-6), `rodio` 0.20.1 → 0.23.0, `windows` 0.59 → 0.62.2. `chrono` тягне лише сама програма.
+
+2026-11-27, план етапів: чернетка в етапі «Супровід». Коли дійде черга, розбити її на задачі по одній звуковій бібліотеці, кожна з повною перевіркою запису (рішення власника 25.11.2026).
 <!-- SECTION:NOTES:END -->

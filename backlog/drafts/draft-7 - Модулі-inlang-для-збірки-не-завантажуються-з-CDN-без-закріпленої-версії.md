@@ -4,13 +4,13 @@ title: Модулі inlang для збірки не завантажуються
 status: Draft
 assignee: []
 created_date: '2026-11-23T18:45:48Z'
-updated_date: '2026-11-25T01:05:59Z'
+updated_date: '2026-11-27T19:21:50Z'
 labels:
   - security
   - frontend
   - model-sonnet
   - effort-low
-milestone: m-3
+milestone: m-11
 dependencies: []
 references:
   - project.inlang/settings.json
@@ -53,4 +53,6 @@ Paraglide завантажує й виконує їх у Node під час ко
 2026-11-24 (TASK-8): перший запуск сервера інтерфейсу (`pnpm vite dev --port 1420`) чекав на Paraglide близько 32 с («ready in 31800 ms», компіляція locale-modules); перший `just vite-dev` за 40 с так і не відповів. Наступний запуск пропустив компіляцію («inputs unchanged») і стартував за 0,5 с. `pnpm vite:build` у той самий час зібрався за 1,4 с. Чи затримку дає завантаження модулів із CDN, не перевірено.
 
 2026-11-25: власник вирішив оновлювати Paraglide 2 → 3 разом із цією чернеткою (розбір DRAFT-2).
+
+2026-11-27, план етапів: закріплення версій модулів винесено в окрему задачу TASK-40 (етап 0.4.1); тут лишається перехід на Paraglide 3 з модулями з npm.
 <!-- SECTION:NOTES:END -->

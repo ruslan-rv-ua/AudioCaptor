@@ -4,12 +4,12 @@ title: Час у журналі програми збігається з год�
 status: Draft
 assignee: []
 created_date: '2026-11-24T22:01:06Z'
-updated_date: '2026-11-24T22:01:15Z'
+updated_date: '2026-11-27T19:21:48Z'
 labels:
   - backend
   - model-sonnet
   - effort-low
-milestone: m-3
+milestone: m-9
 dependencies: []
 priority: low
 ---

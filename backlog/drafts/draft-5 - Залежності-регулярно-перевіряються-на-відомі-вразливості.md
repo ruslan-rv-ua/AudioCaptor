@@ -4,13 +4,13 @@ title: Залежності регулярно перевіряються на �
 status: Draft
 assignee: []
 created_date: '2026-11-23T11:30:23Z'
-updated_date: '2026-11-25T07:58:52Z'
+updated_date: '2026-11-27T19:21:49Z'
 labels:
   - security
   - ci
   - model-sonnet
   - effort-low
-milestone: m-3
+milestone: m-11
 dependencies: []
 priority: low
 type: chore

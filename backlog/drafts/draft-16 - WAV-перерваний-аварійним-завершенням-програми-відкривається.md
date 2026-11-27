@@ -4,13 +4,13 @@ title: WAV, перерваний аварійним завершенням пр�
 status: Draft
 assignee: []
 created_date: '2026-11-26T13:07:06Z'
-updated_date: '2026-11-26T13:07:09Z'
+updated_date: '2026-11-27T19:21:48Z'
 labels:
   - backend
   - audio
   - model-opus
   - effort-medium
-milestone: m-3
+milestone: m-9
 dependencies: []
 references:
   - src-tauri/src/audio/writer.rs

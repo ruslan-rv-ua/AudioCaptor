@@ -4,12 +4,13 @@ title: Логіку інтерфейсу покрито тестами
 status: Draft
 assignee: []
 created_date: '2026-11-23T11:30:23Z'
+updated_date: '2026-11-27T19:21:49Z'
 labels:
   - frontend
   - testing
   - model-sonnet
   - effort-medium
-milestone: m-3
+milestone: m-11
 dependencies: []
 priority: low
 type: enhancement

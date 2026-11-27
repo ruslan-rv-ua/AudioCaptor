@@ -1,18 +1,19 @@
 ---
-id: DRAFT-23
+id: TASK-37
 title: Перевірки збирають програму з тими самими налаштуваннями, що й випуск
-status: Draft
+status: To Do
 assignee: []
 created_date: '2026-11-27T17:25:09Z'
-updated_date: '2026-11-27T17:28:46Z'
+updated_date: '2026-11-27T19:21:46Z'
 labels:
   - ci
   - model-sonnet
   - effort-low
   - testing
-milestone: m-3
+milestone: m-8
 dependencies: []
 priority: low
+ordinal: 14100
 ---
 
 ## Description
@@ -25,8 +26,15 @@ priority: low
 - Тестовий exe залежить від налагоджувальних DLL C runtime. Вони є там, де встановлено Visual Studio чи Build Tools (ПК розробки, `windows-latest`), тож тести проходять, але це випадковість середовища.
 - У тестах libFLAC зібрано без `NDEBUG`: спрацьовують її внутрішні `assert`, а на пошкоджених файлах вона пише в stderr.
 
-Потрібне рішення власника. Варіанти: (1) перенести `.cargo/config.toml` у корінь репозиторію, щоб усі виклики cargo мали однакові налаштування (тести теж зі статичним runtime); (2) запускати clippy й тести з теки `src-tauri` в `justfile`, `ci.yml` і `release.yml`; (3) лишити як є й перед закриттям задач, що міняють збирання, завжди робити пробний запуск Release. Опис нинішнього стану — у розділі «Бібліотеки на C: файл CMake» в `DEVELOPMENT.md`.
+Рішення власника (27.11.2026): перенести `.cargo/config.toml` у корінь репозиторію, щоб усі виклики cargo мали ті самі налаштування, що й випуск (варіант 1). Опис нинішнього стану — у розділі «Бібліотеки на C: файл CMake» в `DEVELOPMENT.md`.
 <!-- SECTION:DESCRIPTION:END -->
+
+## Acceptance Criteria
+<!-- AC:BEGIN -->
+- [ ] #1 Налаштування збирання (статичний C runtime і файл CMake для бібліотек на C) діють на всі виклики cargo: `just check`, `just dev`, `just build`, кроки CI і Release
+- [ ] #2 `just check`, `just build` і пробний запуск Release проходять, а тести FLAC ідуть зі статичним runtime і libFLAC з оптимізацією
+- [ ] #3 `DEVELOPMENT.md` описує, де лежать налаштування збирання і на що вони діють
+<!-- AC:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->

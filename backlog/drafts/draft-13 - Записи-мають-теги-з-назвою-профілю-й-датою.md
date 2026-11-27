@@ -4,12 +4,13 @@ title: Записи мають теги з назвою профілю й дат
 status: Draft
 assignee: []
 created_date: '2026-11-26T08:52:23Z'
+updated_date: '2026-11-27T19:21:49Z'
 labels:
   - backend
   - audio
   - model-sonnet
   - effort-low
-milestone: m-3
+milestone: m-10
 dependencies:
   - TASK-28
 priority: low

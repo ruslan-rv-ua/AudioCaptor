@@ -4,11 +4,12 @@ title: Нескопійований нечитабельний settings.json н�
 status: Draft
 assignee: []
 created_date: '2026-11-26T14:18:05Z'
+updated_date: '2026-11-27T19:21:48Z'
 labels:
   - backend
   - model-sonnet
   - effort-low
-milestone: m-3
+milestone: m-9
 dependencies: []
 references:
   - src-tauri/src/settings.rs

@@ -4,13 +4,13 @@ title: Запис, довший за 6 год 12 хв, не псує WAV
 status: Draft
 assignee: []
 created_date: '2026-11-26T13:07:05Z'
-updated_date: '2026-11-26T17:53:52Z'
+updated_date: '2026-11-27T19:21:49Z'
 labels:
   - backend
   - audio
   - model-opus
   - effort-medium
-milestone: m-3
+milestone: m-10
 dependencies: []
 references:
   - src-tauri/src/audio/writer.rs

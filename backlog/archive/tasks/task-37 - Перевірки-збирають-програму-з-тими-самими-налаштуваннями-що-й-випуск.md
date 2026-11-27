@@ -1,11 +1,11 @@
 ---
 id: TASK-37
 title: Перевірки збирають програму з тими самими налаштуваннями, що й випуск
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-27T17:25:09Z'
-updated_date: '2026-11-27T20:00:49Z'
+updated_date: '2026-11-27T20:15:14Z'
 labels:
   - ci
   - model-sonnet
@@ -33,7 +33,7 @@ ordinal: 14100
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 Налаштування збирання (статичний C runtime і файл CMake для бібліотек на C) діють на всі виклики cargo: `just check`, `just dev`, `just build`, кроки CI і Release
-- [ ] #2 `just check`, `just build` і пробний запуск Release проходять, а тести FLAC ідуть зі статичним runtime і libFLAC з оптимізацією
+- [x] #2 `just check`, `just build` і пробний запуск Release проходять, а тести FLAC ідуть зі статичним runtime і libFLAC з оптимізацією
 - [x] #3 `DEVELOPMENT.md` описує, де лежать налаштування збирання і на що вони діють
 <!-- AC:END -->
 
@@ -70,3 +70,13 @@ ordinal: 14100
 
 2026-11-27, головна сесія: гілку `feature/task-37-build-settings` злито в `develop`; головна сесія повторила `just check` (134 тести). Перед закриттям — ручний запуск CI і пробний запуск Release (вибір власника). decision-10 тепер називає нове місце `.cargo/config.toml`.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Налаштування збирання випуску тепер діють на всі виклики cargo. `.cargo/config.toml` перенесено з `src-tauri/` у корінь репозиторію, бо cargo шукає його в теці запуску й вище, а `just check`, CI і кроки перевірок у Release викликають cargo з кореня. Статичний C runtime (`+crt-static`) і файл CMake для libFLAC і libopus тепер бачать і перевірки, і `just dev`, і `just build`. У профілі dev для `libflac-sys` і `opusic-sys` піднято `opt-level` до 2, а файл CMake дає конфігурації RelWithDebInfo прапорці `/O2 /Ob1 /DNDEBUG`, тож у тестах бібліотеки на C оптимізовані й без внутрішніх `assert`. `DEVELOPMENT.md` описує, де лежать налаштування; decision-10 називає нове місце файлу.
+
+Перевірки: `just check` (134 тести; головна сесія повторила), `just build` — exe байт у байт як у локальній збірці 0.4.0, список DLL той самий. Звичайний `just check` триває як раніше; лише перший після перенесення перезбирав усе (81 с). Ручний CI: https://github.com/ruslan-rv-ua/AudioCaptor/actions/runs/46060695052; пробний запуск Release: https://github.com/ruslan-rv-ua/AudioCaptor/actions/runs/46060698779 — обидва зелені.
+
+Не перевірено: `just dev` з вікном програми (зібрано лише профіль dev з `src-tauri`).
+<!-- SECTION:FINAL_SUMMARY:END -->

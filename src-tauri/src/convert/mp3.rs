@@ -23,6 +23,7 @@ use windows::Win32::Media::MediaFoundation::{
     IMFMediaType, IMFTransform, MFAudioFormat_PCM, MFMediaType_Audio, MP3ACMCodecWrapper,
     MF_MT_AUDIO_AVG_BYTES_PER_SECOND, MF_MT_AUDIO_BITS_PER_SAMPLE, MF_MT_AUDIO_BLOCK_ALIGNMENT,
     MF_MT_AUDIO_NUM_CHANNELS, MF_MT_AUDIO_SAMPLES_PER_SECOND, MF_MT_MAJOR_TYPE, MF_MT_SUBTYPE,
+    MF_MT_USER_DATA,
 };
 
 /// The bitrates of the variants in kbit/s, where the sample rate allows them.
@@ -292,6 +293,7 @@ fn open_encoder(
                 settings.kbps
             ))
         })?;
+    pad_frames(&output)?;
     let input = session.media_type()?;
     // SAFETY: plain calls on live objects.
     unsafe {
@@ -306,6 +308,34 @@ fn open_encoder(
         encoder.SetInputType(0, &input, 0)?;
     }
     Transform::start(session, encoder)
+}
+
+/// `MPEGLAYER3_FLAG_PADDING_ISO`: frames get the padding byte that the MP3
+/// standard gives them, so that the bitrate comes out exactly.
+const PADDING_ISO: u32 = 0;
+
+/// The encoder's own output types turn the padding of frames off. At 44.1 kHz
+/// a frame then holds less than its share of the bitrate (127.7 kbit/s for
+/// 128), and players that work the length out from the bitrate, the standard
+/// players of Windows among them, show an hour as 59:52. With ISO padding they
+/// show the length of the file; at 48, 16 and 8 kHz no frame needs padding.
+/// The flag is part of the MPEGLAYER3WAVEFORMAT that the type holds as its
+/// user data: after `wID` (2 bytes) come the `fdwFlags` (4 bytes).
+fn pad_frames(kind: &IMFMediaType) -> Result<(), ConvertError> {
+    // SAFETY: plain calls on a live object; the buffer has the blob's size.
+    unsafe {
+        let size = kind.GetBlobSize(&MF_MT_USER_DATA)?;
+        let mut format = vec![0u8; size as usize];
+        kind.GetBlob(&MF_MT_USER_DATA, &mut format, None)?;
+        if format.len() < 6 {
+            return Err(ConvertError::failed(
+                "the MP3 encoder of Windows describes its output without the MPEG Layer-3 format",
+            ));
+        }
+        format[2..6].copy_from_slice(&PADDING_ISO.to_le_bytes());
+        kind.SetBlob(&MF_MT_USER_DATA, &format)?;
+    }
+    Ok(())
 }
 
 /// The rate, channels and bytes per second of an audio media type.
@@ -879,6 +909,16 @@ mod tests {
                     (job.frames + 1729..=job.frames + 2880).contains(&samples),
                     "{what}: {samples} samples for {}",
                     job.frames
+                );
+                // A player that works the length out from the size and the
+                // bitrate (the file has no header with the length) gets the
+                // length of the frames: padding makes the bitrate exact.
+                let bytes = std::fs::metadata(&output).unwrap().len();
+                let by_bitrate = bytes as f64 * 8.0 / f64::from(expected.kbps * 1000);
+                let length = samples as f64 / f64::from(rate);
+                assert!(
+                    (by_bitrate - length).abs() < 0.001,
+                    "{what}: {by_bitrate} s by the bitrate, {length} s of frames"
                 );
 
                 let channels = usize::from(expected.channels);

@@ -4,13 +4,13 @@ title: Перехід Tab з останнього елемента на перш
 status: Draft
 assignee: []
 created_date: '2026-11-24T21:19:42Z'
-updated_date: '2026-11-26T08:04:38Z'
+updated_date: '2026-11-27T14:51:53Z'
 labels:
   - frontend
   - a11y
   - model-sonnet
   - effort-medium
-milestone: m-4
+milestone: m-3
 dependencies: []
 references:
   - doc-3

@@ -100,6 +100,41 @@
     liveRegionText = untrack(() => liveRegionText) === text ? `${text}​` : text;
   }
 
+  // After a recording stops, what the conversions report (the end of the
+  // queue, a recording that could not be converted) waits until STOP_READ_MS
+  // have passed since the stop announcement, about the time NVDA takes to read
+  // it (TASK-39). Without the wait, a conversion that ends at once replaces the
+  // stop announcement before NVDA reads it, and NVDA reads the error block (an
+  // alert) at once, cutting into what it is saying. Held reports keep their
+  // order; reports that come later are made at once.
+  const STOP_READ_MS = 3000;
+  let holdUntil = 0;
+  let held: (() => void)[] = [];
+  let holdTimer: ReturnType<typeof setTimeout> | undefined;
+
+  function releaseHeldLater() {
+    clearTimeout(holdTimer);
+    holdTimer = setTimeout(() => {
+      const reports = held;
+      held = [];
+      for (const report of reports) report();
+    }, Math.max(0, holdUntil - performance.now()));
+  }
+
+  function holdConversionReports() {
+    holdUntil = performance.now() + STOP_READ_MS;
+    if (held.length) releaseHeldLater();
+  }
+
+  function reportConversion(report: () => void) {
+    if (performance.now() >= holdUntil && !held.length) {
+      report();
+      return;
+    }
+    held.push(report);
+    releaseHeldLater();
+  }
+
   let saveTimeout: ReturnType<typeof setTimeout> | undefined;
 
   function scheduleSave() {
@@ -144,12 +179,18 @@
       } else {
         announce(m.live_recording_stopped());
       }
+      // What the converter reports on this recording comes after the stop:
+      // the backend sends the new state right after it queues the files (a
+      // stop from the window or the tray menu runs on the main thread, and
+      // the converter's events wait for it).
+      if (previous !== undefined) holdConversionReports();
     }
   });
 
-  // Announces that the queue of conversions has emptied. A recording that
-  // could not be converted has been reported in the error block by then, but
-  // NVDA drops that alert when it arrives among focus changes (a failure right
+  // Announces that the queue of conversions has emptied, after the stop
+  // announcement when the recording has just stopped. A recording that could
+  // not be converted has been reported in the error block by then, but NVDA
+  // drops that alert when it arrives among focus changes (a failure right
   // after the window opens), so this announcement says by itself that the
   // recordings are kept.
   let wasConverting = false;
@@ -158,9 +199,10 @@
     if (!initialized) return;
     if (wasConverting && !busy) {
       const failed = untrack(() => conversion.failed);
-      announce(failed > 0
+      const text = failed > 0
         ? m.live_conversion_finished_with_errors({ count: failed })
-        : m.live_conversion_finished());
+        : m.live_conversion_finished();
+      reportConversion(() => announce(text));
     }
     wasConverting = busy;
   });
@@ -417,7 +459,8 @@
         const what = { format: failure.format, path: failure.wav };
         // Without the encoder (Windows N without the Media Feature Pack) the
         // message says how to get it.
-        showError(failure.noEncoder ? m.error_conversion_no_encoder(what) : m.error_conversion_failed(what));
+        const message = failure.noEncoder ? m.error_conversion_no_encoder(what) : m.error_conversion_failed(what);
+        reportConversion(() => showError(message));
       });
 
       await appWindow.onCloseRequested(async (event) => {

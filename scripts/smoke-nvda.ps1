@@ -48,8 +48,9 @@
                says that the conversion to MP3 started and then that it finished, and the
                recording is an .mp3 file. Then the same with AUDIOCAPTOR_NO_MP3_ENCODER=1, which
                makes the app act as if Windows had no MP3 encoder (Windows N without the Media
-               Feature Pack): NVDA reads how to get the encoder and the end with errors, and the
-               WAV is kept.
+               Feature Pack): the conversion fails at once, yet NVDA says first that the recording
+               stopped and the conversion started, then reads how to get the encoder and the end
+               with errors, and the WAV is kept.
       flac     A profile with the format "FLAC (lossless)": in Edit Profile NVDA reads the
                Format list with that value. A recording in the profile: when it stops, NVDA says
                that the conversion to FLAC started and then that it finished, and the recording
@@ -934,6 +935,8 @@ function Add-Check([string]$Text, [bool]$Ok, [string]$Detail = '') {
 # ExpectAny - for each entry, one of its '|'-separated variants must be said (role words, which
 #             depend on NVDA's language)
 # Forbid    - none of its '|'-separated variants may be said
+# First     - must be said, and before every other text of Expect and Once (the order NVDA says
+#             them in)
 # A step fails when its action throws (the rest of the scenario is then skipped), when it sets
 # $script:SoftFail (the scenario goes on), or when a check fails.
 function Invoke-Step {
@@ -943,7 +946,8 @@ function Invoke-Step {
         [string[]]$Expect = @(),
         [string[]]$Once = @(),
         [string[]]$ExpectAny = @(),
-        [string[]]$Forbid = @()
+        [string[]]$Forbid = @(),
+        [string]$First = ''
     )
     $script:StepNumber++
     $r = [pscustomobject]@{ Scenario = $script:CurrentScenario; N = $script:StepNumber; Title = $Title
@@ -964,13 +968,14 @@ function Invoke-Step {
     catch { $r.Status = 'FAILED'; $r.Detail = $_.Exception.Message; $script:Aborted = $true }
     if ($r.Status -eq 'OK' -and $script:SoftFail) { $r.Status = 'FAILED'; $r.Detail = $script:SoftFail }
 
-    if ($r.Status -eq 'OK' -and ($Expect.Count -or $Once.Count -or $ExpectAny.Count)) {
+    $wanted = @($Expect + $Once + @($First | Where-Object { $_ }))
+    if ($r.Status -eq 'OK' -and ($wanted.Count -or $ExpectAny.Count)) {
         # NVDA can lag behind the app: wait until it has said what is expected.
         $deadline = (Get-Date).AddSeconds($SpeechWaitSec)
         do {
             $said = Get-SaidSince $from
             $done = $true
-            foreach ($p in @($Expect + $Once)) { if ((Get-Count $said $p) -lt 1) { $done = $false } }
+            foreach ($p in $wanted) { if ((Get-Count $said $p) -lt 1) { $done = $false } }
             foreach ($a in $ExpectAny) { if (-not (Test-SaidAny $said $a)) { $done = $false } }
             if ($done) { break }
             Start-Sleep -Milliseconds 200
@@ -987,6 +992,15 @@ function Invoke-Step {
     foreach ($p in $Once) {
         $n = Get-Count $all $p
         $checks.Add((New-Check "NVDA says ""$p"" once" ($n -eq 1) "said $n times"))
+    }
+    if ($First) {
+        # Where each text is said the first time: none of the others may come before it.
+        $at = $all.IndexOf($First, [StringComparison]::OrdinalIgnoreCase)
+        $others = @(@($Expect + $Once) | Where-Object { $_ -ne $First } | Select-Object -Unique)
+        $early = @($others | Where-Object { $where = $all.IndexOf($_, [StringComparison]::OrdinalIgnoreCase); $where -ge 0 -and $where -lt $at })
+        $detail = if ($at -lt 0) { 'not said' } elseif ($early.Count) { 'said after ' + (($early | ForEach-Object { """$_""" }) -join ', ') } else { '' }
+        $before = ($others | ForEach-Object { """$_""" }) -join ' and '
+        $checks.Add((New-Check "NVDA says ""$First"" first, before $before" ($at -ge 0 -and -not $early.Count) $detail))
     }
     foreach ($a in $ExpectAny) { $checks.Add((New-Check "NVDA says $(Format-Variants $a)" (Test-SaidAny $all $a))) }
     foreach ($p in $Forbid) { $checks.Add((New-Check "NVDA does not say $(Format-Variants $p)" (-not (Test-SaidAny $all $p)))) }
@@ -1492,7 +1506,7 @@ function Get-LoopbackFiles([string]$QueueFile) {
 
 # A recording in a profile with the format "MP3 - standard" becomes an .mp3 file. Then the same as
 # on Windows N without the Media Feature Pack, which the switch $NoMp3Switch fakes: the conversion
-# fails at once, NVDA reads how to get the encoder, and the WAV is kept.
+# fails at once, NVDA reads how to get the encoder after the stop announcement, and the WAV is kept.
 function Invoke-Mp3Scenario {
     $recordings = Join-Path $DataDir 'Recordings'
     $queueFile = Join-Path $DataDir 'conversion-queue.json'
@@ -1523,7 +1537,7 @@ function Invoke-Mp3Scenario {
             }
             $other = @($files.Keys | Where-Object { $_ -notlike '*.mp3' })
             Add-Check 'no WAV file and no temporary file is left' ($other.Count -eq 0) ($other -join ', ')
-        } -Once $UI.Mp3Started, $UI.Converted -Forbid $UI.ConvertErrors, $Unavailable, $PageNoise
+        } -Once $UI.Mp3Started, $UI.Converted -First $UI.Mp3Started -Forbid $UI.ConvertErrors, $Unavailable, $PageNoise
 
         Invoke-Step 'Alt+F4: the app quits without asking' {
             Send-Keys 'Alt+F4'
@@ -1542,7 +1556,8 @@ function Invoke-Mp3Scenario {
             $null = Wait-Until "the '$($UI.Pause)' button" { Find-ByName $UI.Pause }
         } -Once $UI.Started
 
-        Invoke-Step 'Alt+T stops it: NVDA reads that Windows has no MP3 encoder and how to get it, then the end with errors; the WAV is kept' {
+        # The conversion fails at once, yet NVDA says the stop first (TASK-39).
+        Invoke-Step 'Alt+T stops it: NVDA says first that the recording stopped and the conversion to MP3 started, then reads that Windows has no MP3 encoder and how to get it, and the end with errors; the WAV is kept' {
             Start-Sleep -Seconds 2
             Send-Keys 'Alt+T'
             $null = Wait-Until "the '$($UI.Start)' button" { Find-ByName $UI.Start }
@@ -1551,7 +1566,7 @@ function Invoke-Mp3Scenario {
             Add-Check 'the recording is kept as WAV' ($wav.Count -eq 1)
             $other = @($files.Keys | Where-Object { $_ -notlike '*.wav' })
             Add-Check 'no MP3 file and no temporary file is left' ($other.Count -eq 0) ($other -join ', ')
-        } -Expect $UI.NoEncoder, $UI.EndWithErrors -Forbid $UI.Converted
+        } -Once $UI.Mp3Started, $UI.EndWithErrors -Expect $UI.NoEncoder -First $UI.Mp3Started -Forbid $UI.Converted
 
         Invoke-Step 'Alt+F4 after the failure: the app quits without asking' {
             Send-Keys 'Alt+F4'
@@ -1613,7 +1628,7 @@ function Invoke-FlacScenario {
             }
             $other = @($files.Keys | Where-Object { $_ -notlike '*.flac' })
             Add-Check 'no WAV file and no temporary file is left' ($other.Count -eq 0) ($other -join ', ')
-        } -Once $UI.FlacStarted, $UI.Converted -Forbid $UI.ConvertErrors, $Unavailable, $PageNoise
+        } -Once $UI.FlacStarted, $UI.Converted -First $UI.FlacStarted -Forbid $UI.ConvertErrors, $Unavailable, $PageNoise
 
         Invoke-Step 'Alt+F4: the app quits without asking' {
             Send-Keys 'Alt+F4'

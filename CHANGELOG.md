@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- After a recording stops in an Opus, MP3 or FLAC profile, the screen reader now always says first that the recording stopped and then how its conversion ended, even when the conversion ends at once. Before, when the conversion failed at once (for example, on the N editions of Windows without the Media Feature Pack) or a very short recording was converted at once, the screen reader skipped "Recording stopped" and read only the end of the conversion. To leave time for the stop announcement, the end of a conversion and the message about a recording that could not be converted now come no sooner than three seconds after the stop.
 - Alt+S now says why a recording does not start when the profile needs a device that is not selected, for example "Select a system audio device": the same hint as the disabled Start recording button. Before, Alt+S did nothing and the screen reader said nothing. Focus stays where it was. The global recording hotkey in this state plays the warning sound and does not start a recording, as before.
 
 ## [0.4.0] — 2026-11-27

@@ -8,6 +8,8 @@ pub mod settings;
 pub mod sounds;
 pub mod state;
 pub mod tray;
+#[cfg(windows)]
+mod webview;
 
 use audio::capture;
 use audio::mixer::{self, MixerConfig};
@@ -780,6 +782,9 @@ pub fn run() {
                 }
                 Err(e) => log::error!("Failed to start device monitor: {e}"),
             }
+
+            #[cfg(windows)]
+            webview::disable_browser_features(app.handle());
 
             // Set up system tray icon
             if let Err(e) = tray::setup_tray(app.handle(), &settings.language) {

@@ -18,6 +18,9 @@
                new state and NVDA names it, without "unavailable"; focus on Stop stays there
                through a pause. Recording really starts (system audio of the default playback
                device, so no microphone is needed); the WAV file is not checked.
+               While recording, the browser keys (F5, Shift+F5, Ctrl+R, Ctrl+Shift+R, Ctrl+P,
+               Ctrl+F, F3, Ctrl+G) and the menu keys (Shift+F10, the Applications key) do
+               nothing: the page does not reload and no menu, print or find bar takes focus.
       nodevice No system audio device is selected, and the active profile records system audio:
                Alt+S on the profile list starts no recording, NVDA says why ("Select a system
                audio device", the hint in the name of the disabled Start button), focus stays on
@@ -444,8 +447,9 @@ if ($ArgError) {
 
 # --- Keyboard ----------------------------------------------------------------------------------
 $VK = @{ Ctrl = 0x11; Alt = 0x12; Shift = 0x10; Enter = 0x0D; Tab = 0x09; Esc = 0x1B; Space = 0x20
-         End = 0x23; Home = 0x24; Left = 0x25; Up = 0x26; Right = 0x27; Down = 0x28; F1 = 0x70; F4 = 0x73 }
-$ExtendedVK = @(0x23, 0x24, 0x25, 0x26, 0x27, 0x28)
+         End = 0x23; Home = 0x24; Left = 0x25; Up = 0x26; Right = 0x27; Down = 0x28; F1 = 0x70; F3 = 0x72; F4 = 0x73
+         F5 = 0x74; F10 = 0x79; Apps = 0x5D }
+$ExtendedVK = @(0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x5D)
 
 # Each chord is keys joined with '+', such as 'Alt+S' or 'Shift+Tab'.
 function Send-Keys([string[]]$Chords) {
@@ -1091,6 +1095,16 @@ function Invoke-RecordScenario {
         Start-Sleep -Seconds 1  # past 00:00:00
         Send-Keys 'Alt+I'
     } -Expect $UI.RecordingInfo
+
+    # WebView2's own browser keys and menu are off (backlog TASK-44). A reload would reset the
+    # window, move focus to the profile list and make NVDA say Recording started again; print,
+    # find and the menu would take focus.
+    Invoke-Step "Browser and menu keys while recording do nothing: focus stays on '$($UI.Pause)', NVDA says Recording and the time on Alt+I" {
+        Send-Keys 'F5', 'Shift+F5', 'Ctrl+R', 'Ctrl+Shift+R', 'Ctrl+P', 'Ctrl+F', 'F3', 'Ctrl+G', 'Shift+F10', 'Apps'
+        Start-Sleep -Milliseconds 1500  # time for a reload, a dialog or a menu to show
+        Confirm-Focus $UI.Pause
+        Send-Keys 'Alt+I'
+    } -Expect $UI.RecordingInfo -Forbid $UI.Started, $PageNoise
 
     Invoke-Step "Alt+P on '$($UI.Pause)' pauses: NVDA says Recording paused; focus moves to '$($UI.Resume)'" {
         Send-Keys 'Alt+P'

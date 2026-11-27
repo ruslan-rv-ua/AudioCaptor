@@ -1,11 +1,11 @@
 ---
 id: TASK-44
 title: Клавіші й меню браузера не діють у вікні програми
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-27T20:00:47Z'
-updated_date: '2026-11-27T21:40:00Z'
+updated_date: '2026-11-27T21:48:29Z'
 labels:
   - a11y
   - frontend
@@ -70,5 +70,9 @@ ordinal: 14450
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Клавіші й меню браузера WebView2 вимкнено в `src-tauri/src/webview.rs`: налаштування `AreBrowserAcceleratorKeysEnabled` і `AreDefaultContextMenusEnabled` у `false` плюс обробники `AcceleratorKeyPressed` (F5, F3, Ctrl+R/P/F/G) і `ContextMenuRequested`, бо налаштування можуть подіяти лише з наступної навігації. Сценарій `record` у `just smoke` натискає ці клавіші під час запису. `just check` і `just smoke record dialogs` пройшли; власник вручну перевірив правий клік, Ctrl+A/C/X/V/Z у полі Name і клавіші NVDA. Ctrl+N і Ctrl+S обробник пропускає; що з ними робить WebView2, перевірить TASK-43. Змінено залежності (webview2-com, windows-core 0.62 з Cargo.lock), тож перед закриттям потрібен запуск CI вручну.
+У вікні програми більше не діють клавіші й меню браузера. Новий `src-tauri/src/webview.rs` через `with_webview` вимикає у WebView2 `AreBrowserAcceleratorKeysEnabled` і `AreDefaultContextMenusEnabled`, а для вже завантаженої першої сторінки додає два обробники: `AcceleratorKeyPressed` поглинає F5, F3, Ctrl+R, Ctrl+P, Ctrl+F і Ctrl+G (зі Shift чи без, але не з Alt), а `ContextMenuRequested` скасовує меню. Залежності `webview2-com` 0.39 і `windows-core` 0.62 — ті самі версії, що вже тягнув wry. Новий крок 6 сценарію `record` під час запису натискає ці клавіші, Shift+F10 і клавішу меню й перевіряє, що вікно не перезавантажилося.
+
+Перевірки: `just check` (138 тестів; головна сесія повторила), `just build`, `just smoke record dialogs` — 37 кроків, 70 перевірок NVDA з 70. Власник сам перевірив правий клік, клавіші редагування в полі Name і клавіші NVDA. Ручний CI на `develop`: https://github.com/ruslan-rv-ua/AudioCaptor/actions/runs/46071803938 — зелений.
+
+Не перевірено: що новий крок падає на старій збірці; що WebView2 робить на Ctrl+N і Ctrl+S — обробник їх не ловить, це перевірить TASK-43.
 <!-- SECTION:FINAL_SUMMARY:END -->

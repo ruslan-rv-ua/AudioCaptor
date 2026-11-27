@@ -1,11 +1,11 @@
 ---
 id: TASK-40
 title: Модулі inlang для збирання мають закріплені версії
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-27T19:21:46Z'
-updated_date: '2026-11-27T20:28:10Z'
+updated_date: '2026-11-27T21:48:28Z'
 labels:
   - security
   - frontend
@@ -38,10 +38,10 @@ ordinal: 14200
 ## Definition of Done
 <!-- DOD:BEGIN -->
 - [x] #1 Усі локальні перевірки проходять: `just check`
-- [ ] #2 Новий або змінений текст інтерфейсу є англійською й українською: у `messages/en.json` і `messages/uk.json`, а підписи меню трея — у `src-tauri/src/tray.rs`
-- [ ] #3 Зміни в інтерфейсі, фокусі, діалогах чи оголошеннях перевірено з клавіатури і з NVDA (якщо задача їх містить)
+- [x] #2 Новий або змінений текст інтерфейсу є англійською й українською: у `messages/en.json` і `messages/uk.json`, а підписи меню трея — у `src-tauri/src/tray.rs`
+- [x] #3 Зміни в інтерфейсі, фокусі, діалогах чи оголошеннях перевірено з клавіатури і з NVDA (якщо задача їх містить)
 - [x] #4 Документацію оновлено там, де змінилася поведінка чи порядок роботи (README.md, README_UK.md, DEVELOPMENT.md)
-- [ ] #5 CHANGELOG.md оновлено: лише зміни, помітні користувачам (без подробиць про інструменти, тести, CI чи збірку)
+- [x] #5 CHANGELOG.md оновлено: лише зміни, помітні користувачам (без подробиць про інструменти, тести, CI чи збірку)
 <!-- DOD:END -->
 
 ## Implementation Notes
@@ -53,3 +53,13 @@ ordinal: 14200
 
 2026-11-27, головна сесія: гілку `feature/task-40-pin-inlang` злито в `develop` лише локально (вибір власника: без відправки); головна сесія повторила `just check` (134 тести). Задача лишається відкритою, доки власник не скаже відправити `develop` і запустити CI вручну; після зеленого CI — закрити.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Модулі inlang для збирання мають закріплені версії: у `project.inlang/settings.json` замість `@latest` стоять `@inlang/message-lint-rule-missing-translation@1.4.8` і `@inlang/plugin-message-format@4.6.0`, тобто ті версії, які збирання завантажувало до зміни (перевірено заголовком `X-JSD-Version` у відповіді jsDelivr і sha256 файлів у кеші Paraglide). `DEVELOPMENT.md` пояснює, як оновлювати ці версії. Згенерований `src/paraglide/` до й після зміни однаковий (144 файли), бандл інтерфейсу має ту саму назву-хеш.
+
+Перевірки: `just check` (134 тести; головна сесія повторила), `just build`. Ручний CI на `develop`: https://github.com/ruslan-rv-ua/AudioCaptor/actions/runs/46071803938 — зелений.
+
+Не перевірено: збирання без мережі — модулі й далі йдуть з jsDelivr. Повністю це питання закриває DRAFT-7 (Paraglide 3 з модулями з npm).
+<!-- SECTION:FINAL_SUMMARY:END -->

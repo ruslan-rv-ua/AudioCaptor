@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - If you go back to AudioCaptor 0.3.0, a profile with the FLAC format records WAV there. The format works again after you update, unless you saved that profile in 0.3.0.
 
+### Fixed
+
+- The profile dialog now closes with the first press of Escape. Before, after a profile had been saved with Enter, the built-in browser of AudioCaptor offered the saved name as an autofill suggestion in the empty Name field: the screen reader announced the suggestions, and the first Escape only hid them. The text fields of the profile dialog no longer show autofill suggestions.
+
 ## [0.3.0] — 2026-11-27
 
 ### Added

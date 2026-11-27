@@ -24,6 +24,8 @@
                of the window, and Settings again once About is closed. In New Profile, Tab
                reaches the Format list, NVDA reads its name and value, and Down changes it. In
                Edit Profile, Opus is chosen and saved: the profile in settings.json has it.
+               Last, a new profile is saved with Enter in its Name field; in the next New
+               Profile NVDA says nothing about autofill and one Escape closes the dialog.
       tray     Escape hides the window; starting the exe again shows it and NVDA announces it.
       settings Start with an unreadable settings.json: the app keeps a copy next to it
                (settings.unreadable.json), NVDA reads the message that the settings were reset
@@ -238,6 +240,11 @@ $TabOrder = @($UI.MinimizeToTray, $UI.About, $UI.OpenSettings, $UI.ProfileList, 
 $Role = @{
     Dialog = 'dialog|' + [regex]::Unescape('\u0434\u0456\u0430\u043b\u043e\u0433')
 }
+# What NVDA says on a text field that has browser autofill suggestions ("has auto complete").
+$Autofill = 'auto complete|autocomplete|' + [regex]::Unescape('\u0430\u0432\u0442\u043e\u043c\u0430\u0442\u0438\u0447\u043d\u0435 \u0437\u0430\u043f\u043e\u0432\u043d\u0435\u043d\u043d\u044f')
+# The name the dialogs scenario types into New Profile and saves with Enter: lower-case letters
+# only, since Send-Keys types a letter key without Shift.
+$AutofillName = 'zed'
 # What NVDA says when the control with focus becomes disabled.
 $Unavailable = 'unavailable|' + [regex]::Unescape('\u043d\u0435\u0434\u043e\u0441\u0442\u0443\u043f\u043d\u043e')
 
@@ -1189,6 +1196,33 @@ function Invoke-DialogsScenario {
         Add-Check 'the profile in settings.json has the format chosen in the dialog (OpusSpeech)' ($saved.outputFormat -eq 'OpusSpeech') "outputFormat is '$($saved.outputFormat)'"
         Add-Check 'settings.json, written as version 5 by the test, is version 6 now' ($settings.version -eq 6) "version is $($settings.version)"
     } -Expect $UI.FormatSpeech, $UI.Save, $UI.ProfileList
+
+    # Browser autofill (backlog TASK-23): WebView2 remembers a name saved with Enter and offers it
+    # in the empty Name field next time; the first Escape then only hides the suggestions. The
+    # browser data lasts for the whole run, so the second New Profile sees what the first one left.
+    Invoke-Step "Tab to the '$($UI.CreateProfile)' button" { Move-Focus $UI.CreateProfile } -Expect $UI.CreateProfile
+
+    Invoke-Step "Space opens New Profile; the name '$AutofillName' typed in Name and Enter create the profile" {
+        Send-Keys 'Space'
+        $null = Wait-Until 'focus on the Name field' { (Get-Focus).Id -eq 'profile-name' }
+        Send-Keys ([char[]]$AutofillName | ForEach-Object { [string]$_ })
+        Send-Keys 'Enter'
+        $null = Wait-Until 'the dialog to close' { -not (Find-ById 'profile-name') } 3
+        Start-Sleep -Milliseconds 1200  # the app saves settings 0.5 s after a change
+        $names = @(([IO.File]::ReadAllText($SettingsFile) | ConvertFrom-Json).profiles | ForEach-Object { $_.name })
+        Add-Check "settings.json has the new profile '$AutofillName'" ($names -contains $AutofillName) "profiles: $($names -join ', ')"
+    } -Once $UI.NewProfile
+
+    Invoke-Step "Tab to the '$($UI.CreateProfile)' button again" { Move-Focus $UI.CreateProfile } -Expect $UI.CreateProfile
+
+    Invoke-Step 'Space opens New Profile again: focus on the empty Name field, NVDA says nothing about autofill' {
+        Send-Keys 'Space'
+        $null = Wait-Until 'focus on the Name field' { (Get-Focus).Id -eq 'profile-name' }
+    } -Once $UI.NewProfile -Forbid $Autofill
+
+    Invoke-Step "One Escape in the empty Name field closes New Profile: focus back on the '$($UI.CreateProfile)' button" {
+        Close-Dialog 'profile-name' $UI.CreateProfile
+    } -Expect $UI.CreateProfile -Forbid $Autofill
 }
 
 function Invoke-TrayScenario {

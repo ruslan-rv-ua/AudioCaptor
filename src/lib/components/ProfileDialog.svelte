@@ -163,7 +163,9 @@
       tabindex="-1"
       onkeydown={handleKeydown}
     >
-      <form onsubmit={handleFormSubmit} novalidate>
+      <!-- No browser autofill (backlog TASK-23): WebView2 would offer saved names in the
+           text fields and take the first Escape to hide them, so the dialog would need two. -->
+      <form onsubmit={handleFormSubmit} novalidate autocomplete="off">
       <h2>{title}</h2>
 
       <!-- BASIC -->
@@ -171,11 +173,11 @@
       <div class="grid-2">
         <div class="field">
           <label for="profile-name">{m.field_name()}</label>
-          <input id="profile-name" type="text" bind:value={name} />
+          <input id="profile-name" type="text" autocomplete="off" bind:value={name} />
         </div>
         <div class="field">
           <label for="profile-desc">{m.field_description()}</label>
-          <input id="profile-desc" type="text" bind:value={description} />
+          <input id="profile-desc" type="text" autocomplete="off" bind:value={description} />
         </div>
         <div class="field col-span">
           <label for="profile-folder">{m.field_output_folder()}</label>
@@ -252,19 +254,19 @@
         {#if showMicFilename}
           <div class="field">
             <label for="profile-mic-fn">{m.field_mic_filename()}</label>
-            <input id="profile-mic-fn" type="text" bind:value={micFilename} />
+            <input id="profile-mic-fn" type="text" autocomplete="off" bind:value={micFilename} />
           </div>
         {/if}
         {#if showLoopbackFilename}
           <div class="field">
             <label for="profile-loop-fn">{m.field_loopback_filename()}</label>
-            <input id="profile-loop-fn" type="text" bind:value={loopbackFilename} />
+            <input id="profile-loop-fn" type="text" autocomplete="off" bind:value={loopbackFilename} />
           </div>
         {/if}
         {#if showMixFilename}
           <div class="field">
             <label for="profile-mix-fn">{m.field_mix_filename()}</label>
-            <input id="profile-mix-fn" type="text" bind:value={mixFilename} />
+            <input id="profile-mix-fn" type="text" autocomplete="off" bind:value={mixFilename} />
           </div>
         {/if}
       </div>

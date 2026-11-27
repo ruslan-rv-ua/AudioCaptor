@@ -1,6 +1,6 @@
 [package]
 name = "audio-captor"
-version = "0.3.0"
+version = "0.4.0"
 description = "AudioCaptor — system audio recorder"
 authors = ["Ruslan Iskov"]
 license = "MIT"

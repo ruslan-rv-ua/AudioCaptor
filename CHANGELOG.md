@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-11-27
+
 ### Added
 
 - Recordings can now be saved as FLAC, a lossless format: the file holds exactly the sound of the WAV, sample for sample, and takes less space. The Format list of a profile has a new entry, "FLAC (lossless)". How much smaller the file gets depends on the sound: an hour of quiet speech at 48 kHz takes about 130 MB instead of 691 MB, an hour of music about 380 MB. As with Opus and MP3, the recording is written as WAV and converted in the background when you stop it (an hour takes about a quarter of a minute on a recent PC). The WAV is deleted only after AudioCaptor has decoded the whole `.flac` file and found every sample the same as in the WAV.
@@ -98,6 +100,7 @@ Initial release.
 - Settings migration (v1 → v2 → v3 → v4 → v5)
 - Scoop package manifest in [ruslan-rv-ua/scoop-bucket](https://github.com/ruslan-rv-ua/scoop-bucket)
 
+[0.4.0]: https://github.com/ruslan-rv-ua/AudioCaptor/releases/tag/v0.4.0
 [0.3.0]: https://github.com/ruslan-rv-ua/AudioCaptor/releases/tag/v0.3.0
 [0.2.0]: https://github.com/ruslan-rv-ua/AudioCaptor/releases/tag/v0.2.0
 [0.1.2]: https://github.com/ruslan-rv-ua/AudioCaptor/releases/tag/v0.1.2

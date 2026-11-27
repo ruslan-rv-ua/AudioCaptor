@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { tick } from "svelte";
+  import { tick, untrack } from "svelte";
+  import { getLocale } from "../../paraglide/runtime";
   import type { Theme } from "../types";
   import * as m from "../../paraglide/messages";
   import { updateHotkey, updateSoundEnabled, setLanguage, setConfirmExitDuringRecording } from "../stores/settings.svelte";
@@ -40,12 +41,34 @@
     { value: "dark",  label: () => m.settings_theme_dark() },
   ];
 
+  // A new language takes effect only after a restart, so the hint about it is
+  // spoken only when the list moves away from the language the app runs in.
+  const startLanguage = getLocale();
+
+  // The dialog speaks through a status region of its own: the main window's
+  // region lies outside this modal dialog, where a screen reader may skip it.
+  // Like announce() in App.svelte, the same text twice in a row gets a
+  // zero-width space at the end, so that it is spoken again.
+  let announcement = $state("");
+  function announce(text: string) {
+    announcement = untrack(() => announcement) === text ? `${text}​` : text;
+  }
+
+  function focusHotkeyField() {
+    document.getElementById("settings-hotkey-display")?.focus();
+  }
+
   let capturingHotkey = $state(false);
   let localHotkey = $state<string | null>(null);
   $effect.pre(() => { localHotkey = hotkey; });
 
+  // The Capture button stays enabled while it waits for a key: it has focus,
+  // and disabling it would drop focus. The key listener below takes every key
+  // first, so the button cannot be pressed again from the keyboard meanwhile.
   async function startHotkeyCapture() {
+    if (capturingHotkey) return;
     capturingHotkey = true;
+    announce(m.settings_hotkey_capture_started());
     await api.unregisterHotkey();
 
     async function onKeyDown(e: KeyboardEvent) {
@@ -63,6 +86,10 @@
       else if (key === "Escape") {
         window.removeEventListener("keydown", onKeyDown, true);
         await cancelCapture();
+        // Focus first: a focus change cuts off what the screen reader is saying.
+        await tick();
+        focusHotkeyField();
+        announce(m.settings_hotkey_capture_cancelled());
         return;
       }
       parts.push(key);
@@ -72,8 +99,9 @@
       onsave({ hotkey: shortcut });
       capturingHotkey = false;
       window.removeEventListener("keydown", onKeyDown, true);
+      // The field's name now holds the new key, and focus reads it.
       await tick();
-      document.getElementById("settings-hotkey-display")?.focus();
+      focusHotkeyField();
     }
 
     window.addEventListener("keydown", onKeyDown, true);
@@ -92,6 +120,7 @@
     localHotkey = null;
     await updateHotkey(null);
     onsave({ hotkey: null });
+    announce(m.settings_hotkey_cleared());
   }
 
   function handleSoundToggle(e: Event) {
@@ -110,6 +139,7 @@
     const lang = (e.target as HTMLSelectElement).value as "en" | "uk";
     setLanguage(lang);
     onsave({ language: lang });
+    if (lang !== startLanguage) announce(m.settings_language_restart_note());
   }
 
   function handleKeydown(e: KeyboardEvent) {
@@ -130,7 +160,10 @@
   }
 
   $effect(() => {
-    if (open) requestAnimationFrame(() => document.getElementById("settings-hotkey-display")?.focus());
+    if (open) {
+      announcement = "";
+      requestAnimationFrame(focusHotkeyField);
+    }
   });
 </script>
 
@@ -149,7 +182,8 @@
       <!-- Theme -->
       <div class="field">
         <span class="field-label">{m.settings_theme_label()}</span>
-        <div class="theme-seg" role="group" aria-label={m.settings_theme_label()}>
+        <div class="theme-seg" role="group" aria-label={m.settings_theme_label()}
+             aria-describedby="settings-theme-hint">
           {#each themeOptions as opt}
             <button
               type="button"
@@ -160,7 +194,7 @@
             >{opt.label()}</button>
           {/each}
         </div>
-        <p class="hint">{m.settings_theme_hint()}</p>
+        <p id="settings-theme-hint" class="hint">{m.settings_theme_hint()}</p>
       </div>
 
       <div class="divider"></div>
@@ -177,15 +211,17 @@
             readonly
             aria-label={localHotkey
               ? m.settings_hotkey_current_aria({ hotkey: localHotkey })
-              : m.settings_hotkey_none()}
+              : m.settings_hotkey_none_aria()}
             class="hotkey-input"
           />
-          <button type="button" class="btn-sm"
-            aria-label={capturingHotkey ? m.settings_hotkey_capturing() : m.settings_hotkey_capture_btn_aria()}
-            onclick={startHotkeyCapture} disabled={capturingHotkey}>
+          <!-- The name stays the same while capturing: NVDA speaks a new name of
+               the focused button, and the announcement already says it. -->
+          <button type="button" class="btn-sm" id="settings-hotkey-capture"
+            aria-label={m.settings_hotkey_capture_btn_aria()}
+            onclick={startHotkeyCapture}>
             {capturingHotkey ? m.settings_hotkey_capturing() : m.settings_hotkey_capture_btn()}
           </button>
-          <button type="button" class="btn-sm btn-secondary"
+          <button type="button" class="btn-sm btn-secondary" id="settings-hotkey-clear"
             aria-label={m.settings_hotkey_reset_btn_aria()}
             onclick={resetHotkey} disabled={capturingHotkey}>
             {m.settings_hotkey_reset_btn()}
@@ -221,11 +257,12 @@
       <!-- Language -->
       <div class="field">
         <label for="settings-language" class="field-label">{m.settings_language_label()}</label>
-        <select id="settings-language" value={language} onchange={handleLanguageChange}>
+        <select id="settings-language" value={language} onchange={handleLanguageChange}
+                aria-describedby="settings-language-hint">
           <option value="en">{m.settings_language_en()}</option>
           <option value="uk">{m.settings_language_uk()}</option>
         </select>
-        <p class="hint">{m.settings_language_restart_note()}</p>
+        <p id="settings-language-hint" class="hint">{m.settings_language_restart_note()}</p>
       </div>
 
       <div class="actions">
@@ -235,6 +272,8 @@
           onclick={async () => { if (capturingHotkey) await cancelCapture(); onclose(); }}
         >{m.btn_close()}</button>
       </div>
+
+      <div role="status" aria-atomic="true" class="visually-hidden">{announcement}</div>
     </div>
   </div>
 {/if}

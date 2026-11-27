@@ -28,7 +28,11 @@
       dialogs  About (F1), Settings, New Profile and the delete confirmation: focus enters the
                dialog, Escape closes it and focus returns to where the dialog was opened. F1 in
                Settings opens About on top of Settings: UI Automation finds About in the middle
-               of the window, and Settings again once About is closed. In New Profile, Tab
+               of the window, and Settings again once About is closed. In Settings, Capture
+               keeps focus and says to press a key, Escape cancels it aloud; NVDA reads the
+               theme hint once on entering the group, the restart hint as the description of
+               the Language list and once more when the language changes (not when it goes
+               back); Clear says the hotkey is cleared. In New Profile, Tab
                reaches the Format list, NVDA reads its name and value, and Down changes it. In
                Edit Profile, Opus is chosen and saved: the profile in settings.json has it.
                Last, a new profile is saved with Enter in its Name field; in the next New
@@ -201,7 +205,19 @@ $UI = @{
     RecordingInfo  = 'Recording, 00:'           # live_status_info with status_recording
     PausedInfo     = 'Paused, 00:'              # live_status_info with status_paused
     Settings       = 'Settings'                 # settings_dialog_title
-    CurrentHotkey  = 'Current hotkey: Pause'    # settings_hotkey_current_aria
+    CurrentHotkey  = 'Global Hotkey: Pause'     # settings_hotkey_current_aria
+    NoHotkey       = 'Global Hotkey: not set'   # settings_hotkey_none_aria
+    CaptureHotkey  = 'Capture new hotkey'       # settings_hotkey_capture_btn_aria
+    ClearHotkey    = 'Clear hotkey'             # settings_hotkey_reset_btn_aria
+    CaptureStarted = 'Press a key. Escape to cancel'  # settings_hotkey_capture_started
+    CaptureCancelled = 'Hotkey capture cancelled'     # settings_hotkey_capture_cancelled
+    HotkeyCleared  = 'Hotkey cleared'           # settings_hotkey_cleared
+    ThemeDark      = 'Dark'                     # settings_theme_dark
+    ThemeLight     = 'Light'                    # settings_theme_light
+    ThemeHint      = 'Auto follows the Windows color setting'  # settings_theme_hint
+    Language       = 'Language'                 # settings_language_label
+    LanguageEn     = 'English'                  # settings_language_en
+    RestartHint    = 'Change takes effect after restart'  # settings_language_restart_note
     NewProfile     = 'New Profile'              # profile_dialog_create_title
     EditTitle      = 'Edit Profile'             # profile_dialog_edit_title
     Save           = 'Save'                     # btn_save
@@ -1193,6 +1209,71 @@ function Invoke-DialogsScenario {
         Close-Dialog 'about-dialog-close' $UI.CurrentHotkey
         Test-OnTop $UI.Settings $UI.About
     } -Expect $UI.CurrentHotkey
+
+    # The settings dialog speaks through its own status region (backlog TASK-47). Capture keeps
+    # focus and stays enabled while it waits for a key; Escape there cancels only the capture.
+    Invoke-Step "Tab to the '$($UI.CaptureHotkey)' button" {
+        Move-InDialog { (Get-Focus).Id -eq 'settings-hotkey-capture' } "the '$($UI.CaptureHotkey)' button"
+    } -Expect $UI.CaptureHotkey
+
+    Invoke-Step 'Space on Capture: NVDA says to press a key, focus stays on the enabled button' {
+        Send-Keys 'Space'
+        Start-Sleep -Milliseconds 500
+        $f = Get-Focus
+        Add-Check "focus stays on the '$($UI.CaptureHotkey)' button" ($f -and $f.Id -eq 'settings-hotkey-capture') "focus on $(Format-Focus $f)"
+        $button = Find-ById 'settings-hotkey-capture'
+        Add-Check "the '$($UI.CaptureHotkey)' button is enabled" ($button -and $button.Current.IsEnabled)
+    } -Once $UI.CaptureStarted -Forbid $Unavailable
+
+    Invoke-Step 'Escape cancels the capture: NVDA says so, focus on the hotkey field, the hotkey is still Pause' {
+        Send-Keys 'Esc'
+        $null = Wait-Until 'focus on the hotkey field' { (Get-Focus).Id -eq 'settings-hotkey-display' } 3
+        Add-Check 'the Settings dialog is still open' ([bool](Find-ById 'settings-hotkey-display'))
+        $saved = ([IO.File]::ReadAllText($SettingsFile) | ConvertFrom-Json).hotkey
+        Add-Check 'settings.json still has the hotkey Pause' ($saved -eq 'Pause') "hotkey is '$saved'"
+    } -Once $UI.CaptureCancelled, $UI.CurrentHotkey
+
+    Invoke-Step "Shift+Tab into the theme group: NVDA reads the theme hint once" {
+        Send-Keys 'Shift+Tab'
+        $null = Wait-Until "focus on the '$($UI.ThemeDark)' button" { (Get-Focus).Name -eq $UI.ThemeDark } 3
+    } -Once $UI.ThemeHint -Expect $UI.ThemeDark
+
+    Invoke-Step "Shift+Tab inside the theme group: NVDA does not repeat the theme hint" {
+        Send-Keys 'Shift+Tab'
+        $null = Wait-Until "focus on the '$($UI.ThemeLight)' button" { (Get-Focus).Name -eq $UI.ThemeLight } 3
+    } -Expect $UI.ThemeLight -Forbid $UI.ThemeHint
+
+    Invoke-Step "Tab to the '$($UI.Language)' list: NVDA reads the restart hint once, as its description" {
+        Move-InDialog { (Get-Focus).Id -eq 'settings-language' } "the '$($UI.Language)' list"
+    } -Expect $UI.Language, $UI.LanguageEn -Once $UI.RestartHint
+
+    Invoke-Step 'Down in the list picks the other language: NVDA says the restart hint once' {
+        Send-Keys 'Down'
+    } -Once $UI.RestartHint
+
+    Invoke-Step 'Up goes back to English, the language the app runs in: NVDA does not say the restart hint' {
+        Send-Keys 'Up'
+    } -Expect $UI.LanguageEn -Forbid $UI.RestartHint
+
+    Invoke-Step "Tab to the '$($UI.ClearHotkey)' button" {
+        Move-InDialog { (Get-Focus).Id -eq 'settings-hotkey-clear' } "the '$($UI.ClearHotkey)' button"
+    } -Expect $UI.ClearHotkey
+
+    Invoke-Step 'Space on Clear: NVDA says the hotkey is cleared, focus stays on the enabled button' {
+        Send-Keys 'Space'
+        Start-Sleep -Milliseconds 500
+        $f = Get-Focus
+        Add-Check "focus stays on the '$($UI.ClearHotkey)' button" ($f -and $f.Id -eq 'settings-hotkey-clear') "focus on $(Format-Focus $f)"
+        $button = Find-ById 'settings-hotkey-clear'
+        Add-Check "the '$($UI.ClearHotkey)' button is enabled" ($button -and $button.Current.IsEnabled)
+    } -Once $UI.HotkeyCleared -Forbid $Unavailable
+
+    Invoke-Step 'Shift+Tab twice to the hotkey field: NVDA reads it as not set' {
+        Send-Keys 'Shift+Tab'
+        $null = Wait-Until "focus on the '$($UI.CaptureHotkey)' button" { (Get-Focus).Id -eq 'settings-hotkey-capture' } 3
+        Send-Keys 'Shift+Tab'
+        $null = Wait-Until 'focus on the hotkey field' { (Get-Focus).Id -eq 'settings-hotkey-display' } 3
+    } -Expect $UI.NoHotkey
 
     Invoke-Step "Escape closes Settings: focus back on the '$($UI.OpenSettings)' button" {
         Close-Dialog 'settings-hotkey-display' $UI.OpenSettings

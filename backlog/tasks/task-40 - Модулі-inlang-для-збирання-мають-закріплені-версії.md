@@ -1,9 +1,11 @@
 ---
 id: TASK-40
 title: Модулі inlang для збирання мають закріплені версії
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-27T19:21:46Z'
+updated_date: '2026-11-27T20:28:10Z'
 labels:
   - security
   - frontend
@@ -28,16 +30,26 @@ ordinal: 14200
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Адреси обох модулів у `project.inlang/settings.json` мають точні версії замість `@latest`: ті, що збирання завантажує зараз
-- [ ] #2 `just check` і `just build` проходять, а тексти інтерфейсу обома мовами не змінилися
-- [ ] #3 `DEVELOPMENT.md` каже, як оновлювати ці версії
+- [x] #1 Адреси обох модулів у `project.inlang/settings.json` мають точні версії замість `@latest`: ті, що збирання завантажує зараз
+- [x] #2 `just check` і `just build` проходять, а тексти інтерфейсу обома мовами не змінилися
+- [x] #3 `DEVELOPMENT.md` каже, як оновлювати ці версії
 <!-- AC:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 Усі локальні перевірки проходять: `just check`
+- [x] #1 Усі локальні перевірки проходять: `just check`
 - [ ] #2 Новий або змінений текст інтерфейсу є англійською й українською: у `messages/en.json` і `messages/uk.json`, а підписи меню трея — у `src-tauri/src/tray.rs`
 - [ ] #3 Зміни в інтерфейсі, фокусі, діалогах чи оголошеннях перевірено з клавіатури і з NVDA (якщо задача їх містить)
-- [ ] #4 Документацію оновлено там, де змінилася поведінка чи порядок роботи (README.md, README_UK.md, DEVELOPMENT.md)
+- [x] #4 Документацію оновлено там, де змінилася поведінка чи порядок роботи (README.md, README_UK.md, DEVELOPMENT.md)
 - [ ] #5 CHANGELOG.md оновлено: лише зміни, помітні користувачам (без подробиць про інструменти, тести, CI чи збірку)
 <!-- DOD:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-27: версії знайдено так: заголовок `X-JSD-Version` у відповіді jsDelivr на адреси з `@latest` (4.6.0 і 1.4.8); sha256 файлів у `project.inlang/cache/plugins` збігся з `dist/index.js` цих версій. У `plugin-message-format` 4.6.0, 4.6.1 і 4.6.2 (npm latest) `dist/index.js` однаковий байт у байт. Paraglide 2.29.3 сам пропонує `plugin-message-format@4.5.0` у шаблоні init, тож 4.x працює з Paraglide 2. `src/paraglide/` до й після зміни однаковий (`git diff --no-index` без різниці); після збирання в кеші з'явилися файли для нових адрес. `just check` пройшов.
+
+2026-11-27: `just build` пройшов (AudioCaptor.exe зібрано); бандл інтерфейсу `index-BzxfSR-P.js` має ту саму назву-хеш, що й до зміни. DoD #2, #3, #5 не стосуються: текстів інтерфейсу й поведінки задача не змінює, CHANGELOG без запису. Коміт a53ee35 на гілці feature/task-40-pin-inlang. CI вручну ще не запускали.
+
+2026-11-27, головна сесія: гілку `feature/task-40-pin-inlang` злито в `develop` лише локально (вибір власника: без відправки); головна сесія повторила `just check` (134 тести). Задача лишається відкритою, доки власник не скаже відправити `develop` і запустити CI вручну; після зеленого CI — закрити.
+<!-- SECTION:NOTES:END -->

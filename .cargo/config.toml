@@ -1,0 +1,14 @@
+# Build settings for every cargo call in this repository. The file sits in the
+# repository root because cargo looks for `.cargo/config.toml` in the folder it
+# runs in and its parents, not next to the manifest: `just check` and CI call
+# cargo from the root with `--manifest-path`, Tauri calls it in `src-tauri`, and
+# both must build the app the same way as the release (TASK-37).
+
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]
+
+# The C libraries built with CMake (libFLAC, libopus) get the static C runtime
+# and their optimisation flags from this file; see the comments in it.
+# `relative = true` is relative to the folder that holds `.cargo`.
+[env]
+CMAKE_TOOLCHAIN_FILE_x86_64_pc_windows_msvc = { value = "src-tauri/cmake/msvc-toolchain.cmake", relative = true }

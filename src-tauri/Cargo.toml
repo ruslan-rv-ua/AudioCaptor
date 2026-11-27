@@ -31,7 +31,7 @@ rubato = "0.16"
 opus = "0.4"
 ogg = "0.9"
 # FLAC: libFLAC (C, built with CMake) without Ogg (decision-10). Its build
-# settings come from cmake/msvc-toolchain.cmake, named in .cargo/config.toml.
+# settings come from cmake/msvc-toolchain.cmake, named in ../.cargo/config.toml.
 libflac-sys = { version = "0.3.4", default-features = false, features = ["build-flac"] }
 ringbuf = "0.5.2"
 crossbeam-channel = "0.5"
@@ -55,6 +55,16 @@ windows = { version = "0.59", features = [
     "Win32_Foundation",
 ] }
 windows-core = "0.59"
+
+# The C libraries are optimised in dev builds too, so clippy, tests and `just dev`
+# run libFLAC and libopus as the release does: with optimisation and NDEBUG, not
+# with libFLAC's internal asserts. With opt-level 0 the `cmake` crate would build
+# them in the Debug configuration, which cmake/msvc-toolchain.cmake leaves as is.
+[profile.dev.package.libflac-sys]
+opt-level = 2
+
+[profile.dev.package.opusic-sys]
+opt-level = 2
 
 [profile.release]
 panic = "abort"

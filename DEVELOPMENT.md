@@ -210,7 +210,6 @@ AudioCaptor/
 │   ├── icons/                  # Значки програми для всіх платформ
 │   ├── capabilities/           # Дозволи Tauri
 │   ├── cmake/msvc-toolchain.cmake # Налаштування бібліотек на C: статичний C runtime, оптимізація
-│   ├── .cargo/config.toml      # Статичний C runtime (+crt-static) і шлях до файлу CMake
 │   ├── tauri.conf.json         # Конфігурація Tauri
 │   ├── Cargo.toml              # Залежності Rust і профілі збирання
 │   └── Cargo.lock              # Точні версії залежностей Rust
@@ -219,6 +218,7 @@ AudioCaptor/
 ├── backlog/                    # Задачі, чернетки, рішення, документи, етапи (Backlog.md)
 ├── scripts/
 │   └── smoke-nvda.ps1          # Перевірка зібраного exe з NVDA (just smoke)
+├── .cargo/config.toml          # Налаштування збирання для всіх викликів cargo: +crt-static, файл CMake
 ├── .github/workflows/          # CI (ci.yml) і Release (release.yml)
 ├── public/                     # Статичні файли (favicon)
 ├── index.html                  # HTML-точка входу
@@ -277,23 +277,32 @@ Release і маніфест Scoop (рішення decision-2).
 libopus і libFLAC написано на C; під час `cargo build` їх збирає CMake через крейт `cmake`. Файл
 `src-tauri/cmake/msvc-toolchain.cmake` задає для них дві речі (рішення decision-10):
 
-- **Статичний C runtime**, як `+crt-static` для Rust у `src-tauri/.cargo/config.toml`. libFLAC вимагає
+- **Статичний C runtime**, як `+crt-static` для Rust у `.cargo/config.toml`. libFLAC вимагає
   політик CMake до 3.31, тому бере runtime зі змінної `CMAKE_MSVC_RUNTIME_LIBRARY`, а не з прапорця `-MT`,
   який передає крейт `cmake`. Без файлу вона збирається з динамічним runtime, і exe не компонується
   (помилка LNK1120). libopus вмикає статичний runtime сама (`OPUS_STATIC_RUNTIME` у `opusic-sys`).
 - **Оптимізацію.** Для генератора Visual Studio крейт `cmake` замінює `CMAKE_C_FLAGS_<CONFIG>` прапорцями
   без `/O`. Без файлу libFLAC додає до exe близько 700 КБ замість 140 і кодує втричі повільніше (TASK-11).
-  Файл повертає типові прапорці CMake: `/O1` для MinSizeRel (профіль `release`, `opt-level = "s"`) і `/O2`
-  для Release (профіль `release-fast`). libopus збирається через Ninja, якщо він є в PATH (на
-  `windows-latest` є), і тоді прапорці в неї й так на місці; без Ninja файл повертає їх і їй.
+  Файл повертає типові прапорці CMake: `/O1` для MinSizeRel (профіль `release`, `opt-level = "s"`), `/O2`
+  для Release (профіль `release-fast`) і RelWithDebInfo (профіль `dev`, див. нижче). libopus збирається
+  через Ninja, якщо він є в PATH (на `windows-latest` є), і тоді прапорці в неї й так на місці; без Ninja
+  файл повертає їх і їй.
 
 Файл підключає змінна `CMAKE_TOOLCHAIN_FILE_x86_64_pc_windows_msvc` у розділі `[env]` файлу
-`src-tauri/.cargo/config.toml`. Cargo читає цей файл лише тоді, коли працює в теці `src-tauri`: так його
-запускає Tauri (`just dev`, `just build`, `pnpm tauri build`). `just check` і кроки CI викликають cargo з
-кореня з `--manifest-path`, тож clippy і тести збираються без `+crt-static` і без файлу CMake: Rust — з
-динамічним C runtime, а libFLAC — без оптимізації, з налагоджувальним C runtime (він є там, де встановлено
-Visual Studio чи Build Tools). Тому збирання для випуску перевіряє `just build` або пробний запуск Release
-(`dry_run=true`), а не CI.
+`.cargo/config.toml` у **корені репозиторію**. Там же лежить `+crt-static`. Cargo шукає цей файл у теці, де
+його запущено, і в її батьківських теках, а не біля `Cargo.toml`. Тому файл лежить у корені: його бачать
+усі виклики cargo — і з кореня з `--manifest-path` (`just check`, кроки CI і Release), і з теки `src-tauri`
+(Tauri: `just dev`, `just build`, `pnpm tauri build`). Тож clippy, тести й випуск збираються з тими самими
+налаштуваннями (TASK-37). Шлях до файлу CMake у `[env]` відносний (`relative = true`), тобто рахується від
+теки, де лежить `.cargo`, — від кореня.
+
+У профілі `dev` (clippy, тести, `just dev`) `src-tauri/Cargo.toml` піднімає `opt-level` до 2 для
+`libflac-sys` і `opusic-sys`. Інакше крейт `cmake` зібрав би бібліотеки в конфігурації Debug: без
+оптимізації і з увімкненими `assert` усередині libFLAC. Так тести FLAC перевіряють libFLAC такою, як у
+випуску. Решта коду в профілі `dev` лишається без оптимізації.
+
+Якщо змінити ці налаштування, перший `just check` перезбирає всі залежності (кілька хвилин); далі він знову
+швидкий.
 
 Перевірити зібраний exe можна командою `dumpbin /dependents src-tauri\target\release\AudioCaptor.exe`: серед
 бібліотек не має бути `VCRUNTIME140.dll`, а сам список має лишитися таким, як у попередньому випуску

@@ -1,7 +1,0 @@
-[target.x86_64-pc-windows-msvc]
-rustflags = ["-C", "target-feature=+crt-static"]
-
-# The C libraries built with CMake (libFLAC, libopus) get the static C runtime
-# and their optimisation flags from this file; see the comments in it.
-[env]
-CMAKE_TOOLCHAIN_FILE_x86_64_pc_windows_msvc = { value = "cmake/msvc-toolchain.cmake", relative = true }

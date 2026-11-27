@@ -244,7 +244,12 @@
     const key = e.key.toLowerCase();
     switch (key) {
       case "s":
-        if (recording.state === "Idle" && recording.canRecord) { e.preventDefault(); startRecording(); }
+        if (recording.state !== "Idle") break;
+        e.preventDefault();
+        // Without a device the profile needs, say why nothing starts: the same
+        // hint as the name of the disabled Start button. Focus stays put.
+        if (recording.canRecord) startRecording();
+        else announce(recording.readinessHint);
         break;
       case "p":
         if (recording.state === "Recording") { e.preventDefault(); pauseRecording(); }
@@ -543,9 +548,7 @@
 
   <RecordControls
     recordingState={recording.state}
-    canRecord={recording.canRecord}
-    needsMic={recording.needsMic}
-    needsLoopback={recording.needsLoopback}
+    readinessHint={recording.readinessHint}
     onstart={startRecording}
     onpause={pauseRecording}
     onresume={resumeRecording}

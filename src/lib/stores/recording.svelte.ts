@@ -7,6 +7,7 @@ import type {
   RecordingProfile,
 } from "../types";
 import * as api from "../utils/invoke";
+import * as m from "../../paraglide/messages";
 
 let recordingState = $state<RecordingState>("Idle");
 let durationMs = $state(0);
@@ -21,6 +22,19 @@ let loopbackVolume = $state(0.5);
 let outputMode = $state<OutputMode>("Mix");
 let sampleRate = $state(48000);
 let recordingError = $state<string | null>(null);
+
+// The modes that record from the microphone, and from system audio.
+const MIC_MODES: OutputMode[] = ["Microphone", "Mix", "MixPlusMicrophone", "MixPlusLoopback", "SeparateFiles"];
+const LOOPBACK_MODES: OutputMode[] = ["Loopback", "Mix", "MixPlusMicrophone", "MixPlusLoopback", "SeparateFiles"];
+
+function readinessHint(): string {
+  const needsMic = MIC_MODES.includes(outputMode) && !selectedMic;
+  const needsLoopback = LOOPBACK_MODES.includes(outputMode) && !selectedLoopback;
+  if (needsMic && needsLoopback) return m.hint_select_both();
+  if (needsMic) return m.hint_select_mic();
+  if (needsLoopback) return m.hint_select_loopback();
+  return "";
+}
 
 export function getRecording() {
   return {
@@ -40,31 +54,11 @@ export function getRecording() {
     get sampleRate() { return sampleRate; },
     set sampleRate(v: number) { sampleRate = v; },
     get error() { return recordingError; },
-    get canRecord() {
-      const mode = outputMode;
-      const needsMic = mode === "Microphone" || mode === "Mix" || mode === "MixPlusMicrophone" || mode === "MixPlusLoopback" || mode === "SeparateFiles";
-      const needsLoopback = mode === "Loopback" || mode === "Mix" || mode === "MixPlusMicrophone" || mode === "MixPlusLoopback" || mode === "SeparateFiles";
-      if (needsMic && !selectedMic) return false;
-      if (needsLoopback && !selectedLoopback) return false;
-      return true;
-    },
-    get needsMic() {
-      return (outputMode === "Microphone" || outputMode === "Mix" || outputMode === "MixPlusMicrophone" || outputMode === "MixPlusLoopback" || outputMode === "SeparateFiles")
-        && !selectedMic;
-    },
-    get needsLoopback() {
-      return (outputMode === "Loopback" || outputMode === "Mix" || outputMode === "MixPlusMicrophone" || outputMode === "MixPlusLoopback" || outputMode === "SeparateFiles")
-        && !selectedLoopback;
-    },
-    get readinessHint() {
-      const mode = outputMode;
-      const needsMic = (mode === "Microphone" || mode === "Mix" || mode === "MixPlusMicrophone" || mode === "MixPlusLoopback" || mode === "SeparateFiles") && !selectedMic;
-      const needsLoopback = (mode === "Loopback" || mode === "Mix" || mode === "MixPlusMicrophone" || mode === "MixPlusLoopback" || mode === "SeparateFiles") && !selectedLoopback;
-      if (needsMic && needsLoopback) return "Select microphone and system audio device";
-      if (needsMic) return "Select a microphone";
-      if (needsLoopback) return "Select a system audio device";
-      return "";
-    },
+    get canRecord() { return readinessHint() === ""; },
+    // Why a recording cannot start: the device the profile needs and that is
+    // not selected. The disabled Start button carries it in its name, and Alt+S
+    // announces it. Empty when a recording can start.
+    get readinessHint() { return readinessHint(); },
   };
 }
 

@@ -18,6 +18,10 @@
                new state and NVDA names it, without "unavailable"; focus on Stop stays there
                through a pause. Recording really starts (system audio of the default playback
                device, so no microphone is needed); the WAV file is not checked.
+      nodevice No system audio device is selected, and the active profile records system audio:
+               Alt+S on the profile list starts no recording, NVDA says why ("Select a system
+               audio device", the hint in the name of the disabled Start button), focus stays on
+               the list, and a second Alt+S says it again.
       dialogs  About (F1), Settings, New Profile and the delete confirmation: focus enters the
                dialog, Escape closes it and focus returns to where the dialog was opened. F1 in
                Settings opens About on top of Settings: UI Automation finds About in the middle
@@ -85,7 +89,7 @@
     in its chat before it starts the test; the script itself asks nothing.
 
 .PARAMETER Scenario
-    One or more of launch, record, dialogs, tray, settings, convert, mp3, flac. All of them when omitted.
+    One or more of launch, record, nodevice, dialogs, tray, settings, convert, mp3, flac. All of them when omitted.
 
 .PARAMETER ConvertMB
     The size of the large WAV file of the convert scenario, in megabytes. Default: 900, which a
@@ -130,7 +134,7 @@ param(
 $ErrorActionPreference = 'Stop'
 
 # --- Arguments ---------------------------------------------------------------------------------
-$AllScenarios = @('launch', 'record', 'dialogs', 'tray', 'settings', 'convert', 'mp3', 'flac')
+$AllScenarios = @('launch', 'record', 'nodevice', 'dialogs', 'tray', 'settings', 'convert', 'mp3', 'flac')
 $Selected = @($Scenario | Where-Object { $_ } | ForEach-Object { $_.ToLowerInvariant() })
 if ($Selected.Count -eq 0 -or $Selected -contains 'all') { $Selected = $AllScenarios }
 $unknown = @($Selected | Where-Object { $AllScenarios -notcontains $_ })
@@ -180,6 +184,8 @@ $UI = @{
     MicVolume      = 'Microphone Volume'        # mic_volume_label
     LoopbackVolume = 'Loopback Volume'          # loopback_volume_label
     Start          = 'Start recording (Alt+S)'  # start_recording_aria
+    NoLoopback     = 'Select a system audio device'  # hint_select_loopback
+    StartNoLoopback = 'Start recording (Alt+S). Select a system audio device'  # start_recording_disabled_aria
     Pause          = 'Pause recording (Alt+P)'  # pause_recording_aria
     Resume         = 'Resume recording (Alt+R)' # resume_recording_aria
     Stop           = 'Stop recording (Alt+T)'   # stop_recording_aria
@@ -570,7 +576,7 @@ function Write-TestSettings {
     $settings = [ordered]@{
         version                    = 5
         selectedMic                = $null
-        selectedLoopback           = $script:PlaybackDeviceId
+        selectedLoopback           = if ($script:NoLoopbackDevice) { $null } else { $script:PlaybackDeviceId }
         hotkey                     = 'Pause'
         soundEnabled               = $true
         profiles                   = @((& $newProfile 'smoke-system' $Profiles.System 'Loopback' $systemFormat),
@@ -1105,6 +1111,29 @@ function Invoke-RecordScenario {
     Invoke-Step 'Alt+I after stopping: NVDA says Ready' { Send-Keys 'Alt+I' } -Expect $UI.Ready
 }
 
+# The settings select no system audio device, and the active profile records system audio
+# (backlog TASK-38). The hint is said once per press: the app makes a repeated announcement differ.
+function Invoke-NoDeviceScenario {
+    $script:NoLoopbackDevice = $true
+    try {
+        Invoke-Step 'Start without a system audio device: the window opens with focus on the profile list' {
+            Start-App
+            Add-Check "the disabled Start button is named '$($UI.StartNoLoopback)'" ($null -ne (Find-ByName $UI.StartNoLoopback))
+        }
+
+        foreach ($press in 'Alt+S', 'Alt+S again') {
+            Invoke-Step "$press on the profile list: no recording, NVDA says '$($UI.NoLoopback)', focus stays on the list" {
+                Send-Keys 'Alt+S'
+                Start-Sleep -Milliseconds 1500  # a recording would have started by now
+                Add-Check 'no recording started (no Pause button)' ($null -eq (Find-ByName $UI.Pause))
+                Confirm-Focus $UI.ProfileList
+            } -Once $UI.NoLoopback -Forbid $UI.Started
+        }
+    } finally {
+        $script:NoLoopbackDevice = $false
+    }
+}
+
 # Buttons are pressed with Space: it acts on key up, so no key event reaches the dialog that opens.
 function Invoke-DialogsScenario {
     Invoke-Step 'Start: the window opens with focus on the profile list' { Start-App }
@@ -1607,6 +1636,7 @@ function Invoke-Scenario([string]$Name) {
         switch ($Name) {
             'launch'  { Invoke-LaunchScenario }
             'record'  { Invoke-RecordScenario }
+            'nodevice' { Invoke-NoDeviceScenario }
             'dialogs' { Invoke-DialogsScenario }
             'tray'    { Invoke-TrayScenario }
             'settings' { Invoke-SettingsScenario }

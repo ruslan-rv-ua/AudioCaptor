@@ -114,20 +114,13 @@ fn handle_shortcut_event(app: &AppHandle, event: ShortcutEvent) {
 
             match current {
                 RecordingState::Idle => {
-                    // Proactive check: verify required devices before attempting
-                    let settings = settings::read_settings();
-                    let profile = settings
-                        .profiles
-                        .iter()
-                        .find(|p| p.id == settings.active_profile_id)
-                        .cloned()
-                        .unwrap_or_default();
-                    let needs_mic = profile.output_mode.needs_mic();
-                    let needs_loopback = profile.output_mode.needs_loopback();
-                    let mic_missing = needs_mic && settings.selected_mic.is_none();
-                    let loopback_missing = needs_loopback && settings.selected_loopback.is_none();
-
-                    if mic_missing || loopback_missing {
+                    // A device the active profile needs is not selected: no
+                    // recording, only the warning sound (the window, if open,
+                    // shows why under its disabled Start button).
+                    if device_missing(&settings::read_settings()) {
+                        log::info!(
+                            "Hotkey start skipped: a device the profile needs is not selected"
+                        );
                         if let Ok(s) = state.lock() {
                             play_sound(&s, sounds::SoundKind::Warning);
                         }
@@ -157,9 +150,78 @@ fn handle_shortcut_event(app: &AppHandle, event: ShortcutEvent) {
     }
 }
 
+/// Whether the active profile records from a device that is not selected.
+fn device_missing(settings: &settings::Settings) -> bool {
+    let profile = settings
+        .profiles
+        .iter()
+        .find(|p| p.id == settings.active_profile_id)
+        .cloned()
+        .unwrap_or_default();
+    let mode = &profile.output_mode;
+    (mode.needs_mic() && settings.selected_mic.is_none())
+        || (mode.needs_loopback() && settings.selected_loopback.is_none())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::audio::types::OutputMode;
+
+    /// Settings whose only, active profile records in `mode`.
+    fn settings_with(
+        mode: OutputMode,
+        mic: Option<&str>,
+        loopback: Option<&str>,
+    ) -> settings::Settings {
+        let mut s = settings::Settings::default();
+        let mut profile = s.profiles.first().cloned().unwrap_or_default();
+        profile.output_mode = mode;
+        s.active_profile_id = profile.id.clone();
+        s.profiles = vec![profile];
+        s.selected_mic = mic.map(String::from);
+        s.selected_loopback = loopback.map(String::from);
+        s
+    }
+
+    #[test]
+    fn device_missing_when_profile_needs_unselected_device() {
+        assert!(device_missing(&settings_with(
+            OutputMode::Loopback,
+            Some("mic"),
+            None
+        )));
+        assert!(device_missing(&settings_with(
+            OutputMode::Microphone,
+            None,
+            Some("out")
+        )));
+        assert!(device_missing(&settings_with(
+            OutputMode::Mix,
+            Some("mic"),
+            None
+        )));
+        assert!(device_missing(&settings_with(OutputMode::Mix, None, None)));
+    }
+
+    #[test]
+    fn device_not_missing_when_profile_has_its_devices() {
+        assert!(!device_missing(&settings_with(
+            OutputMode::Loopback,
+            None,
+            Some("out")
+        )));
+        assert!(!device_missing(&settings_with(
+            OutputMode::Microphone,
+            Some("mic"),
+            None
+        )));
+        assert!(!device_missing(&settings_with(
+            OutputMode::Mix,
+            Some("mic"),
+            Some("out")
+        )));
+    }
     use std::sync::Mutex;
 
     /// Serializes tests that mutate shared global atomics.

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Alt+S now says why a recording does not start when the profile needs a device that is not selected, for example "Select a system audio device": the same hint as the disabled Start recording button. Before, Alt+S did nothing and the screen reader said nothing. Focus stays where it was. The global recording hotkey in this state plays the warning sound and does not start a recording, as before.
+
 ## [0.4.0] — 2026-11-27
 
 ### Added

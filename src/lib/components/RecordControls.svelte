@@ -4,22 +4,17 @@
 
   interface Props {
     recordingState: RecordingState;
-    canRecord: boolean;
-    needsMic: boolean;
-    needsLoopback: boolean;
+    // Why a recording cannot start; empty when it can.
+    readinessHint: string;
     onstart: () => void;
     onpause: () => void;
     onresume: () => void;
     onstop: () => void;
   }
 
-  let { recordingState, canRecord, needsMic, needsLoopback, onstart, onpause, onresume, onstop }: Props = $props();
+  let { recordingState, readinessHint, onstart, onpause, onresume, onstop }: Props = $props();
 
-  let readinessHint = $derived(
-    needsMic && needsLoopback ? m.hint_select_both() :
-    needsMic ? m.hint_select_mic() :
-    needsLoopback ? m.hint_select_loopback() : ""
-  );
+  let canRecord = $derived(readinessHint === "");
 </script>
 
 <div class="record-controls" role="group" aria-label={m.recording_controls()}>

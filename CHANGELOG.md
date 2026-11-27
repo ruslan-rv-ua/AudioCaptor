@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Recordings can now be saved as FLAC, a lossless format: the file holds exactly the sound of the WAV, sample for sample, and takes less space. The Format list of a profile has a new entry, "FLAC (lossless)". How much smaller the file gets depends on the sound: an hour of quiet speech at 48 kHz takes about 130 MB instead of 691 MB, an hour of music about 380 MB. As with Opus and MP3, the recording is written as WAV and converted in the background when you stop it (an hour takes about a quarter of a minute on a recent PC). The WAV is deleted only after AudioCaptor has decoded the whole `.flac` file and found every sample the same as in the WAV.
+- FLAC works at every sample rate of a profile and keeps the sample rate and the channels of the recording as they are. It needs no encoder from Windows, so it also works on the N and KN editions without the Media Feature Pack.
+
+### Changed
+
+- If you go back to AudioCaptor 0.3.0, a profile with the FLAC format records WAV there. The format works again after you update, unless you saved that profile in 0.3.0.
+
 ## [0.3.0] — 2026-11-27
 
 ### Added

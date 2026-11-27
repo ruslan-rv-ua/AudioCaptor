@@ -20,6 +20,7 @@ TypeScript у WebView2. Тут описано, що встановити, як �
 | Запис WAV | [hound](https://github.com/ruuda/hound) |
 | Стиснення Opus | [libopus](https://opus-codec.org/) через крейти [opus](https://github.com/SpaceManiac/opus-rs) і `opusic-sys` (код на C, збирається CMake); контейнер Ogg — [ogg](https://github.com/RustAudio/ogg) (рішення decision-8) |
 | Стиснення MP3 | Кодер, вбудований у Windows: [MP3 Audio Encoder](https://learn.microsoft.com/en-us/windows/win32/medfound/mp3-audio-encoder) з Media Foundation, через крейт `windows`; сторонньої бібліотеки MP3 немає (рішення decision-5) |
+| Стиснення FLAC | [libFLAC](https://xiph.org/flac/) 1.5.0 через крейт [libflac-sys](https://github.com/mgeier/libflac-sys) без Ogg (код на C, збирається CMake); кодер і декодер викликаються напряму (рішення decision-10) |
 | Звукові сигнали | [rodio](https://github.com/RustAudio/rodio) (OGG, вбудовані через `include_bytes!`) |
 | Глобальна гаряча клавіша | `tauri-plugin-global-shortcut` |
 | Одна копія програми | `tauri-plugin-single-instance` |
@@ -37,11 +38,12 @@ TypeScript у WebView2. Тут описано, що встановити, як �
 - **Microsoft C++ Build Tools** з набором «Desktop development with C++»
   ([завантаження](https://visualstudio.microsoft.com/visual-cpp-build-tools/)): ними Rust для Windows
   компонує exe.
-- **[CMake](https://cmake.org/download/)** — ним під час `cargo build` збирається libopus, кодер Opus,
-  написаний на C (його приносить крейт `opusic-sys`). Команда `cmake` має бути в PATH: поставте CMake
-  через `scoop install cmake` або інсталятором із сайту. Перевірено з CMake 4.5; на образі
-  `windows-latest`, де працюють CI і Release, він уже є. Без CMake збирання зупиняється на крейті
-  `opusic-sys`.
+- **[CMake](https://cmake.org/download/)** — ним під час `cargo build` збираються дві бібліотеки, написані
+  на C: libopus, кодер Opus (його приносить крейт `opusic-sys`), і libFLAC (крейт `libflac-sys`). Команда
+  `cmake` має бути в PATH: поставте CMake через `scoop install cmake` або інсталятором із сайту. Перевірено
+  з CMake 4.5; на образі `windows-latest`, де працюють CI і Release, він уже є. Без CMake збирання
+  зупиняється на крейті `opusic-sys` або `libflac-sys`. Налаштування цих бібліотек — у розділі «Бібліотеки
+  на C: файл CMake».
 - **[Node.js](https://nodejs.org/) 22** — цю версію ставлять CI і Release. Мажорна версія `@types/node` у
   `package.json` така сама, тож перехід на інший Node міняє і `node-version` у `ci.yml` та `release.yml`, і
   `@types/node`. Vite 8 і `@sveltejs/vite-plugin-svelte` 7 працюють з Node 20.19+, 22.12+ або 24+; Node 18 уже
@@ -190,6 +192,7 @@ AudioCaptor/
 │   │   │   └── types.rs        # Аудіотипи й переліки
 │   │   ├── convert/            # Конвертація готового WAV у стиснений формат
 │   │   │   ├── mod.rs          # Спільний шлях: тимчасовий файл, перевірка, заміна WAV
+│   │   │   ├── flac.rs         # FLAC: кодер libFLAC, звірка з WAV семпл у семпл
 │   │   │   ├── media_foundation.rs # Media Foundation: mfplat.dll завантажується під час конвертації
 │   │   │   ├── mp3.rs          # MP3: кодер Windows, перевірка кадрів і тривалості
 │   │   │   ├── ogg_opus.rs     # Opus: кодер, контейнер Ogg, перевірка розкодуванням
@@ -206,7 +209,8 @@ AudioCaptor/
 │   ├── sounds/                 # Звуки OGG
 │   ├── icons/                  # Значки програми для всіх платформ
 │   ├── capabilities/           # Дозволи Tauri
-│   ├── .cargo/config.toml      # Статичний C runtime (+crt-static)
+│   ├── cmake/msvc-toolchain.cmake # Налаштування бібліотек на C: статичний C runtime, оптимізація
+│   ├── .cargo/config.toml      # Статичний C runtime (+crt-static) і шлях до файлу CMake
 │   ├── tauri.conf.json         # Конфігурація Tauri
 │   ├── Cargo.toml              # Залежності Rust і профілі збирання
 │   └── Cargo.lock              # Точні версії залежностей Rust
@@ -267,6 +271,33 @@ pnpm vite dev --port 1420                               # vite-dev
 
 Назву `AudioCaptor.exe` задано явно (`mainBinaryName` у `src-tauri/tauri.conf.json`); на неї спираються
 Release і маніфест Scoop (рішення decision-2).
+
+### Бібліотеки на C: файл CMake
+
+libopus і libFLAC написано на C; під час `cargo build` їх збирає CMake через крейт `cmake`. Файл
+`src-tauri/cmake/msvc-toolchain.cmake` задає для них дві речі (рішення decision-10):
+
+- **Статичний C runtime**, як `+crt-static` для Rust у `src-tauri/.cargo/config.toml`. libFLAC вимагає
+  політик CMake до 3.31, тому бере runtime зі змінної `CMAKE_MSVC_RUNTIME_LIBRARY`, а не з прапорця `-MT`,
+  який передає крейт `cmake`. Без файлу вона збирається з динамічним runtime, і exe не компонується
+  (помилка LNK1120). libopus вмикає статичний runtime сама (`OPUS_STATIC_RUNTIME` у `opusic-sys`).
+- **Оптимізацію.** Для генератора Visual Studio крейт `cmake` замінює `CMAKE_C_FLAGS_<CONFIG>` прапорцями
+  без `/O`. Без файлу libFLAC додає до exe близько 700 КБ замість 140 і кодує втричі повільніше (TASK-11).
+  Файл повертає типові прапорці CMake: `/O1` для MinSizeRel (профіль `release`, `opt-level = "s"`) і `/O2`
+  для Release (профіль `release-fast`). libopus збирається через Ninja, якщо він є в PATH (на
+  `windows-latest` є), і тоді прапорці в неї й так на місці; без Ninja файл повертає їх і їй.
+
+Файл підключає змінна `CMAKE_TOOLCHAIN_FILE_x86_64_pc_windows_msvc` у розділі `[env]` файлу
+`src-tauri/.cargo/config.toml`. Cargo читає цей файл лише тоді, коли працює в теці `src-tauri`: так його
+запускає Tauri (`just dev`, `just build`, `pnpm tauri build`). `just check` і кроки CI викликають cargo з
+кореня з `--manifest-path`, тож clippy і тести збираються без `+crt-static` і без файлу CMake: Rust — з
+динамічним C runtime, а libFLAC — без оптимізації, з налагоджувальним C runtime (він є там, де встановлено
+Visual Studio чи Build Tools). Тому збирання для випуску перевіряє `just build` або пробний запуск Release
+(`dry_run=true`), а не CI.
+
+Перевірити зібраний exe можна командою `dumpbin /dependents src-tauri\target\release\AudioCaptor.exe`: серед
+бібліотек не має бути `VCRUNTIME140.dll`, а сам список має лишитися таким, як у попередньому випуску
+(системні бібліотеки Windows і `api-ms-win-crt-*.dll`).
 
 ## Портативний режим
 
@@ -375,15 +406,16 @@ ImageMagick).
 називається «конвертація».
 
 - **Формат профілю.** Поле `outputFormat` профілю (`settings.json` версії 6) містить ідентифікатор варіанта
-  зі списку «Формат»: `Wav`, `OpusSpeech`, `OpusMusic`, `Mp3Speech`, `Mp3Standard`, `Mp3High` (`OutputFormat`
-  у `audio/types.rs`). У профілі це
+  зі списку «Формат»: `Wav`, `OpusSpeech`, `OpusMusic`, `Mp3Speech`, `Mp3Standard`, `Mp3High`, `Flac`
+  (`OutputFormat` у `audio/types.rs`). У профілі це
   рядок, а не перелік: формат, якого версія не знає (його записала новіша), читається без помилки, лишається
   у файлі, а запис іде у WAV (`RecordingProfile::format`).
 - **Кількість кадрів.** `WavOutputWriter` рахує записані кадри, мікшер повертає їх разом зі шляхами
   (`RecordedFile`). Конвертація читає WAV за цією кількістю (`convert/wav.rs`), а не за заголовком: після
   4 ГБ число в заголовку переповнюється, а після збою воно нульове.
-- **Спільний шлях** (`convert::convert_file`): кодування в тимчасовий файл `<назва>.opus.tmp` чи
-  `<назва>.mp3.tmp`, перевірка, перейменування на `<назва>.opus` чи `<назва>.mp3`, видалення WAV. Будь-яка
+- **Спільний шлях** (`convert::convert_file`): кодування в тимчасовий файл `<назва>.opus.tmp`,
+  `<назва>.mp3.tmp` чи `<назва>.flac.tmp`, перевірка, перейменування на `<назва>.opus`, `<назва>.mp3` чи
+  `<назва>.flac`, видалення WAV. Будь-яка
   помилка до перейменування видаляє тимчасовий файл і лишає WAV. Формат додає лише свій `Codec` з двома
   методами, `encode` і `verify`; `encode_share` каже, яку частку часу займає кодування (для відсотка й оцінки
   часу).
@@ -424,6 +456,25 @@ ImageMagick).
 - **Перемикач для перевірок.** Змінна середовища `AUDIOCAPTOR_NO_MP3_ENCODER=1` змушує програму поводитися
   так, ніби кодера MP3 немає (`mp3::NO_ENCODER_SWITCH`). Нею `just smoke` перевіряє повідомлення для
   Windows N; іншого впливу вона не має.
+- **FLAC** (`convert/flac.rs`): libFLAC 1.5.0 через крейт `libflac-sys`, кодер і декодер викликаються
+  напряму (рішення decision-10). Рівень стиснення 5, блок 4096 кадрів, таблиця переходів із точкою кожні
+  10 с, MD5 звуку в блоці STREAMINFO. Частота й канали лишаються як у записі: 8, 16, 44,1 і 48 кГц, моно й
+  стерео; нічого не перетворюється й не зводиться. Кодер пише файл через власні функції write, seek і tell
+  (`FLAC__stream_encoder_init_stream`): наприкінці libFLAC сама повертається на початок файлу й дописує
+  довжину, MD5 і таблицю переходів. WAV читається блоками по 4096 кадрів, тож пам'ять не росте з тривалістю
+  запису. Порожній запис дає правильний файл без звуку. `encode_share` — 0,7.
+- **Перевірка FLAC** — звірка з WAV семпл у семпл (рішення decision-7). Декодер libFLAC розкодовує весь
+  файл з увімкненою перевіркою MD5, кожен блок порівнюється з тими самими кадрами WAV, а наприкінці і
+  кількість звірених кадрів, і довжина в STREAMINFO мають дорівнювати кількості кадрів запису. Помилка — це
+  також будь-яке повідомлення декодера (втрачена синхронізація, хибна контрольна сума блока), MD5 із самих
+  нулів і блок з іншою частотою чи кількістю каналів, ніж у STREAMINFO. Кодер і перевірка дивляться на
+  прапорець зупинки на кожному блоці. У збиранні без `NDEBUG` (тести, `just dev`) libFLAC, натрапивши на
+  пошкоджений файл, пише в stderr рядки на кшталт «Rewinding, seeking necessary»: у тестах пошкоджених
+  файлів це очікувано.
+- **Заміри FLAC** (TASK-12, зібраний exe, ПК розробки з i5-14500): година 48 кГц стерео конвертується за
+  13,5 с — і мовлення (файл 126 МБ, 18 % від WAV), і музика (384 МБ, 56 %); запис на 6 год 30 хв (WAV
+  4,49 ГБ з переповненим заголовком) — за 69 с. Приватна пам'ять процесу під час конвертації — 8,0 МБ, без
+  неї — 7,7 МБ. Exe більший на 137 КБ, нових DLL серед залежностей немає.
 - **Черга** (`convert/queue.rs`): один потік `converter` бере файли по одному, в порядку зупинки. Файл, який
   конвертується, лишається першим у черзі й у `conversion-queue.json`, доки не готовий. Файл, який не вдалося
   конвертувати, з черги зникає: повторних спроб немає, користувачеві лишається WAV. Запис із форматом, якого
@@ -458,6 +509,9 @@ GitHub `windows-latest` компонента Media Foundation немає (Window
 там, де задано змінну `CI`, ці тести пропускаються й пишуть «Skipped: this Windows has no MP3 encoder».
 Деінде відсутній кодер — помилка тесту. Перевірка кадрів, межі тривалості й відсутній кодер тестуються й
 без Media Foundation.
+
+Тести FLAC (`convert/flac.rs`) кодують і розкодовують самою libFLAC, від Windows не залежать і йдуть також
+на CI.
 
 ### Команди IPC
 
@@ -543,8 +597,8 @@ CI і Release її не запускають.
   поясненням і кодом виходу 2.
 - Пристрій відтворення за замовчуванням у Windows: сценарій `record` записує системний звук.
 - Руки геть від клавіатури й миші від старту до трьох сигналів наприкінці: тест забирає
-  клавіатуру, мишу й голос NVDA на дві-три хвилини (усі сценарії — близько двох з половиною хвилин, з
-  них сценарій `convert` — близько 50 с, `mp3` — близько 20 с).
+  клавіатуру, мишу й голос NVDA на дві-три хвилини (усі сценарії — близько трьох хвилин, з
+  них сценарій `convert` — близько 50 с, `mp3` — близько 20 с, `flac` — близько 20 с).
 - Для сценарію `convert` — близько 900 МБ вільного місця в теці `%TEMP%`: тест генерує там WAV,
   який програма конвертує, і видаляє його наприкінці сценарію.
 
@@ -596,7 +650,12 @@ CI і Release її не запускають.
     у Windows немає кодера MP3 (Windows N без Media Feature Pack): після Alt+S і Alt+T NVDA читає
     «Windows has no MP3 encoder. To record in MP3, install the Media Feature Pack…» і «Conversion
     finished with errors. Recordings kept as WAV: 1.», а запис лишається у WAV без файлів `.mp3` і
-    `.mp3.tmp`.
+    `.mp3.tmp`;
+  - `flac` — формат FLAC (TASK-12), близько 20 с. Активний профіль має формат «FLAC (lossless)». У
+    діалозі редагування профілю Tab доходить до списку «Format», і NVDA читає його назву й значення
+    «FLAC (lossless)»; Escape закриває діалог. Потім Alt+S, три секунди запису системного звуку, Alt+T:
+    NVDA каже «Recording stopped. Conversion to FLAC started.» і «Conversion finished.», а в теці записів
+    лежить один файл `.flac`, який починається позначкою `fLaC`, і немає WAV.
 - Старт. Спершу тест перевіряє exe, NVDA і його журнал (якщо чогось бракує, він зупиняється
   одразу). Потім лунає один звуковий сигнал, і за 5 секунд тест натискає першу клавішу. Іншу паузу
   задає параметр `-PauseSec`, наприклад `just smoke dialogs -PauseSec 10`.
@@ -618,8 +677,8 @@ CI і Release її не запускають.
 - Тест запускає копію exe з `%TEMP%\audiocaptor-smoke` з власною `AudioCaptor-data` (англійський
   інтерфейс, два тестові профілі, вибрано пристрій відтворення за замовчуванням). Профілі в тестовому
   `settings.json` записано як у версії 5, без формату, тож кожен запуск тестової копії проходить і
-  міграцію налаштувань до версії 6; лише сценарій `convert` дає активному профілю формат
-  «Opus — мовлення». Дані WebView2 ця
+  міграцію налаштувань до версії 6; лише сценарії `convert`, `mp3` і `flac` дають активному профілю
+  формат («Opus — мовлення», «MP3 — стандарт», «FLAC»). Дані WebView2 ця
   копія, як і будь-яка інша, тримає в `AudioCaptor-webview` поруч зі своїм exe: тест перевіряє, що вона
   сама створила там `EBWebView`, а звіт показує стан цієї теки. Кожен прогін починається з порожнім
   профілем браузера, як перший запуск нової копії чи запуск після оновлення через Scoop.

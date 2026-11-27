@@ -35,7 +35,7 @@
 - **Internationalization** — English and Ukrainian
 - **Portable** — single `.exe` file, all data stored in `AudioCaptor-data/` folder
 - **Accessible** — full screen reader support, keyboard navigation, ARIA labels
-- **WAV, Opus or MP3** — lossless WAV, or Opus and MP3 files many times smaller, made automatically when a recording stops; 8, 16, 44.1, or 48 kHz
+- **WAV, FLAC, Opus or MP3** — lossless WAV, lossless FLAC in a smaller file, or Opus and MP3 files many times smaller, made automatically when a recording stops; 8, 16, 44.1, or 48 kHz
 
 ## Quick Start
 
@@ -50,7 +50,7 @@ AudioCaptor.exe
 AudioCaptor-data/
 ├── settings.json      # Your preferences (auto-saved)
 ├── settings.unreadable.json  # Only if settings.json could not be read: a copy of the old file
-├── conversion-queue.json     # Only while recordings wait to be converted to Opus or MP3
+├── conversion-queue.json     # Only while recordings wait to be converted to Opus, MP3 or FLAC
 ├── logs/              # Diagnostic logs
 └── Recordings/        # Default recordings folder
 AudioCaptor-webview/   # Cache of the built-in browser
@@ -66,7 +66,7 @@ The built-in browser that draws the window (Microsoft Edge WebView2) keeps its c
 4. **Pause / Resume** — short press the hotkey or use the UI buttons
 5. **Stop** — long press the hotkey (≥500ms) or click Stop
 
-Recordings are saved with automatic timestamps (e.g., `mix_2026-03-31_14-30-00.wav`): as WAV files, or as `.opus` or `.mp3` files when the profile's format is Opus or MP3.
+Recordings are saved with automatic timestamps (e.g., `mix_2026-03-31_14-30-00.wav`): as WAV files, or as `.opus`, `.mp3` or `.flac` files when the profile's format is Opus, MP3 or FLAC.
 
 ## Recording Formats
 
@@ -80,13 +80,14 @@ The **Format** list of a profile sets the kind of file you get:
 | MP3 — speech (mono, 64 kbps) | Meetings and lectures in the format that every player, phone and website opens. Both channels are mixed into one. | about 29 MB |
 | MP3 — standard (128 kbps) | Any sound in stereo, in the most common kind of MP3. | about 58 MB |
 | MP3 — high quality (320 kbps) | Music in stereo, as close to the WAV as MP3 gets. | about 144 MB |
+| FLAC (lossless) | The sound exactly as recorded, sample for sample, in a smaller file. For an archive, or to edit the recording later. | from about 130 MB (speech) to about 380 MB (music) at 48 kHz |
 
-Opus and MP3 are lossy formats: they leave out what the ear hardly notices, so the sound is very close to the WAV but not identical. Opus gives the same quality in smaller files; MP3 opens everywhere. Choose WAV when you need the recording exactly as it was, for example to edit it later.
+Opus and MP3 are lossy formats: they leave out what the ear hardly notices, so the sound is very close to the WAV but not identical. Opus gives the same quality in smaller files; MP3 opens everywhere. Choose FLAC or WAV when you need the recording exactly as it was, for example to edit it later. FLAC is lossless: it keeps every sample of the WAV and only packs them tighter, so how much smaller the file gets depends on the sound. Quiet speech packs down to about a fifth of the WAV, music to a little over a half.
 
-How a recording becomes an Opus or MP3 file:
+How a recording becomes an Opus, MP3 or FLAC file:
 
-- The recording itself is written as WAV, as before. When you stop it, AudioCaptor converts it in the background. On a recent PC an hour of recording takes about half a minute in Opus and about a quarter of a minute in MP3.
-- The new file gets the same name with `.opus` or `.mp3` at the end. AudioCaptor checks it before it deletes the WAV, so one file per track is left: an Opus file must decode and last exactly as long as the recording; an MP3 file must consist of whole MP3 frames and last as long as the recording plus the silence of a few hundredths of a second that every MP3 encoder adds at the start and the end.
+- The recording itself is written as WAV, as before. When you stop it, AudioCaptor converts it in the background. On a recent PC an hour of recording takes about half a minute in Opus and about a quarter of a minute in MP3 or FLAC.
+- The new file gets the same name with `.opus`, `.mp3` or `.flac` at the end. AudioCaptor checks it before it deletes the WAV, so one file per track is left: an Opus file must decode and last exactly as long as the recording; an MP3 file must consist of whole MP3 frames and last as long as the recording plus the silence of a few hundredths of a second that every MP3 encoder adds at the start and the end; a FLAC file is decoded in full, and every sample of it must be the same as in the WAV.
 - Recordings are converted one at a time, in the order you stopped them. You can start a new recording meanwhile.
 - The screen reader says when a conversion starts and when all conversions are finished. `Alt+I` says about how long is left and how many files are waiting.
 - If a recording cannot be converted, it is not lost: the WAV stays, the warning sound plays and a message says where the WAV is.
@@ -104,9 +105,11 @@ MP3 and the sample rate of a profile:
 - At **16 kHz** MP3 allows at most 80 kbit/s in stereo and 48 kbit/s in mono, so "standard" and "high quality" both give 80 kbit/s (about 36 MB per hour) and "speech" gives 48 kbit/s (about 22 MB).
 - At **8 kHz** MP3 allows at most 32 kbit/s in stereo and 16 kbit/s in mono: "standard" and "high quality" give 32 kbit/s (about 14 MB per hour), "speech" 16 kbit/s (about 7 MB).
 
+FLAC and the sample rate of a profile: FLAC keeps the sample rate and the channels of the recording as they are, at 8, 16, 44.1 and 48 kHz. Nothing is converted and nothing is mixed.
+
 MP3 on Windows N: AudioCaptor makes MP3 files with the MP3 encoder that comes with Windows, so it needs no extra library. The N and KN editions of Windows have no such encoder until the Media Feature Pack is installed. There a recording in an MP3 profile stays WAV: the warning sound plays and a message says how to get the encoder. Install the Media Feature Pack from Optional features in Windows Settings, restart the computer, and the next recordings are saved as MP3.
 
-AudioCaptor 0.1.2 and older do not know the format of a profile. If you go back to one of them, your profiles stay, but they record WAV, and you choose the format again after you update. AudioCaptor 0.2.0 knows WAV and Opus but not MP3: there a profile with an MP3 format records WAV, and the format works again after you update, unless you saved that profile in 0.2.0.
+AudioCaptor 0.1.2 and older do not know the format of a profile. If you go back to one of them, your profiles stay, but they record WAV, and you choose the format again after you update. AudioCaptor 0.2.0 knows WAV and Opus but not MP3, and AudioCaptor 0.3.0 knows MP3 but not FLAC: there a profile with a format that the version does not know records WAV, and the format works again after you update, unless you saved that profile in the older version.
 
 ## Keyboard Shortcuts
 
@@ -150,7 +153,7 @@ AudioCaptor is built with accessibility as a top priority:
 - Sound notifications mirror visual state changes
 - Global hotkey works from any application
 - `Alt+I` announces current recording status
-- The start and the end of a conversion to Opus or MP3 are announced; `Alt+I` says about how long is left
+- The start and the end of a conversion to Opus, MP3 or FLAC are announced; `Alt+I` says about how long is left
 - About dialog with hotkeys reference and quick start guide
 
 ## License

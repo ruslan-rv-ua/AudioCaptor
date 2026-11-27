@@ -3,6 +3,7 @@ use crate::profiles::RecordingProfile;
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::sync::{Mutex, MutexGuard};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase", default)]
@@ -129,6 +130,9 @@ pub(crate) fn migrate_settings(mut settings: Settings) -> Settings {
 }
 
 pub fn read_settings() -> Settings {
+    if let Some(held) = held_settings(&write_guard()) {
+        return held;
+    }
     let path = match settings_path() {
         Ok(p) => p,
         Err(_) => return Settings::default(),
@@ -155,9 +159,16 @@ pub struct StartupSettings {
 /// file, a field of an unexpected type) is copied to `settings.unreadable.json`
 /// before the caller writes the defaults over it. An existing copy is never
 /// overwritten: the next ones are `settings.unreadable-2.json`, `-3` and so on.
+/// When the copy fails, it is tried again before the first save of the settings.
 pub fn read_settings_at_startup() -> StartupSettings {
     match crate::portable::data_dir() {
-        Ok(dir) => read_settings_from(&dir),
+        Ok(dir) => {
+            let loaded = read_settings_from(&dir);
+            if !loaded.write_back && loaded.unreadable_kept_at.is_some() {
+                *write_guard() = WriteGuard::RetryCopy;
+            }
+            loaded
+        }
         Err(_) => StartupSettings {
             settings: Settings::default(),
             unreadable_kept_at: None,
@@ -249,11 +260,70 @@ pub(crate) fn write_atomic(path: &Path, contents: &str) -> std::io::Result<()> {
     })
 }
 
-pub fn write_settings(settings: &Settings) -> anyhow::Result<()> {
-    let path = settings_path()?;
+/// Whether `settings.json` may be written over.
+#[derive(Debug)]
+enum WriteGuard {
+    /// Written as usual.
+    Free,
+    /// The unreadable file could not be copied at startup: the copy is tried
+    /// again before the first write.
+    RetryCopy,
+    /// The second copy failed too, so the file stays as it is until the app
+    /// restarts. Holds the settings saved since then, so that the app reads
+    /// back its own changes until it closes.
+    Held(Option<Settings>),
+}
+
+static WRITE_GUARD: Mutex<WriteGuard> = Mutex::new(WriteGuard::Free);
+
+fn write_guard() -> MutexGuard<'static, WriteGuard> {
+    WRITE_GUARD.lock().unwrap_or_else(|e| e.into_inner())
+}
+
+/// The settings saved while `settings.json` is held back, if any.
+fn held_settings(guard: &WriteGuard) -> Option<Settings> {
+    match guard {
+        WriteGuard::Held(held) => held.clone(),
+        _ => None,
+    }
+}
+
+/// Writes `settings` to `settings.json` in `dir`, unless the guard holds the
+/// file back. An unreadable file that could not be copied at startup is copied
+/// once more first; if that fails as well, the file is left unchanged.
+fn write_guarded(dir: &Path, settings: &Settings, guard: &mut WriteGuard) -> anyhow::Result<()> {
+    let path = dir.join("settings.json");
+    if matches!(guard, WriteGuard::RetryCopy) {
+        match keep_unreadable_copy(dir, &path) {
+            Ok(copy) => {
+                log::warn!("Kept the unreadable settings as {}", copy.display());
+                *guard = WriteGuard::Free;
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                log::info!("The unreadable settings.json is gone; nothing to keep");
+                *guard = WriteGuard::Free;
+            }
+            Err(e) => {
+                log::error!(
+                    "Could not copy the unreadable settings.json again, so it is left \
+                     unchanged until AudioCaptor restarts: {e}"
+                );
+                *guard = WriteGuard::Held(None);
+            }
+        }
+    }
+    if let WriteGuard::Held(held) = guard {
+        *held = Some(settings.clone());
+        return Ok(());
+    }
     let json = serde_json::to_string_pretty(settings)?;
     write_atomic(&path, &json)?;
     Ok(())
+}
+
+pub fn write_settings(settings: &Settings) -> anyhow::Result<()> {
+    let dir = crate::portable::data_dir()?;
+    write_guarded(&dir, settings, &mut write_guard())
 }
 
 #[cfg(test)]
@@ -335,6 +405,68 @@ mod tests {
         write_atomic(&path, "new").unwrap();
         assert_eq!(fs::read_to_string(&path).unwrap(), "new");
         assert!(!dir.join("settings.json.tmp").exists());
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    fn changed_settings(hotkey: &str) -> Settings {
+        Settings {
+            hotkey: Some(hotkey.to_string()),
+            ..Settings::default()
+        }
+    }
+
+    #[test]
+    fn copy_is_retried_before_first_write_and_then_saved() {
+        let dir = test_dir("retry-ok");
+        fs::write(dir.join("settings.json"), "broken").unwrap();
+        let mut guard = WriteGuard::RetryCopy;
+        write_guarded(&dir, &changed_settings("F9"), &mut guard).unwrap();
+        assert!(matches!(guard, WriteGuard::Free));
+        assert_eq!(
+            fs::read_to_string(dir.join("settings.unreadable.json")).unwrap(),
+            "broken"
+        );
+        let saved: Settings =
+            serde_json::from_str(&fs::read_to_string(dir.join("settings.json")).unwrap()).unwrap();
+        assert_eq!(saved.hotkey.as_deref(), Some("F9"));
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn file_stays_unchanged_when_the_retried_copy_fails() {
+        use std::os::windows::fs::OpenOptionsExt;
+        let dir = test_dir("retry-fails");
+        let path = dir.join("settings.json");
+        fs::write(&path, "broken").unwrap();
+        let mut guard = WriteGuard::RetryCopy;
+        {
+            // Opened with no sharing, so neither the copy nor a write can reach it.
+            let _lock = fs::OpenOptions::new()
+                .read(true)
+                .share_mode(0)
+                .open(&path)
+                .unwrap();
+            write_guarded(&dir, &changed_settings("F9"), &mut guard).unwrap();
+        }
+        // The lock is gone, but the file is still left alone until a restart.
+        write_guarded(&dir, &changed_settings("F10"), &mut guard).unwrap();
+        assert_eq!(fs::read_to_string(&path).unwrap(), "broken");
+        assert!(!dir.join("settings.unreadable.json").exists());
+        assert!(!dir.join("settings.json.tmp").exists());
+        let held = held_settings(&guard).expect("changes are held in memory");
+        assert_eq!(held.hotkey.as_deref(), Some("F10"));
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn missing_file_at_retry_is_simply_written() {
+        let dir = test_dir("retry-gone");
+        let mut guard = WriteGuard::RetryCopy;
+        write_guarded(&dir, &changed_settings("F9"), &mut guard).unwrap();
+        assert!(matches!(guard, WriteGuard::Free));
+        assert!(dir.join("settings.json").exists());
+        assert!(!dir.join("settings.unreadable.json").exists());
         let _ = fs::remove_dir_all(&dir);
     }
 

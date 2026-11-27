@@ -44,6 +44,10 @@
                makes the app act as if Windows had no MP3 encoder (Windows N without the Media
                Feature Pack): NVDA reads how to get the encoder and the end with errors, and the
                WAV is kept.
+      flac     A profile with the format "FLAC (lossless)": in Edit Profile NVDA reads the
+               Format list with that value. A recording in the profile: when it stops, NVDA says
+               that the conversion to FLAC started and then that it finished, and the recording
+               is a .flac file.
 
     Exit code: 0 everything passed; 1 a step or an NVDA check failed, or the test copy wrote to
     %LOCALAPPDATA%\com.audiocaptor.app; 2 the test could not run or stopped early (no exe, NVDA
@@ -79,7 +83,7 @@
     in its chat before it starts the test; the script itself asks nothing.
 
 .PARAMETER Scenario
-    One or more of launch, record, dialogs, tray, settings, convert, mp3. All of them when omitted.
+    One or more of launch, record, dialogs, tray, settings, convert, mp3, flac. All of them when omitted.
 
 .PARAMETER ConvertMB
     The size of the large WAV file of the convert scenario, in megabytes. Default: 900, which a
@@ -124,7 +128,7 @@ param(
 $ErrorActionPreference = 'Stop'
 
 # --- Arguments ---------------------------------------------------------------------------------
-$AllScenarios = @('launch', 'record', 'dialogs', 'tray', 'settings', 'convert', 'mp3')
+$AllScenarios = @('launch', 'record', 'dialogs', 'tray', 'settings', 'convert', 'mp3', 'flac')
 $Selected = @($Scenario | Where-Object { $_ } | ForEach-Object { $_.ToLowerInvariant() })
 if ($Selected.Count -eq 0 -or $Selected -contains 'all') { $Selected = $AllScenarios }
 $unknown = @($Selected | Where-Object { $AllScenarios -notcontains $_ })
@@ -192,6 +196,7 @@ $UI = @{
     Format         = 'Format'                   # field_output_format, the name of the format list
     FormatWav      = 'WAV (uncompressed)'       # format_wav
     FormatSpeech   = 'speech (mono)'            # format_opus_speech, the part after the dash
+    FormatFlac     = 'FLAC (lossless)'          # format_flac
     DeleteTitle    = 'Delete this profile?'     # delete_profile_confirm
     Cancel         = 'Cancel'                   # btn_cancel
     Exit           = 'Exit'                     # btn_exit
@@ -209,6 +214,7 @@ $UI = @{
     Converted      = 'Conversion finished.'     # live_conversion_finished
     ConvertErrors  = 'Conversion finished with errors|Could not finish the conversion'  # live_conversion_finished_with_errors, error_conversion_failed
     Mp3Started     = 'Recording stopped. Conversion to MP3 started.'  # live_recording_stopped_conversion_started
+    FlacStarted    = 'Recording stopped. Conversion to FLAC started.'  # live_recording_stopped_conversion_started
     NoEncoder      = 'Windows has no MP3 encoder. To record in MP3, install the Media Feature Pack'  # error_conversion_no_encoder
 }
 
@@ -543,7 +549,7 @@ function Write-TestSettings {
         return
     }
     # Profiles as settings version 5 wrote them, without a format: every start of the test copy
-    # also goes through the migration to version 6. The convert and mp3 scenarios give the active
+    # also goes through the migration to version 6. The convert, mp3 and flac scenarios give the active
     # profile a format ($script:ProfileFormat), so that its recording is converted.
     $newProfile = {
         param([string]$Id, [string]$Name, [string]$Mode, [string]$Format)
@@ -1497,6 +1503,67 @@ function Invoke-Mp3Scenario {
     }
 }
 
+# A profile with the format "FLAC (lossless)": the Format list of Edit Profile shows it, and a
+# recording in the profile becomes a .flac file.
+function Invoke-FlacScenario {
+    $recordings = Join-Path $DataDir 'Recordings'
+    $queueFile = Join-Path $DataDir 'conversion-queue.json'
+    $script:ProfileFormat = 'Flac'
+    try {
+        Invoke-Step 'Start with a FLAC profile: the window opens with focus on the profile list' {
+            if (-not $script:PlaybackDeviceId) { throw 'Windows has no default playback device; this scenario records system audio and needs one' }
+            Remove-Item -LiteralPath $recordings -Recurse -Force -ErrorAction SilentlyContinue
+            Start-App
+        }
+
+        Invoke-Step "Tab to the '$($UI.EditProfile)' button" { Move-Focus $UI.EditProfile } -Expect $UI.EditProfile
+
+        Invoke-Step 'Space opens Edit Profile: focus on the Name field, NVDA reads the dialog' {
+            Send-Keys 'Space'
+            $null = Wait-Until 'focus on the Name field' { (Get-Focus).Id -eq 'profile-name' }
+        } -Once $UI.EditTitle -ExpectAny $Role.Dialog
+
+        Invoke-Step "Tab to the '$($UI.Format)' list: NVDA reads its name and the format of the profile, FLAC" {
+            Move-InDialog { (Get-Focus).Id -eq 'profile-format' } "the '$($UI.Format)' list"
+        } -Expect $UI.Format, $UI.FormatFlac
+
+        Invoke-Step "Escape closes Edit Profile: focus back on the '$($UI.EditProfile)' button" {
+            Close-Dialog 'profile-name' $UI.EditProfile
+        } -Expect $UI.EditProfile
+
+        Invoke-Step "Alt+S starts a recording: NVDA says Recording started; focus moves to '$($UI.Pause)'" {
+            Send-Keys 'Alt+S'
+            $null = Wait-Until "the '$($UI.Pause)' button" { Find-ByName $UI.Pause }
+            Confirm-Focus $UI.Pause
+        } -Once $UI.Started -Expect $UI.Pause -Forbid $Unavailable, $PageNoise
+
+        Invoke-Step 'Alt+T stops it: NVDA says that the conversion to FLAC started and that it finished; a FLAC file and no WAV are left' {
+            Start-Sleep -Seconds 3
+            Send-Keys 'Alt+T'
+            $null = Wait-Until "the '$($UI.Start)' button" { Find-ByName $UI.Start }
+            $files = Get-LoopbackFiles $queueFile
+            $flac = @($files.Keys | Where-Object { $_ -like 'loopback_*.flac' -and $files[$_] -gt 0 })
+            Add-Check 'the recording is a FLAC file now' ($flac.Count -eq 1)
+            if ($flac.Count -eq 1) {
+                $bytes = [IO.File]::ReadAllBytes((Join-Path $recordings $flac[0]))
+                Add-Check 'the file starts with the FLAC marker' ($bytes.Length -gt 4 -and [Text.Encoding]::ASCII.GetString($bytes, 0, 4) -ceq 'fLaC')
+            }
+            $other = @($files.Keys | Where-Object { $_ -notlike '*.flac' })
+            Add-Check 'no WAV file and no temporary file is left' ($other.Count -eq 0) ($other -join ', ')
+        } -Once $UI.FlacStarted, $UI.Converted -Forbid $UI.ConvertErrors, $Unavailable, $PageNoise
+
+        Invoke-Step 'Alt+F4: the app quits without asking' {
+            Send-Keys 'Alt+F4'
+            if (-not $script:AppProc.WaitForExit(8000)) { throw 'the app did not quit within 8 s of Alt+F4' }
+        } -Forbid $UI.ExitTitle
+    } finally {
+        $script:ProfileFormat = ''
+        Stop-App
+        Remove-Item -LiteralPath $recordings -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath $queueFile -Force -ErrorAction SilentlyContinue
+    }
+}
+
 function Invoke-Scenario([string]$Name) {
     $script:CurrentScenario = $Name
     $script:StepNumber = 0
@@ -1511,6 +1578,7 @@ function Invoke-Scenario([string]$Name) {
             'settings' { Invoke-SettingsScenario }
             'convert' { Invoke-ConvertScenario }
             'mp3'     { Invoke-Mp3Scenario }
+            'flac'    { Invoke-FlacScenario }
         }
     } finally {
         Stop-App

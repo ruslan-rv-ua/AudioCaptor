@@ -164,6 +164,17 @@ cargo fmt --manifest-path src-tauri/Cargo.toml
 - Кожен пункт `CHANGELOG.md` — один рядок, без ручних переносів, хоч би яким довгим він був. Release бере розділ
   версії як є описом релізу на GitHub, а там кожен перенос рядка стає новим рядком: речення рвуться, і NVDA в
   режимі огляду читає пункт уривками (TASK-24).
+- Paraglide завантажує два модулі inlang з jsDelivr за адресами в `project.inlang/settings.json` і виконує їх під
+  час кожної збірки інтерфейсу: `@inlang/plugin-message-format` (читає `messages/*.json`) і
+  `@inlang/message-lint-rule-missing-translation`. Версії в адресах закріплені (TASK-40), тож нова публікація
+  пакета сама до збірки не потрапить. Щоб оновити модуль:
+  1. Подивіться версії: `npm view @inlang/plugin-message-format versions dist-tags` (так само для другого
+     пакета). Мажорна версія має підходити до встановленого `@inlang/paraglide-js`; про несумісність з
+     Paraglide 2 пише список змін пакета.
+  2. Змініть номер версії в адресі в `project.inlang/settings.json`.
+  3. Запустіть `pnpm vite:build` до й після зміни, скопіювавши `src/paraglide/` перед зміною, і порівняйте
+     обидві копії (`git diff --no-index <копія> src/paraglide`): тексти обома мовами не мають змінитися.
+  4. Запустіть `just check` і `just build`.
 
 ## Структура проєкту
 

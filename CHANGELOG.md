@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.1] — 2026-11-28
+
 ### Fixed
 
 - After a recording stops in an Opus, MP3 or FLAC profile, the screen reader now always says first that the recording stopped and then how its conversion ended, even when the conversion ends at once. Before, when the conversion failed at once (for example, on the N editions of Windows without the Media Feature Pack) or a very short recording was converted at once, the screen reader skipped "Recording stopped" and read only the end of the conversion. To leave time for the stop announcement, the end of a conversion and the message about a recording that could not be converted now come no sooner than three seconds after the stop.
@@ -109,6 +111,7 @@ Initial release.
 - Settings migration (v1 → v2 → v3 → v4 → v5)
 - Scoop package manifest in [ruslan-rv-ua/scoop-bucket](https://github.com/ruslan-rv-ua/scoop-bucket)
 
+[0.4.1]: https://github.com/ruslan-rv-ua/AudioCaptor/releases/tag/v0.4.1
 [0.4.0]: https://github.com/ruslan-rv-ua/AudioCaptor/releases/tag/v0.4.0
 [0.3.0]: https://github.com/ruslan-rv-ua/AudioCaptor/releases/tag/v0.3.0
 [0.2.0]: https://github.com/ruslan-rv-ua/AudioCaptor/releases/tag/v0.2.0

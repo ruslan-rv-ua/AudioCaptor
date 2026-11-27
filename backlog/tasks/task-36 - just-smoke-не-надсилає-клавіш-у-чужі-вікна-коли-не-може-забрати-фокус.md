@@ -4,19 +4,19 @@ title: just smoke не надсилає клавіш у чужі вікна, к�
 status: To Do
 assignee: []
 created_date: '2026-11-27T14:51:52Z'
-updated_date: '2026-11-27T19:21:46Z'
+updated_date: '2026-11-27T19:33:49Z'
 labels:
   - testing
   - a11y
   - model-opus
   - effort-medium
-milestone: m-8
+milestone: m-3
 dependencies: []
 references:
   - scripts/smoke-nvda.ps1
 priority: medium
 type: bug
-ordinal: 14000
+ordinal: 90900
 ---
 
 ## Description
@@ -43,3 +43,9 @@ ordinal: 14000
 - [ ] #4 Документацію оновлено там, де змінилася поведінка чи порядок роботи (README.md, README_UK.md, DEVELOPMENT.md)
 - [ ] #5 CHANGELOG.md оновлено: лише зміни, помітні користувачам (без подробиць про інструменти, тести, CI чи збірку)
 <!-- DOD:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-27: власник відклав задачу на невизначений термін: зараз не може підтвердити проблему. Задачу перенесено в «Пізніше» (m-3) і прибрано із залежностей випуску 0.4.1 (TASK-41).
+<!-- SECTION:NOTES:END -->

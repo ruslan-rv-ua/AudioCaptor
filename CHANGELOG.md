@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-11-27
+
 ### Added
 
 - Recordings can now be saved as MP3, the format that every player, phone and website opens. The Format list of a profile has three new entries: "MP3 — speech (mono, 64 kbps)", about 29 MB per hour; "MP3 — standard (128 kbps)", about 58 MB per hour; and "MP3 — high quality (320 kbps)", about 144 MB per hour, for music. As with Opus, the recording is written as WAV and converted in the background when you stop it (an hour takes about a quarter of a minute on a recent PC), and the WAV is deleted only after AudioCaptor has checked that the `.mp3` file is whole and lasts as long as the recording.
@@ -83,6 +85,7 @@ Initial release.
 - Settings migration (v1 → v2 → v3 → v4 → v5)
 - Scoop package manifest in [ruslan-rv-ua/scoop-bucket](https://github.com/ruslan-rv-ua/scoop-bucket)
 
+[0.3.0]: https://github.com/ruslan-rv-ua/AudioCaptor/releases/tag/v0.3.0
 [0.2.0]: https://github.com/ruslan-rv-ua/AudioCaptor/releases/tag/v0.2.0
 [0.1.2]: https://github.com/ruslan-rv-ua/AudioCaptor/releases/tag/v0.1.2
 [0.1.1]: https://github.com/ruslan-rv-ua/AudioCaptor/releases/tag/v0.1.1

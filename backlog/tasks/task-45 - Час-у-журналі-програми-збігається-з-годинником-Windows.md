@@ -1,17 +1,18 @@
 ---
-id: DRAFT-12
+id: TASK-45
 title: Час у журналі програми збігається з годинником Windows
-status: Draft
+status: To Do
 assignee: []
 created_date: '2026-11-24T22:01:06Z'
-updated_date: '2026-11-27T19:21:48Z'
+updated_date: '2026-11-27T21:39:58Z'
 labels:
   - backend
   - model-sonnet
   - effort-low
-milestone: m-9
+milestone: m-8
 dependencies: []
 priority: low
+ordinal: 14460
 ---
 
 ## Description
@@ -23,7 +24,7 @@ priority: low
 
 Модуль уміє писати й місцевий час, але у версії 2.10.2 це налаштування заодно змінює порядок полів у рядку: рівень стає перед назвою модуля.
 
-Потрібне рішення власника: місцевий час (зрозуміліший людині) чи UTC (однозначний, коли порівнюють журнали з різних комп'ютерів).
+Рішення власника (27.11.2026): журнал пише місцевий час за годинником Windows; задачу взято в патч 0.4.1.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria

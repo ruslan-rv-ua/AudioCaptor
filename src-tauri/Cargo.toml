@@ -30,6 +30,9 @@ rubato = "0.16"
 # Opus: libopus (C, built with CMake by opusic-sys) and the Ogg container (decision-8)
 opus = "0.4"
 ogg = "0.9"
+# FLAC: libFLAC (C, built with CMake) without Ogg (decision-10). Its build
+# settings come from cmake/msvc-toolchain.cmake, named in .cargo/config.toml.
+libflac-sys = { version = "0.3.4", default-features = false, features = ["build-flac"] }
 ringbuf = "0.5.2"
 crossbeam-channel = "0.5"
 rodio = { version = "0.20", default-features = false, features = ["vorbis"] }

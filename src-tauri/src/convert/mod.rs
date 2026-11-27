@@ -2,10 +2,12 @@
 //!
 //! Every format goes the same way (decision-7, decision-8): the WAV is encoded
 //! into a temporary file, that file is read back and must decode and last as
-//! long as the recording, then it gets its final name and the WAV is deleted.
+//! long as the recording (a FLAC file must also match the WAV sample for
+//! sample), then it gets its final name and the WAV is deleted.
 //! If a step fails, the temporary file is removed and the WAV stays. A format
 //! adds only its `Codec`; `queue` runs the conversions one file at a time.
 
+pub mod flac;
 pub mod media_foundation;
 pub mod mp3;
 pub mod ogg_opus;
@@ -138,7 +140,7 @@ pub trait Codec: Send {
     fn encode(&self, job: &Job, output: &Path, control: &Control) -> Result<(), ConvertError>;
 
     /// Reads `output` back: it must decode without an error and last as long as
-    /// the recording.
+    /// the recording. A lossless format also compares every sample with the WAV.
     fn verify(&self, job: &Job, output: &Path, control: &Control) -> Result<(), ConvertError>;
 }
 
@@ -153,6 +155,7 @@ pub fn codec_for(format: OutputFormat) -> Option<Box<dyn Codec>> {
         OutputFormat::Mp3Speech => Some(Box::new(Mp3Codec::new(mp3::Variant::Speech))),
         OutputFormat::Mp3Standard => Some(Box::new(Mp3Codec::new(mp3::Variant::Standard))),
         OutputFormat::Mp3High => Some(Box::new(Mp3Codec::new(mp3::Variant::High))),
+        OutputFormat::Flac => Some(Box::new(flac::FlacCodec)),
     }
 }
 
@@ -349,6 +352,7 @@ mod tests {
             (OutputFormat::Mp3Speech, "mp3"),
             (OutputFormat::Mp3Standard, "mp3"),
             (OutputFormat::Mp3High, "mp3"),
+            (OutputFormat::Flac, "flac"),
         ] {
             assert_eq!(codec_for(format).unwrap().extension(), extension);
         }

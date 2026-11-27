@@ -49,16 +49,18 @@ pub enum OutputFormat {
     Mp3Speech,
     Mp3Standard,
     Mp3High,
+    Flac,
 }
 
 impl OutputFormat {
-    const ALL: [OutputFormat; 6] = [
+    const ALL: [OutputFormat; 7] = [
         OutputFormat::Wav,
         OutputFormat::OpusSpeech,
         OutputFormat::OpusMusic,
         OutputFormat::Mp3Speech,
         OutputFormat::Mp3Standard,
         OutputFormat::Mp3High,
+        OutputFormat::Flac,
     ];
 
     /// The id stored in `settings.json`.
@@ -70,6 +72,7 @@ impl OutputFormat {
             OutputFormat::Mp3Speech => "Mp3Speech",
             OutputFormat::Mp3Standard => "Mp3Standard",
             OutputFormat::Mp3High => "Mp3High",
+            OutputFormat::Flac => "Flac",
         }
     }
 
@@ -84,6 +87,7 @@ impl OutputFormat {
             OutputFormat::Wav => "WAV",
             OutputFormat::OpusSpeech | OutputFormat::OpusMusic => "Opus",
             OutputFormat::Mp3Speech | OutputFormat::Mp3Standard | OutputFormat::Mp3High => "MP3",
+            OutputFormat::Flac => "FLAC",
         }
     }
 }
@@ -117,6 +121,8 @@ mod tests {
             Some(OutputFormat::Mp3Standard)
         );
         assert_eq!(OutputFormat::Mp3High.family(), "MP3");
+        assert_eq!(OutputFormat::from_id("Flac"), Some(OutputFormat::Flac));
+        assert_eq!(OutputFormat::Flac.family(), "FLAC");
         assert_eq!(OutputFormat::from_id("mp3standard"), None);
         assert_eq!(OutputFormat::from_id("AacStandard"), None);
     }

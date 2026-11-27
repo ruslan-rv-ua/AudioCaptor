@@ -61,6 +61,7 @@
     { value: "Mp3Speech",   label: m.format_mp3_speech() },
     { value: "Mp3Standard", label: m.format_mp3_standard() },
     { value: "Mp3High",     label: m.format_mp3_high() },
+    { value: "Flac",        label: m.format_flac() },
   ];
 
   // Filename visibility depends on which streams are produced

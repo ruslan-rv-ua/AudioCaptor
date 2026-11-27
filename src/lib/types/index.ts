@@ -9,7 +9,7 @@ export type RecordingState = "Idle" | "Recording" | "Paused";
 export type OutputMode = "Microphone" | "Loopback" | "Mix" | "MixPlusMicrophone" | "MixPlusLoopback" | "SeparateFiles";
 
 /** The formats this version records in: the entries of the profile's format list. */
-export type OutputFormat = "Wav" | "OpusSpeech" | "OpusMusic" | "Mp3Speech" | "Mp3Standard" | "Mp3High";
+export type OutputFormat = "Wav" | "OpusSpeech" | "OpusMusic" | "Mp3Speech" | "Mp3Standard" | "Mp3High" | "Flac";
 
 export type Theme = "auto" | "light" | "dark";
 

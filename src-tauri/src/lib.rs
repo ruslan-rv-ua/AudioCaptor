@@ -308,6 +308,15 @@ fn format_timestamp(t: &SYSTEMTIME) -> String {
     )
 }
 
+/// Formats a date and time as `[YYYY-MM-DD][hh:mm:ss]`, the start of every
+/// line in the app's log (the layout of `tauri-plugin-log`).
+fn log_time(t: &SYSTEMTIME) -> String {
+    format!(
+        "[{:04}-{:02}-{:02}][{:02}:{:02}:{:02}]",
+        t.wYear, t.wMonth, t.wDay, t.wHour, t.wMinute, t.wSecond
+    )
+}
+
 #[tauri::command]
 fn pause_recording(
     state: tauri::State<'_, SharedState>,
@@ -724,6 +733,21 @@ pub fn run() {
                 ])
                 .level(log::LevelFilter::Info)
                 .max_file_size(1_000_000)
+                // The plugin stamps lines in UTC; its `UseLocal` setting also
+                // swaps the level and module name and falls back to UTC on
+                // error. This keeps the plugin's line layout and takes the
+                // time from the Windows clock, as recording file names do.
+                .format(|out, message, record| {
+                    // SAFETY: GetLocalTime takes no arguments and only fills the struct it returns.
+                    let now = unsafe { GetLocalTime() };
+                    out.finish(format_args!(
+                        "{}[{}][{}] {}",
+                        log_time(&now),
+                        record.target(),
+                        record.level(),
+                        message
+                    ))
+                })
                 .build(),
         )
         .manage(std::sync::Arc::new(std::sync::Mutex::new(
@@ -863,5 +887,21 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(format_timestamp(&late), "2026-12-31_23-59-59");
+    }
+
+    #[test]
+    fn log_time_keeps_the_plugin_layout() {
+        // The same layout tauri-plugin-log writes, zero-padded, no milliseconds.
+        let t = SYSTEMTIME {
+            wYear: 2026,
+            wMonth: 1,
+            wDay: 5,
+            wHour: 23,
+            wMinute: 7,
+            wSecond: 9,
+            wMilliseconds: 987,
+            ..Default::default()
+        };
+        assert_eq!(log_time(&t), "[2026-01-05][23:07:09]");
     }
 }

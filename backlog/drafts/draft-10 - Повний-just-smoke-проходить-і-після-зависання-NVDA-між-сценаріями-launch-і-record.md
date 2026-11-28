@@ -6,7 +6,7 @@ title: >-
 status: Draft
 assignee: []
 created_date: '2026-11-24T17:38:48Z'
-updated_date: '2026-11-28T04:47:13Z'
+updated_date: '2026-11-28T04:48:17Z'
 labels:
   - a11y
   - testing
@@ -89,4 +89,6 @@ priority: medium
 - Звіти: `task-13-smoke-full.txt` і `task-13-smoke-record-tray.txt` у спільній теці нотаток.
 
 Доповнення 2026-11-28, головна сесія (за звітом робочої сесії TASK-51). Прогін `just smoke launch record dialogs` о 06:37 (exe 06:29): 64 кроки з 65. Не пройшов лише крок 4 сценарію `record` (Alt+S на списку профілів): NVDA сказав «Recording started | документ | додаток | Recording controls, групування | Pause recording (Alt+P), кнопка». У журналі NVDA о 06:37:18 — `VBufBackend_t::terminate` для закритого процесу WebView2, «Starting freeze recovery after 0.50 seconds» і «Recovered from freeze after 0.61 seconds»: перехід між `launch` і `record`. Робоча сесія TASK-51 припускає ще одну причину: Alt+S вимикає список профілів, на якому стоїть фокус, тож фокус на мить падає на документ, перш ніж ефект у `App.svelte` переносить його на «Pause»; тоді виправленням було б переносити фокус до того, як список вимкнеться. Не перевірено. Протокол — `task-51-smoke-launch-record-dialogs-1.txt` у спільній теці нотаток.
+
+Доповнення 2026-11-28 (TASK-51, далі): окремий повтор `just smoke record` одразу після того прогону (зі згоди власника) пройшов: 17 кроків з 17, 41 перевірка NVDA з 41; крок 4 звучав чисто («Recording started | Recording controls, групування | Pause recording (Alt+P), кнопка»). Протокол — `task-51-smoke-record-2.txt` у спільній теці нотаток.
 <!-- SECTION:NOTES:END -->

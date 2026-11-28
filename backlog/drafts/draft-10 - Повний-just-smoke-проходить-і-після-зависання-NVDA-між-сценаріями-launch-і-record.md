@@ -6,7 +6,7 @@ title: >-
 status: Draft
 assignee: []
 created_date: '2026-11-24T17:38:48Z'
-updated_date: '2026-11-27T19:21:49Z'
+updated_date: '2026-11-28T04:47:13Z'
 labels:
   - a11y
   - testing
@@ -87,4 +87,6 @@ priority: medium
 - Повний `just smoke`: 50 кроків із 53. Не пройшли крок 4 сценарію `record` (після TASK-35 це колишній крок 3) з тим самим «Recording started | недоступно | документ | додаток | Recording controls, групування | Pause recording (Alt+P), кнопка» і, вперше, крок 2 сценарію `tray`: Escape не сховав вікно («timed out waiting for the window to hide», NVDA нічого не сказав). На старті `tray` вікно теж прочитано через UI Automation («tauri.localhost – веб-вміст, регіон | документ, http://tauri.localhost/ | …»), тож, імовірно, це та сама родина збоїв; не перевірено.
 - Повторний `just smoke record tray` одразу після нього пройшов: 15 кроків із 15.
 - Звіти: `task-13-smoke-full.txt` і `task-13-smoke-record-tray.txt` у спільній теці нотаток.
+
+Доповнення 2026-11-28, головна сесія (за звітом робочої сесії TASK-51). Прогін `just smoke launch record dialogs` о 06:37 (exe 06:29): 64 кроки з 65. Не пройшов лише крок 4 сценарію `record` (Alt+S на списку профілів): NVDA сказав «Recording started | документ | додаток | Recording controls, групування | Pause recording (Alt+P), кнопка». У журналі NVDA о 06:37:18 — `VBufBackend_t::terminate` для закритого процесу WebView2, «Starting freeze recovery after 0.50 seconds» і «Recovered from freeze after 0.61 seconds»: перехід між `launch` і `record`. Робоча сесія TASK-51 припускає ще одну причину: Alt+S вимикає список профілів, на якому стоїть фокус, тож фокус на мить падає на документ, перш ніж ефект у `App.svelte` переносить його на «Pause»; тоді виправленням було б переносити фокус до того, як список вимкнеться. Не перевірено. Протокол — `task-51-smoke-launch-record-dialogs-1.txt` у спільній теці нотаток.
 <!-- SECTION:NOTES:END -->

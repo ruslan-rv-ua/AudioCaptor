@@ -4,7 +4,7 @@ title: Наявні записи у WAV можна стиснути в самі�
 status: Draft
 assignee: []
 created_date: '2026-11-26T08:52:23Z'
-updated_date: '2026-11-27T19:21:49Z'
+updated_date: '2026-11-28T18:29:36Z'
 labels:
   - backend
   - frontend
@@ -35,3 +35,9 @@ type: feature
 - [ ] #4 Документацію оновлено там, де змінилася поведінка чи порядок роботи (README.md, README_UK.md, DEVELOPMENT.md)
 - [ ] #5 CHANGELOG.md оновлено: лише зміни, помітні користувачам (без подробиць про інструменти, тести, CI чи збірку)
 <!-- DOD:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-28, головна сесія: під час планування етапу 0.5.0 власник відмовився від цієї можливості; чернетку заархівовано.
+<!-- SECTION:NOTES:END -->

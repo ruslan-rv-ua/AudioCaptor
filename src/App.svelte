@@ -274,6 +274,33 @@
     confirmExitOpen = true;
   }
 
+  // Tab goes round the window (backlog TASK-51): Tab on the last control moves
+  // focus to the first, and Shift+Tab on the first to the last. Left to the
+  // browser, focus would leave the page there for a moment and WebView2 would
+  // bring it back through the document, and NVDA would read the document and
+  // the application around the controls ("blank", "application") before the
+  // control. The first and the last control are found at the key press, among
+  // those that can take focus right then: the set changes with the recording
+  // state and with disabled controls. A modal dialog keeps Tab inside itself,
+  // so nothing happens here while one is open.
+  function focusableControls(): HTMLElement[] {
+    return [...document.querySelectorAll<HTMLElement>("a[href], button, input, select, textarea, [tabindex]")]
+      .filter((el) => el.tabIndex >= 0 && !el.matches(":disabled") && el.getClientRects().length > 0);
+  }
+
+  function wrapTab(e: KeyboardEvent) {
+    if (e.key !== "Tab" || e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey) return;
+    if (document.querySelector('[aria-modal="true"]')) return;
+    const controls = focusableControls();
+    const first = controls[0];
+    const last = controls[controls.length - 1];
+    const focused = document.activeElement;
+    const target = e.shiftKey ? (focused === first ? last : null) : (focused === last ? first : null);
+    if (!target) return;
+    e.preventDefault();
+    target.focus();
+  }
+
   function handleMnemonic(e: KeyboardEvent) {
     if (e.key === "F1") { e.preventDefault(); openAbout(); return; }
     if (e.key === "Escape" && !settingsOpen && !dialogOpen && !confirmExitOpen && !deleteConfirmOpen && !aboutOpen) {
@@ -494,8 +521,10 @@
       } catch { /* the recordings stay in the queue as WAV files */ }
     })();
     window.addEventListener("keydown", handleMnemonic);
+    window.addEventListener("keydown", wrapTab);
     return () => {
       window.removeEventListener("keydown", handleMnemonic);
+      window.removeEventListener("keydown", wrapTab);
       cleanupTheme();
       unlistenFocus?.();
       unlistenTrayQuit?.();

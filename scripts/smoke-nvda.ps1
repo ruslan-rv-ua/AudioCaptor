@@ -10,13 +10,18 @@
 
     Scenarios; each one starts the app afresh and quits it at the end:
       launch   NVDA names the window once (AudioCaptor) and then the profile list; Tab goes
-               round every control, each one has a name and NVDA reads it.
+               round every control in the window's order, each one has a name and NVDA reads it,
+               and nothing of the page. Tab on the last control (Start) goes round to the first
+               (Minimize to tray) and Shift+Tab back, three times each: NVDA names only the new
+               control, not the app name, the document, the application or a blank line.
       record   Alt+S, Alt+P, Alt+R and Alt+T announce the new state once, Alt+I the current one,
                and a second Alt+I in the same state says it again.
                When the control with focus is disabled or goes away (Alt+S on the profile list,
                Alt+P on Pause, Alt+R on Resume, Alt+T on Stop), focus moves to the button of the
                new state and NVDA names it, without "unavailable"; focus on Stop stays there
-               through a pause. Recording really starts (system audio of the default playback
+               through a pause. While recording, Tab on Stop, the last control, goes round to
+               Minimize to tray and Shift+Tab back, twice each, and NVDA names only the new
+               control. Recording really starts (system audio of the default playback
                device, so no microphone is needed); the WAV file is not checked.
                While recording, the browser keys (F5, Shift+F5, Ctrl+R, Ctrl+Shift+R, Ctrl+P,
                Ctrl+F, F3, Ctrl+G) and the menu keys (Shift+F10, the Applications key) do
@@ -283,6 +288,9 @@ $Unavailable = 'unavailable|' + [regex]::Unescape('\u043d\u0435\u0434\u043e\u044
 # them by their roles.
 $PageNoise = $AppTitle + '|document|' + [regex]::Unescape('\u0434\u043e\u043a\u0443\u043c\u0435\u043d\u0442') +
     '|application|' + [regex]::Unescape('\u0434\u043e\u0434\u0430\u0442\u043e\u043a')
+# What NVDA says for a line without text in its browse mode copy of the page, such as the
+# application, which has no name: it said it with the page when Tab left the page (backlog TASK-51).
+$Blank = 'blank|' + [regex]::Unescape('\u043f\u043e\u0440\u043e\u0436\u043d\u044c\u043e')
 
 # What NVDA says when it reads the web content through UI Automation instead of the usual way (the
 # web content pane, the address of the page): a sign of the broken first reading of a WebView2
@@ -1051,7 +1059,8 @@ function Invoke-Step {
 
 # --- Scenarios ---------------------------------------------------------------------------------
 # Tab from the profile list until focus comes back to it. Every stop must have a name that NVDA
-# reads, and every control of $TabOrder must be among the stops.
+# reads, the stops must be the controls of $TabOrder in its order, going round from the last
+# control to the first, and NVDA must say nothing of the page at any of them.
 function Test-TabRound {
     $start = Get-Focus
     if (-not $start -or $start.Name -ne $UI.ProfileList) { throw "focus is on $(Format-Focus $start), not on the '$($UI.ProfileList)' list" }
@@ -1088,6 +1097,45 @@ function Test-TabRound {
     Add-Check "Tab comes back to '$($UI.ProfileList)' (a full round)" $round "not within $($stops.Count) presses"
     $extra = @($stops | Where-Object { $_.Name -ne $UI.ProfileList -and $TabOrder -notcontains $_.Name } | ForEach-Object { Format-Focus $_ })
     if ($extra.Count) { $script:StepInfo.Add("Tab also stops on: $($extra -join ', ')") }
+    # The order of the window, starting after the profile list and ending on it.
+    $at = [array]::IndexOf($TabOrder, $UI.ProfileList)
+    $expected = @(for ($k = 1; $k -le $TabOrder.Count; $k++) { $TabOrder[($at + $k) % $TabOrder.Count] })
+    $got = @($stops | ForEach-Object { $_.Name })
+    Add-Check 'Tab stops on the controls in the order of the window' (($got -join '|') -eq ($expected -join '|')) "stops: $(($got | ForEach-Object { "'$_'" }) -join ', ')"
+    # A control may carry the app name in its own name (About AudioCaptor).
+    $noisy = @($stops | Where-Object {
+            $rest = if ($_.Name) { $_.Said.Replace($_.Name, '') } else { $_.Said }
+            (Test-SaidAny $rest $PageNoise) -or (Test-SaidAny $rest $Blank)
+        } | ForEach-Object { "Tab $($_.N) '$($_.Name)': $($_.Said)" })
+    Add-Check "NVDA says nothing of the page at any Tab stop: not $(Format-Variants "$PageNoise|$Blank")" ($noisy.Count -eq 0) ($noisy -join '; ')
+}
+
+# Tab on the last control of the window goes round to the first, and Shift+Tab on the first to
+# the last (backlog TASK-51): $Times times each way, one step per press, starting from the end
+# that has focus. NVDA must name the new control and say nothing of the page around it, as it did
+# when focus left the page for a moment there: the app name, the document, the application or a
+# blank line.
+function Invoke-TabWrapSteps([string]$FirstControl, [string]$LastControl, [int]$Times, [string]$State) {
+    $f = Get-Focus
+    if (-not $f -or ($f.Name -ne $FirstControl -and $f.Name -ne $LastControl)) {
+        throw "focus is on $(Format-Focus $f), not on '$FirstControl' or '$LastControl'"
+    }
+    $tabFirst = $f.Name -eq $LastControl
+    for ($wrapRound = 1; $wrapRound -le $Times; $wrapRound++) {
+        foreach ($tabNow in @($tabFirst, -not $tabFirst)) {
+            if ($tabNow) {
+                Invoke-Step "Tab on '$LastControl', the last control $State, goes round to '$FirstControl' ($wrapRound of $Times): NVDA names only it" {
+                    Send-Keys 'Tab'
+                    Confirm-Focus $FirstControl
+                } -Expect $FirstControl -Forbid $PageNoise, $Blank
+            } else {
+                Invoke-Step "Shift+Tab on '$FirstControl', the first control $State, goes round to '$LastControl' ($wrapRound of $Times): NVDA names only it" {
+                    Send-Keys 'Shift+Tab'
+                    Confirm-Focus $LastControl
+                } -Expect $LastControl -Forbid $PageNoise, $Blank
+            }
+        }
+    }
 }
 
 function Invoke-LaunchScenario {
@@ -1097,9 +1145,17 @@ function Invoke-LaunchScenario {
         Start-App
     } -Once $AppTitle -Expect $UI.ProfileList, $Profiles.System -Forbid $WebviewNoise
 
-    Invoke-Step 'Tab goes round the window: it reaches every control, each has a name and NVDA reads it' {
+    Invoke-Step 'Tab goes round the window in its order: it reaches every control, each has a name and NVDA reads it, and nothing of the page' {
         Test-TabRound
     }
+
+    # Tab used to leave the page between the last control and the first (backlog TASK-51), and
+    # NVDA did not always say the page then: each way is pressed more than once.
+    Invoke-Step "Shift+Tab to the '$($UI.MinimizeToTray)' button, the first control of the window" {
+        Move-Focus $UI.MinimizeToTray
+    } -Expect $UI.MinimizeToTray
+
+    Invoke-TabWrapSteps $UI.MinimizeToTray $UI.Start 3 'while idle'
 }
 
 function Invoke-RecordScenario {
@@ -1154,6 +1210,9 @@ function Invoke-RecordScenario {
     } -Once $UI.Resumed -Expect $UI.Pause -Forbid $UI.Started, $Unavailable, $PageNoise
 
     Invoke-Step "Tab to the '$($UI.Stop)' button" { Move-Focus $UI.Stop } -Expect $UI.Stop
+
+    # While recording, the profile and device controls are disabled and Stop is the last control.
+    Invoke-TabWrapSteps $UI.MinimizeToTray $UI.Stop 2 'while recording'
 
     # Stop is the same button while recording and while paused, so focus stays on it.
     Invoke-Step "Alt+P on '$($UI.Stop)' pauses: NVDA says Recording paused; focus stays on '$($UI.Stop)'" {

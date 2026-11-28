@@ -1,7 +1,16 @@
+use anyhow::Context;
 use hound::{WavSpec, WavWriter};
 use std::fs::File;
 use std::io::BufWriter;
 use std::path::PathBuf;
+
+/// How often the WAV header is brought up to date while recording, in seconds
+/// of recorded sound. hound fills in the sizes of the file and of its sound only
+/// when the file is finalized, so a crash or a killed process would leave zeros
+/// there, and many players would show no length or not open the file. Kept up
+/// to date, a file cut short that way opens, and its header leaves out at most
+/// this much of the sound written to it.
+const HEADER_UPDATE_SECONDS: u64 = 1;
 
 /// A recording file the recorder has finished writing.
 #[derive(Debug, Clone, PartialEq)]
@@ -10,7 +19,7 @@ pub struct RecordedFile {
     /// Frames (one sample per channel) written to the file, counted by the
     /// recorder itself. The conversion to a compressed format reads this many
     /// frames and never trusts the WAV header: past 4 GB the header's length has
-    /// wrapped around, and after a failed finalize it is zero.
+    /// wrapped around, and after a failed finalize it can be a second short.
     pub frames: u64,
     pub sample_rate: u32,
     pub channels: u16,
@@ -32,6 +41,10 @@ pub struct WavOutputWriter {
     sample_rate: u32,
     channels: u16,
     samples_written: u64,
+    /// `samples_written` when the header was last brought up to date.
+    samples_in_header: u64,
+    /// Samples (`HEADER_UPDATE_SECONDS` of sound) between two header updates.
+    samples_per_header_update: u64,
 }
 
 impl WavOutputWriter {
@@ -52,19 +65,51 @@ impl WavOutputWriter {
             sample_rate,
             channels,
             samples_written: 0,
+            samples_in_header: 0,
+            samples_per_header_update: u64::from(sample_rate)
+                * u64::from(channels)
+                * HEADER_UPDATE_SECONDS,
         })
+    }
+
+    /// Writes the sizes of what the file holds so far into its header and hands
+    /// the buffered samples to Windows, so that the file can be read up to here
+    /// even if the app never finalizes it. The file stays open for more samples.
+    ///
+    /// A failure is a write error like any other: after it, the writer may no
+    /// longer stand at the end of the file.
+    fn update_header(&mut self) -> anyhow::Result<()> {
+        self.samples_in_header = self.samples_written;
+        self.writer
+            .flush()
+            .context("Failed to update the WAV header")?;
+        Ok(())
     }
 }
 
 impl OutputWriter for WavOutputWriter {
     /// Write a slice of f32 samples (interleaved if stereo).
     /// Converts f32 [-1.0, 1.0] to i16.
+    ///
+    /// Runs on the mixer thread, which owns the writer; the capture threads only
+    /// fill the ring buffers, so the header updates never hold them up.
     fn write_samples(&mut self, samples: &[f32]) -> anyhow::Result<()> {
         for &sample in samples {
             let clamped = sample.clamp(-1.0, 1.0);
             let int_sample = (clamped * i16::MAX as f32) as i16;
             self.writer.write_sample(int_sample)?;
             self.samples_written += 1;
+        }
+        // Only after whole frames: in the middle of one, hound's `flush` stops
+        // before it seeks back to the end of the file, and the next samples would
+        // overwrite the start of the sound.
+        let whole_frames = self
+            .samples_written
+            .is_multiple_of(u64::from(self.channels.max(1)));
+        if whole_frames
+            && self.samples_written - self.samples_in_header >= self.samples_per_header_update
+        {
+            self.update_header()?;
         }
         Ok(())
     }
@@ -149,6 +194,112 @@ mod tests {
         assert_eq!(read_samples.len(), 4);
         assert_eq!(read_samples[0], i16::MAX); // 2.0 clamped to 1.0
         assert_eq!(read_samples[1], -i16::MAX); // -2.0 clamped to -1.0
+
+        std::fs::remove_file(&path).ok();
+    }
+
+    /// Samples of a signal in which no two neighbours are equal, so that a
+    /// sample out of place shows.
+    fn signal(samples: usize) -> Vec<f32> {
+        (0..samples)
+            .map(|i| (i % 1000) as f32 / 1000.0 - 0.5)
+            .collect()
+    }
+
+    /// The samples as the writer stores them.
+    fn as_stored(samples: &[f32]) -> Vec<i16> {
+        samples
+            .iter()
+            .map(|&s| (s.clamp(-1.0, 1.0) * i16::MAX as f32) as i16)
+            .collect()
+    }
+
+    /// How many frames the header of the file at `path` says it holds.
+    fn frames_in_header(path: &std::path::Path) -> u32 {
+        hound::WavReader::open(path).unwrap().duration()
+    }
+
+    #[test]
+    fn unfinalized_file_holds_every_sample_up_to_the_last_header_update() {
+        let path = temp_wav_path();
+        let mut writer = WavOutputWriter::new(path.clone(), 8000, 2).unwrap();
+        // Two and a half seconds of stereo at 8 kHz, in halves of a second.
+        let sound = signal(5 * 8000);
+        let mut halves = sound.chunks(8000);
+
+        writer.write_samples(halves.next().unwrap()).unwrap();
+        writer.write_samples(halves.next().unwrap()).unwrap();
+        assert_eq!(frames_in_header(&path), 8000, "after the first second");
+        writer.write_samples(halves.next().unwrap()).unwrap();
+        assert_eq!(frames_in_header(&path), 8000, "half a second waits");
+        writer.write_samples(halves.next().unwrap()).unwrap();
+        assert_eq!(frames_in_header(&path), 16000, "after the second second");
+        writer.write_samples(halves.next().unwrap()).unwrap();
+
+        // The app is killed: neither finalize nor drop runs (hound's drop would
+        // write the header). The file stays open until the tests end.
+        std::mem::forget(writer);
+
+        let mut reader = hound::WavReader::open(&path).unwrap();
+        assert_eq!(reader.spec().channels, 2);
+        assert_eq!(reader.spec().sample_rate, 8000);
+        assert_eq!(reader.duration(), 16000);
+        let read: Vec<i16> = reader.samples::<i16>().map(Result::unwrap).collect();
+        assert_eq!(read, as_stored(&sound[..32000]));
+
+        std::fs::remove_file(&path).ok();
+    }
+
+    #[test]
+    fn finalized_file_is_the_same_as_without_header_updates() {
+        let sound = signal(5 * 8000);
+        let path = temp_wav_path();
+        let mut writer: Box<dyn OutputWriter> =
+            Box::new(WavOutputWriter::new(path.clone(), 8000, 2).unwrap());
+        for tenth_of_a_second in sound.chunks(1600) {
+            writer.write_samples(tenth_of_a_second).unwrap();
+        }
+        writer.finalize();
+
+        // The same samples through hound alone, as AudioCaptor wrote them before
+        // it updated the header while recording.
+        let plain_path = temp_wav_path();
+        let spec = WavSpec {
+            channels: 2,
+            sample_rate: 8000,
+            bits_per_sample: 16,
+            sample_format: hound::SampleFormat::Int,
+        };
+        let mut plain = WavWriter::create(&plain_path, spec).unwrap();
+        for sample in as_stored(&sound) {
+            plain.write_sample(sample).unwrap();
+        }
+        plain.finalize().unwrap();
+
+        assert_eq!(
+            std::fs::read(&path).unwrap(),
+            std::fs::read(&plain_path).unwrap()
+        );
+
+        std::fs::remove_file(&path).ok();
+        std::fs::remove_file(&plain_path).ok();
+    }
+
+    #[test]
+    fn header_update_waits_for_a_whole_frame() {
+        let path = temp_wav_path();
+        let mut writer: Box<dyn OutputWriter> =
+            Box::new(WavOutputWriter::new(path.clone(), 8000, 2).unwrap());
+        // A second and half a frame, then the other half of that frame.
+        let sound = signal(16002);
+        writer.write_samples(&sound[..16001]).unwrap();
+        writer.write_samples(&sound[16001..]).unwrap();
+        assert_eq!(frames_in_header(&path), 8001);
+        writer.finalize();
+
+        let mut reader = hound::WavReader::open(&path).unwrap();
+        let read: Vec<i16> = reader.samples::<i16>().map(Result::unwrap).collect();
+        assert_eq!(read, as_stored(&sound));
 
         std::fs::remove_file(&path).ok();
     }

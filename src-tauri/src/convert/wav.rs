@@ -3,7 +3,8 @@
 //! How many frames to read is given by the caller, who counted them while
 //! recording. The length in the WAV header is ignored: hound keeps it in 32
 //! bits, so past 4 GB (about 6 h 12 min at 48 kHz stereo) it has wrapped around
-//! while the samples are all in the file, and after a failed finalize it is zero.
+//! while the samples are all in the file, and after a failed finalize it can be
+//! a second short (`audio::writer` brings it up to date every second).
 
 use std::fs::File;
 use std::io::{self, BufReader, Read};

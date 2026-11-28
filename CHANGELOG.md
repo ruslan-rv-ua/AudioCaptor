@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- A WAV recording cut short because AudioCaptor crashed or was ended in Task Manager now opens with its real length and misses at most about the last second. Before, the sound was in the file, but the file said it was empty, so some players showed a length of zero or did not open it. In a profile with Opus, MP3 or FLAC, such a recording stays a WAV file, as before.
+
 ## [0.4.1] — 2026-11-28
 
 ### Fixed

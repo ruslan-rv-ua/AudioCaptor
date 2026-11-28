@@ -4,7 +4,7 @@ title: Залежності переведено на нові мажорні в
 status: Draft
 assignee: []
 created_date: '2026-11-23T11:30:22Z'
-updated_date: '2026-11-28T18:44:06Z'
+updated_date: '2026-11-28T18:50:04Z'
 labels:
   - backend
   - frontend
@@ -24,7 +24,7 @@ type: chore
 - `typescript` 5.8.3 → 7: `svelte-check` (4.7.8) підтримує TypeScript лише 5 і 6. Рішення власника (25.11.2026): переходити, коли `svelte-check` підтримає 7.
 - `@types/node` 22 → новіша: типи мають відповідати версії Node, на якій збирають CI і Release (зараз 22), тож вони змінюються разом із нею.
 
-Paraglide 3 — у DRAFT-7. Звукові й системні бібліотеки Rust (`windows`, `wasapi`, `ringbuf`, `rubato`, `rodio`) винесено в окремі задачі етапу 0.5.0.
+Paraglide 3 — у TASK-63 (колишня DRAFT-7). Звукові й системні бібліотеки Rust (`windows`, `wasapi`, `ringbuf`, `rubato`, `rodio`) винесено в окремі задачі етапу 0.5.0.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Definition of Done

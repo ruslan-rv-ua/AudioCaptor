@@ -4,7 +4,7 @@ title: Випуск 0.5.0
 status: To Do
 assignee: []
 created_date: '2026-11-28T18:29:45Z'
-updated_date: '2026-11-28T18:44:06Z'
+updated_date: '2026-11-28T18:50:04Z'
 labels:
   - release
   - model-sonnet
@@ -18,6 +18,7 @@ dependencies:
   - TASK-58
   - TASK-59
   - TASK-60
+  - TASK-63
 references:
   - DEVELOPMENT.md
   - CHANGELOG.md
@@ -31,7 +32,7 @@ ordinal: 20500
 <!-- SECTION:DESCRIPTION:BEGIN -->
 Випуск з новими можливостями: клавіші для папки записів, профілів, налаштувань і меню трея, повний шлях у полі теки й довідка (TASK-43); теги з назвою профілю й датою у файлах Opus, MP3 і FLAC (TASK-54).
 
-Також оновлено бібліотеки без змін для користувачів: TASK-56, TASK-57, TASK-58, TASK-59, TASK-60.
+Також оновлено бібліотеки без змін для користувачів: TASK-56, TASK-57, TASK-58, TASK-59, TASK-60 і TASK-63 (Paraglide 3).
 
 Порядок випуску — у `DEVELOPMENT.md`, так само як для 0.4.2 (TASK-53). Push і запуск workflow потребують дозволу власника.
 <!-- SECTION:DESCRIPTION:END -->
@@ -59,4 +60,6 @@ ordinal: 20500
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-28: за рішенням власника в етап додано оновлення бібліотек із DRAFT-2 (TASK-56…TASK-60); випуск чекає й на них.
+
+2026-11-28: за рішенням власника в етап додано TASK-63 (Paraglide 3, колишня DRAFT-7); випуск чекає й на неї.
 <!-- SECTION:NOTES:END -->

@@ -34,10 +34,15 @@
                dialog, Escape closes it and focus returns to where the dialog was opened. F1 in
                Settings opens About on top of Settings: UI Automation finds About in the middle
                of the window, and Settings again once About is closed. In Settings, Capture
-               keeps focus and says to press a key, Escape cancels it aloud; Ctrl+Shift+1
-               (Ctrl+Shift+!, which cannot be a global hotkey) ends the capture: NVDA names the key and
-               says why once, focus stays on Capture, the app registers Pause again and
-               settings.json keeps it, Shift+Tab works again; NVDA reads the
+               keeps focus and says to press a key, Escape cancels it aloud; the Applications key
+               (ContextMenu, which cannot be a global hotkey) ends the capture: NVDA names the key
+               and says why once, focus stays on Capture, the app registers Pause again and
+               settings.json keeps it, Shift+Tab works again. The capture names the physical key
+               under any layout: with the Ukrainian layout Ctrl+Q and Ctrl+Shift+1, with the
+               English one Ctrl+Q again, each read once in the hotkey field, saved, and held by
+               the app in Windows; then Pause is captured back. The test switches the window's
+               layout and switches it back, also when a step fails, and says so in the report.
+               NVDA reads the
                theme hint once on entering the group, the restart hint as the description of
                the Language list and once more when the language changes (not when it goes
                back); Clear says the hotkey is cleared. In New Profile, Tab
@@ -220,7 +225,9 @@ $UI = @{
     CaptureStarted = 'Press a key. Escape to cancel'  # settings_hotkey_capture_started
     CaptureCancelled = 'Hotkey capture cancelled'     # settings_hotkey_capture_cancelled
     HotkeyCleared  = 'Hotkey cleared'           # settings_hotkey_cleared
-    HotkeyRefused  = 'Could not set Ctrl+Shift+! as the hotkey: it cannot be a global hotkey, or another program already uses it. The hotkey stays Pause'  # settings_hotkey_refused
+    HotkeyRefused  = 'Could not set ContextMenu as the hotkey: it cannot be a global hotkey, or another program already uses it. The hotkey stays Pause'  # settings_hotkey_refused
+    HotkeyCtrlQ    = 'Global Hotkey: Ctrl+Q'    # settings_hotkey_current_aria
+    HotkeyCtrlShift1 = 'Global Hotkey: Ctrl+Shift+1'  # settings_hotkey_current_aria
     ThemeDark      = 'Dark'                     # settings_theme_dark
     ThemeLight     = 'Light'                    # settings_theme_light
     ThemeHint      = 'Auto follows the Windows color setting'  # settings_theme_hint
@@ -361,13 +368,70 @@ public static class AcSmokeNative {
     // content reads KeyboardEvent.code, which stays empty without one.
     public static void Chord(byte[] vks, bool[] extended) {
         for (int i = 0; i < vks.Length; i++) {
-            keybd_event(vks[i], (byte)MapVirtualKey(vks[i], 0), extended[i] ? 1u : 0u, UIntPtr.Zero);
+            keybd_event(vks[i], Scan(vks[i]), extended[i] ? 1u : 0u, UIntPtr.Zero);
             Thread.Sleep(30);
         }
         for (int i = vks.Length - 1; i >= 0; i--) {
-            keybd_event(vks[i], (byte)MapVirtualKey(vks[i], 0), (extended[i] ? 1u : 0u) | 2u, UIntPtr.Zero);
+            keybd_event(vks[i], Scan(vks[i]), (extended[i] ? 1u : 0u) | 2u, UIntPtr.Zero);
             Thread.Sleep(30);
         }
+    }
+
+    // MapVirtualKey has no scan code for Pause; a real Pause key sends 0x45 (Num Lock's code,
+    // without the extended flag).
+    static byte Scan(byte vk) { return vk == 0x13 ? (byte)0x45 : (byte)MapVirtualKey(vk, 0); }
+
+    [StructLayout(LayoutKind.Sequential)] struct RECT { public int Left, Top, Right, Bottom; }
+    [StructLayout(LayoutKind.Sequential)] struct GUITHREADINFO {
+        public int cbSize; public int flags;
+        public IntPtr hwndActive, hwndFocus, hwndCapture, hwndMenuOwner, hwndMoveSize, hwndCaret;
+        public RECT rcCaret;
+    }
+    [DllImport("user32.dll")] static extern bool GetGUIThreadInfo(uint idThread, ref GUITHREADINFO info);
+    [DllImport("user32.dll")] static extern IntPtr GetKeyboardLayout(uint idThread);
+    [DllImport("user32.dll")] static extern int GetKeyboardLayoutList(int count, [Out] IntPtr[] list);
+    [DllImport("user32.dll", SetLastError = true)] static extern bool RegisterHotKey(IntPtr hWnd, int id, uint mods, uint vk);
+    [DllImport("user32.dll")] static extern bool UnregisterHotKey(IntPtr hWnd, int id);
+
+    // The window with keyboard focus in the foreground window: in WebView2 the web content's own
+    // window, which belongs to the browser process and reads the keys with its own layout.
+    static IntPtr FocusWindow() {
+        IntPtr fg = GetForegroundWindow();
+        uint pid;
+        GUITHREADINFO info = new GUITHREADINFO();
+        info.cbSize = Marshal.SizeOf(typeof(GUITHREADINFO));
+        if (fg != IntPtr.Zero && GetGUIThreadInfo(GetWindowThreadProcessId(fg, out pid), ref info) && info.hwndFocus != IntPtr.Zero) {
+            return info.hwndFocus;
+        }
+        return fg;
+    }
+
+    // The keyboard layout of the focused window, and the layouts Windows has for this user.
+    public static long FocusLayout() {
+        uint pid;
+        return GetKeyboardLayout(GetWindowThreadProcessId(FocusWindow(), out pid)).ToInt64();
+    }
+    public static long[] Layouts() {
+        IntPtr[] list = new IntPtr[64];
+        int n = GetKeyboardLayoutList(list.Length, list);
+        long[] result = new long[n];
+        for (int i = 0; i < n; i++) result[i] = list[i].ToInt64();
+        return result;
+    }
+
+    // Asks the focused window to switch to a layout, as Alt+Shift does (WM_INPUTLANGCHANGEREQUEST).
+    public static void RequestLayout(long hkl) {
+        PostMessage(FocusWindow(), 0x0050, IntPtr.Zero, new IntPtr(hkl));
+    }
+
+    // Whether another program holds this key as a global hotkey: this process cannot take it.
+    // mods: Alt 1, Ctrl 2, Shift 4.
+    public static bool HotkeyTaken(uint mods, uint vk) {
+        if (RegisterHotKey(IntPtr.Zero, 0xAC52, mods, vk)) {
+            UnregisterHotKey(IntPtr.Zero, 0xAC52);
+            return false;
+        }
+        return Marshal.GetLastWin32Error() == 1409;  // ERROR_HOTKEY_ALREADY_REGISTERED
     }
 
     // Plays count beeps of hz for ms each, gapMs apart, as one sound through the default playback
@@ -476,7 +540,7 @@ if ($ArgError) {
 # --- Keyboard ----------------------------------------------------------------------------------
 $VK = @{ Ctrl = 0x11; Alt = 0x12; Shift = 0x10; Enter = 0x0D; Tab = 0x09; Esc = 0x1B; Space = 0x20
          End = 0x23; Home = 0x24; Left = 0x25; Up = 0x26; Right = 0x27; Down = 0x28; F1 = 0x70; F3 = 0x72; F4 = 0x73
-         F5 = 0x74; F10 = 0x79; Apps = 0x5D }
+         F5 = 0x74; F10 = 0x79; Apps = 0x5D; Pause = 0x13 }
 $ExtendedVK = @(0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x5D)
 
 # Each chord is keys joined with '+', such as 'Alt+S' or 'Shift+Tab'.
@@ -1253,6 +1317,65 @@ function Invoke-NoDeviceScenario {
     }
 }
 
+# --- Keyboard layout (dialogs) -----------------------------------------------------------------
+# The layout of the focused window before the test first switched it; $null while not switched.
+$script:LayoutBefore = $null
+
+function Format-Layout([long]$Hkl) { return '{0:X8}' -f ($Hkl -band [long]4294967295) }
+
+# Switches the focused window to an installed Ukrainian or English layout. It installs none: a
+# missing layout fails the step and says so.
+function Switch-KeyboardLayout([ValidateSet('uk', 'en')][string]$Lang) {
+    if ($Lang -eq 'uk') { $name = 'Ukrainian'; $mask = 0xFFFF; $want = 0x0422 }
+    else { $name = 'English'; $mask = 0x3FF; $want = 0x09 }  # any English: the primary language
+    $hkl = @([AcSmokeNative]::Layouts() | Where-Object { ($_ -band $mask) -eq $want }) | Select-Object -First 1
+    if ($null -eq $hkl) { throw "no $name keyboard layout is installed in Windows (the test installs none)" }
+    $current = [AcSmokeNative]::FocusLayout()
+    if ($null -eq $script:LayoutBefore) { $script:LayoutBefore = $current }
+    [AcSmokeNative]::RequestLayout($hkl)
+    $null = Wait-Until "the $name layout in the window" { [AcSmokeNative]::FocusLayout() -eq $hkl } 3
+    $script:StepInfo.Add("keyboard layout $(Format-Layout $hkl) ($name), was $(Format-Layout $current)")
+}
+
+# Puts back the layout the window had before the first switch, and says so in the report.
+function Restore-KeyboardLayout {
+    if ($null -eq $script:LayoutBefore) { return }
+    $before = $script:LayoutBefore
+    $script:LayoutBefore = $null
+    $what = "The dialogs scenario switched the keyboard layout of the window"
+    try {
+        [AcSmokeNative]::RequestLayout($before)
+        $deadline = (Get-Date).AddSeconds(3)
+        while ([AcSmokeNative]::FocusLayout() -ne $before -and (Get-Date) -lt $deadline) { Start-Sleep -Milliseconds 100 }
+        $now = [AcSmokeNative]::FocusLayout()
+        if ($now -eq $before) { $Notes.Add("$what and switched it back to $(Format-Layout $before).") }
+        else { $Notes.Add("$what but could not switch it back to $(Format-Layout $before): it is $(Format-Layout $now). Switch it with Alt+Shift.") }
+    } catch {
+        $Notes.Add("$what but could not switch it back to $(Format-Layout $before): $($_.Exception.Message). Switch it with Alt+Shift.")
+    }
+}
+
+# From the hotkey field: Tab to Capture, Space, then the chord. The capture ends with the new
+# hotkey: the app registers it, settings.json has it, focus is on the hotkey field, NVDA reads its
+# name once, and Windows gives the key to the app alone. Mods: Alt 1, Ctrl 2, Shift 4.
+function Invoke-HotkeyCapture([string]$Chord, [string]$Title, [string]$FieldName, [uint32]$Mods, [uint32]$Vk) {
+    Invoke-Step "Tab to the '$($UI.CaptureHotkey)' button, Space: NVDA says to press a key" {
+        Move-InDialog { (Get-Focus).Id -eq 'settings-hotkey-capture' } "the '$($UI.CaptureHotkey)' button"
+        Send-Keys 'Space'
+        Start-Sleep -Milliseconds 500
+    } -Expect $UI.CaptureHotkey -Once $UI.CaptureStarted
+    Invoke-Step "$($Title): focus on the hotkey field, NVDA reads it once" {
+        $line = "Global hotkey registered: $Chord"
+        $before = Get-AppLogCount $line
+        Send-Keys $Chord
+        $null = Wait-Until "the app registers $Chord" { (Get-AppLogCount $line) -gt $before } 3
+        $null = Wait-Until 'focus on the hotkey field' { (Get-Focus).Id -eq 'settings-hotkey-display' } 3
+        $saved = ([IO.File]::ReadAllText($SettingsFile) | ConvertFrom-Json).hotkey
+        Add-Check "settings.json has the hotkey $Chord" ($saved -eq $Chord) "hotkey is '$saved'"
+        Add-Check "Windows gives $Chord to the app: the test cannot take it" ([AcSmokeNative]::HotkeyTaken($Mods, $Vk))
+    } -Once $FieldName -Forbid $UI.CaptureStarted
+}
+
 # Buttons are pressed with Space: it acts on key up, so no key event reaches the dialog that opens.
 function Invoke-DialogsScenario {
     Invoke-Step 'Start: the window opens with focus on the profile list' { Start-App }
@@ -1308,10 +1431,9 @@ function Invoke-DialogsScenario {
         Add-Check 'settings.json still has the hotkey Pause' ($saved -eq 'Pause') "hotkey is '$saved'"
     } -Once $UI.CaptureCancelled, $UI.CurrentHotkey
 
-    # A key that cannot be a global hotkey (backlog TASK-49). Ctrl+Shift+1 reaches the capture
-    # as "Ctrl+Shift+!" under the English and the Ukrainian layout, and the shortcut parser has no
-    # code for "!". A key that another program holds with RegisterHotKey would not do: Windows
-    # gives it to that program and the focused window never sees it. So the test takes no hotkey.
+    # A key that cannot be a global hotkey (backlog TASK-49): the shortcut parser has no code for
+    # the Applications key (ContextMenu). A key that another program holds with RegisterHotKey
+    # would not do: Windows gives it to that program and the focused window never sees it.
     Invoke-Step "Tab to the '$($UI.CaptureHotkey)' button again" {
         Move-InDialog { (Get-Focus).Id -eq 'settings-hotkey-capture' } "the '$($UI.CaptureHotkey)' button"
     } -Expect $UI.CaptureHotkey
@@ -1321,9 +1443,9 @@ function Invoke-DialogsScenario {
         Start-Sleep -Milliseconds 500
     } -Once $UI.CaptureStarted
 
-    Invoke-Step 'Ctrl+Shift+1 cannot be a hotkey: NVDA says so once, focus stays on Capture, Pause works again' {
+    Invoke-Step 'The Applications key cannot be a hotkey: NVDA says so once, focus stays on Capture, Pause works again' {
         $before = Get-AppLogCount $HotkeyRegistered
-        Send-Keys 'Ctrl+Shift+1'
+        Send-Keys 'Apps'
         $null = Wait-Until 'the app registers Pause again' { (Get-AppLogCount $HotkeyRegistered) -gt $before } 3
         $f = Get-Focus
         Add-Check "focus stays on the '$($UI.CaptureHotkey)' button" ($f -and $f.Id -eq 'settings-hotkey-capture') "focus on $(Format-Focus $f)"
@@ -1335,6 +1457,19 @@ function Invoke-DialogsScenario {
         Send-Keys 'Shift+Tab'
         $null = Wait-Until 'focus on the hotkey field' { (Get-Focus).Id -eq 'settings-hotkey-display' } 3
     } -Expect $UI.CurrentHotkey
+
+    # The capture names the physical key, whatever the layout types (backlog TASK-52): under the
+    # Ukrainian layout the Q key types a Cyrillic letter and Shift+1 types "!".
+    try {
+        Invoke-Step 'Keyboard layout of the window: Ukrainian' { Switch-KeyboardLayout 'uk' }
+        Invoke-HotkeyCapture 'Ctrl+Q' 'Ctrl+Q under the Ukrainian layout becomes the hotkey Ctrl+Q' $UI.HotkeyCtrlQ 2 0x51
+        Invoke-HotkeyCapture 'Ctrl+Shift+1' 'Ctrl+Shift+1 under the Ukrainian layout becomes the hotkey Ctrl+Shift+1' $UI.HotkeyCtrlShift1 6 0x31
+        Invoke-Step 'Keyboard layout of the window: English' { Switch-KeyboardLayout 'en' }
+        Invoke-HotkeyCapture 'Ctrl+Q' 'Ctrl+Q under the English layout becomes the hotkey Ctrl+Q again' $UI.HotkeyCtrlQ 2 0x51
+    } finally {
+        Restore-KeyboardLayout
+    }
+    Invoke-HotkeyCapture 'Pause' 'Pause becomes the hotkey again, as the test found it' $UI.CurrentHotkey 0 0x13
 
     Invoke-Step "Shift+Tab into the theme group: NVDA reads the theme hint once" {
         Send-Keys 'Shift+Tab'
@@ -1859,6 +1994,7 @@ function Invoke-Scenario([string]$Name) {
             'flac'    { Invoke-FlacScenario }
         }
     } finally {
+        Restore-KeyboardLayout  # dialogs: also when the scenario stopped half-way
         Stop-App
         try { Enter-HomeWindow } catch { }
     }

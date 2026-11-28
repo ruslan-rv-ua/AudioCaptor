@@ -21,10 +21,11 @@ static STOP_TRIGGERED: AtomicBool = AtomicBool::new(false);
 /// (from a previous press/release cycle) can detect they are outdated.
 static PRESS_EPOCH: AtomicU64 = AtomicU64::new(0);
 
-/// Parses a shortcut as the capture in the settings dialog builds it, such as
-/// `Ctrl+Shift+F9`. Fails for a key the parser has no code for: a letter of a
-/// non-Latin layout (`Ctrl+Й`), a shifted symbol (`Ctrl+Shift+!`), or a key
-/// such as `ContextMenu`.
+/// Parses a shortcut as the capture in the settings dialog builds it from the
+/// physical key (`src/lib/utils/hotkeyName.ts`), such as `Ctrl+Shift+F9` or
+/// `Ctrl+Q`. Fails for a key the parser has no code for, such as
+/// `ContextMenu`; names saved by older versions from the typed character
+/// (`Ctrl+Й`, `Ctrl+Shift+!`) fail too.
 fn parse(shortcut_str: &str) -> Result<Shortcut, String> {
     shortcut_str
         .parse()
@@ -307,6 +308,51 @@ mod tests {
             "F12",
             "Ctrl+Alt+R",
             "Ctrl+Shift+F9",
+            // Names from the physical key (hotkeyName.ts), under any layout.
+            "Ctrl+Q",
+            "Ctrl+Shift+1",
+            "Ctrl+Alt+Shift+Z",
+            "F24",
+            "Ctrl+Minus",
+            "Equal",
+            "BracketLeft",
+            "BracketRight",
+            "Backslash",
+            "Semicolon",
+            "Quote",
+            "Comma",
+            "Period",
+            "Slash",
+            "Backquote",
+            "Numpad5",
+            "NumpadDecimal",
+            "NumpadAdd",
+            "NumpadSubtract",
+            "NumpadMultiply",
+            "NumpadDivide",
+            "NumpadEnter",
+            "NumpadEqual",
+            "Backspace",
+            "Delete",
+            "Insert",
+            "Home",
+            "End",
+            "PageUp",
+            "PageDown",
+            "ArrowDown",
+            "ArrowLeft",
+            "ArrowRight",
+            "PrintScreen",
+            "ScrollLock",
+            "NumLock",
+            "CapsLock",
+            "AudioVolumeUp",
+            "AudioVolumeDown",
+            "AudioVolumeMute",
+            "MediaPlayPause",
+            "MediaStop",
+            "MediaTrackNext",
+            "MediaTrackPrevious",
         ] {
             assert!(parse(s).is_ok(), "{s} should parse");
         }
@@ -318,6 +364,7 @@ mod tests {
             "Ctrl+Й",
             "Ctrl+Shift+!",
             "ContextMenu",
+            "IntlBackslash",
             "Shift++",
             "Unidentified",
         ] {

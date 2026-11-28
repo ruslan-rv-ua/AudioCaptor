@@ -126,7 +126,7 @@ AudioCaptor 0.1.2 and older do not know the format of a profile. If you go back 
 | `Tab` | Navigate between UI elements |
 | `Escape` | Close dialogs / minimize to tray |
 
-The global hotkey works even when AudioCaptor is not focused. You can change it in Settings.
+The global hotkey works even when AudioCaptor is not focused. You can change it in Settings: press Capture, then the key. Capture takes the key itself, not the character it types, so it works the same under any keyboard layout: Ctrl with the Й/Q key is set as Ctrl+Q under the Ukrainian layout too.
 
 ## System Requirements
 

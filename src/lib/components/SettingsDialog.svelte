@@ -6,6 +6,7 @@
   import { updateHotkey, updateSoundEnabled, setLanguage, setConfirmExitDuringRecording } from "../stores/settings.svelte";
   import * as api from "../utils/invoke";
   import { bringToFront } from "../utils/dialogLayer";
+  import { hotkeyKeyName, refusedKeyName } from "../utils/hotkeyName";
 
   interface Props {
     open: boolean;
@@ -74,16 +75,14 @@
     async function onKeyDown(e: KeyboardEvent) {
       e.preventDefault();
       e.stopPropagation();
-      if (["Control", "Shift", "Alt", "Meta"].includes(e.key)) return;
+      // Modifiers alone wait for the key; AltGr is Ctrl+Alt under many layouts.
+      if (["Control", "Shift", "Alt", "AltGraph", "Meta"].includes(e.key)) return;
 
       const parts: string[] = [];
       if (e.ctrlKey)  parts.push("Ctrl");
       if (e.altKey)   parts.push("Alt");
       if (e.shiftKey) parts.push("Shift");
-      let key = e.key;
-      if (key === " ")         key = "Space";
-      else if (key.length === 1) key = key.toUpperCase();
-      else if (key === "Escape") {
+      if (e.key === "Escape") {
         window.removeEventListener("keydown", onKeyDown, true);
         await cancelCapture();
         // Focus first: a focus change cuts off what the screen reader is saying.
@@ -92,15 +91,18 @@
         announce(m.settings_hotkey_capture_cancelled());
         return;
       }
-      parts.push(key);
+      // The physical key, named the same under every keyboard layout.
+      const name = hotkeyKeyName(e.code, e.key);
+      parts.push(name ?? refusedKeyName(e.code, e.key));
       const shortcut = parts.join("+");
       // Capture ends here, whether or not the key can be registered.
       window.removeEventListener("keydown", onKeyDown, true);
       try {
+        if (name === null) throw new Error(`No hotkey name for ${e.code}`);
         await updateHotkey(shortcut);
       } catch {
-        // The key cannot be a global hotkey (no such key for the shortcut
-        // parser, such as a Cyrillic letter) or Windows refused it (another
+        // The key cannot be a global hotkey (the shortcut parser has no code
+        // for it, such as the Menu key) or Windows refused it (another
         // program holds it). The old hotkey comes back, nothing is saved, and
         // focus stays on Capture so that another key can be tried at once.
         await cancelCapture();

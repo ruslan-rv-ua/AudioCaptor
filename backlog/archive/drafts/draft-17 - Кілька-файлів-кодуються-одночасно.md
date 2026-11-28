@@ -4,7 +4,7 @@ title: Кілька файлів кодуються одночасно
 status: Draft
 assignee: []
 created_date: '2026-11-26T13:11:00Z'
-updated_date: '2026-11-26T13:11:02Z'
+updated_date: '2026-11-28T18:33:49Z'
 labels:
   - backend
   - frontend
@@ -37,3 +37,9 @@ type: enhancement
 - [ ] #4 Документацію оновлено там, де змінилася поведінка чи порядок роботи (README.md, README_UK.md, DEVELOPMENT.md)
 - [ ] #5 CHANGELOG.md оновлено: лише зміни, помітні користувачам (без подробиць про інструменти, тести, CI чи збірку)
 <!-- DOD:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-28, головна сесія: власник відмовився від цієї можливості; чернетку заархівовано.
+<!-- SECTION:NOTES:END -->

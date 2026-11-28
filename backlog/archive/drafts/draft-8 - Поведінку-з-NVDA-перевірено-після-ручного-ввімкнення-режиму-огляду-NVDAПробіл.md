@@ -6,7 +6,7 @@ title: >-
 status: Draft
 assignee: []
 created_date: '2026-11-23T22:05:12Z'
-updated_date: '2026-11-23T22:06:16Z'
+updated_date: '2026-11-28T18:51:36Z'
 labels:
   - frontend
   - a11y
@@ -40,3 +40,9 @@ type: task
 - [ ] #4 Документацію оновлено там, де змінилася поведінка чи порядок роботи (README.md, README_UK.md, DEVELOPMENT.md)
 - [ ] #5 CHANGELOG.md оновлено: лише зміни, помітні користувачам (без подробиць про інструменти, тести, CI чи збірку)
 <!-- DOD:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-28, головна сесія: власник відмовився: користувач скрінрідера, який сам увімкнув режим огляду, і так знає, як із нього вийти (NVDA+Пробіл). Чернетку заархівовано.
+<!-- SECTION:NOTES:END -->

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.2] — 2026-11-28
+
 ### Fixed
 
 - A WAV recording cut short because AudioCaptor crashed or was ended in Task Manager now opens with its real length and misses at most about the last second. Before, the sound was in the file, but the file said it was empty, so some players showed a length of zero or did not open it. In a profile with Opus, MP3 or FLAC, such a recording stays a WAV file, as before.
@@ -14,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A key that cannot be the global hotkey no longer leaves the Settings dialog stuck. After Capture, such a key (for example the Applications key) now makes the screen reader say once that it could not be set, with the key's name and the reason: it cannot be a global hotkey, or another program already uses it. The capture ends, focus stays on the Capture button so you can try another key at once, and your previous hotkey keeps working and stays saved (or there is still none). Before, the dialog kept waiting for a key and said nothing, the previous hotkey stopped working, and the key that did not work could be saved in its place. Keys without Ctrl or Alt are still accepted, as before.
 - The global hotkey can now be set under any keyboard layout. Capture takes the key you press, not the character it types, and names it in Latin letters and digits, the way shortcuts are named: Ctrl with the Й/Q key is "Ctrl+Q" under the Ukrainian layout too, and Ctrl+Shift+1 is "Ctrl+Shift+1". The hotkey field and the screen reader use that name. Before, under the Ukrainian layout Ctrl with a letter came out as a Cyrillic letter (Ctrl+Й), and Shift with a digit as a symbol (Ctrl+Shift+!) under any layout, and such a key could not be set. Punctuation keys are named by word, such as "Ctrl+Period" or "Ctrl+Minus". A hotkey you already saved, such as Pause or Ctrl+Alt+R, keeps working and shows as before.
 - Tab now goes round the main window without extra words from the screen reader. Tab on the last control (Start recording, or Stop recording while recording) moves straight to the first one, Minimize to tray, and Shift+Tab on Minimize to tray moves straight to the last control. Before, focus left the window's content for a moment there, and the screen reader sometimes said "blank" and "application" before it named the button. The rest of the Tab order and the dialogs are unchanged.
+
+### Changed
+
+- If you go back to AudioCaptor 0.4.1, a recording over 4 GB that is still waiting for its conversion to Opus, MP3 or FLAC stays a WAV file there, because 0.4.1 cannot convert RF64. Let the conversion finish before you go back.
 
 ## [0.4.1] — 2026-11-28
 
@@ -119,6 +125,7 @@ Initial release.
 - Settings migration (v1 → v2 → v3 → v4 → v5)
 - Scoop package manifest in [ruslan-rv-ua/scoop-bucket](https://github.com/ruslan-rv-ua/scoop-bucket)
 
+[0.4.2]: https://github.com/ruslan-rv-ua/AudioCaptor/releases/tag/v0.4.2
 [0.4.1]: https://github.com/ruslan-rv-ua/AudioCaptor/releases/tag/v0.4.1
 [0.4.0]: https://github.com/ruslan-rv-ua/AudioCaptor/releases/tag/v0.4.0
 [0.3.0]: https://github.com/ruslan-rv-ua/AudioCaptor/releases/tag/v0.3.0

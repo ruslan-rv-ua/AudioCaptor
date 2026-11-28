@@ -31,13 +31,15 @@ export function loadSettingsFields(s: Settings) {
   minimizeToTrayOnFocusLoss = s.minimizeToTrayOnFocusLoss ?? false;
 }
 
+// The key is stored only once it is registered: a key Windows refuses (the
+// call throws) leaves the stored hotkey as it was.
 export async function updateHotkey(shortcut: string | null) {
-  hotkey = shortcut;
   if (shortcut === null) {
     await api.unregisterHotkey();
   } else {
     await api.setHotkey(shortcut);
   }
+  hotkey = shortcut;
 }
 
 export async function updateSoundEnabled(enabled: boolean) {

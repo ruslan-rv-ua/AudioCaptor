@@ -589,7 +589,7 @@ impl QueueEvents for QueueToWindow {
 
 #[tauri::command]
 fn set_hotkey(app: tauri::AppHandle, shortcut: String) -> Result<(), String> {
-    hotkey::register(&app, &shortcut)
+    hotkey::register(&app, &shortcut).inspect_err(|e| log::warn!("Hotkey not set: {e}"))
 }
 
 #[tauri::command]

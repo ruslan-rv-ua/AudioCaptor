@@ -79,6 +79,8 @@
   "settings_hotkey_reset_btn_aria": "Clear hotkey",
   "settings_hotkey_none": "Not set",
   "settings_hotkey_capturing": "Press a key...",
+  "settings_hotkey_refused": "Could not set {hotkey} as the hotkey: it cannot be a global hotkey, or another program already uses it. The hotkey stays {previous}",
+  "settings_hotkey_refused_none": "Could not set {hotkey} as the hotkey: it cannot be a global hotkey, or another program already uses it. There is still no hotkey",
   "settings_sound_label": "Sound notifications",
   "settings_confirm_exit_label": "Confirm exit during recording or conversion",
   "settings_language_label": "Language",

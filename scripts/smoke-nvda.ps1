@@ -29,7 +29,10 @@
                dialog, Escape closes it and focus returns to where the dialog was opened. F1 in
                Settings opens About on top of Settings: UI Automation finds About in the middle
                of the window, and Settings again once About is closed. In Settings, Capture
-               keeps focus and says to press a key, Escape cancels it aloud; NVDA reads the
+               keeps focus and says to press a key, Escape cancels it aloud; the Applications
+               key, which cannot be a global hotkey, ends the capture: NVDA names the key and
+               says why once, focus stays on Capture, the app registers Pause again and
+               settings.json keeps it, Shift+Tab works again; NVDA reads the
                theme hint once on entering the group, the restart hint as the description of
                the Language list and once more when the language changes (not when it goes
                back); Clear says the hotkey is cleared. In New Profile, Tab
@@ -212,6 +215,7 @@ $UI = @{
     CaptureStarted = 'Press a key. Escape to cancel'  # settings_hotkey_capture_started
     CaptureCancelled = 'Hotkey capture cancelled'     # settings_hotkey_capture_cancelled
     HotkeyCleared  = 'Hotkey cleared'           # settings_hotkey_cleared
+    HotkeyRefused  = 'Could not set ContextMenu as the hotkey: it cannot be a global hotkey, or another program already uses it. The hotkey stays Pause'  # settings_hotkey_refused
     ThemeDark      = 'Dark'                     # settings_theme_dark
     ThemeLight     = 'Light'                    # settings_theme_light
     ThemeHint      = 'Auto follows the Windows color setting'  # settings_theme_hint
@@ -890,6 +894,18 @@ function Get-SaidSince([long]$From) {
                 ForEach-Object { $_.Text }) -join ' | ')
 }
 
+# The line the test copy logs each time it registers the hotkey Pause (hotkey.rs).
+$HotkeyRegistered = 'Global hotkey registered: Pause'
+
+# How many lines of the test copy's own log contain $Text. The app keeps the file open.
+function Get-AppLogCount([string]$Text) {
+    $path = Join-Path $DataDir 'logs\audiocaptor.log'
+    if (-not (Test-Path -LiteralPath $path)) { return 0 }
+    $stream = [IO.File]::Open($path, 'Open', 'Read', 'ReadWrite')
+    try { $content = (New-Object IO.StreamReader($stream)).ReadToEnd() } finally { $stream.Dispose() }
+    return ([regex]::Matches($content, [regex]::Escape($Text))).Count
+}
+
 function Get-Count([string]$Haystack, [string]$Needle) {
     if (-not $Needle -or -not $Haystack) { return 0 }
     $i = 0; $n = 0
@@ -1232,6 +1248,34 @@ function Invoke-DialogsScenario {
         $saved = ([IO.File]::ReadAllText($SettingsFile) | ConvertFrom-Json).hotkey
         Add-Check 'settings.json still has the hotkey Pause' ($saved -eq 'Pause') "hotkey is '$saved'"
     } -Once $UI.CaptureCancelled, $UI.CurrentHotkey
+
+    # A key that cannot be a global hotkey (backlog TASK-49). The Applications key reaches the
+    # capture as "ContextMenu", which the shortcut parser has no code for, under any keyboard
+    # layout. A key that another program holds with RegisterHotKey would not do: Windows gives
+    # it to that program and the focused window never sees it. So the test takes no hotkey.
+    Invoke-Step "Tab to the '$($UI.CaptureHotkey)' button again" {
+        Move-InDialog { (Get-Focus).Id -eq 'settings-hotkey-capture' } "the '$($UI.CaptureHotkey)' button"
+    } -Expect $UI.CaptureHotkey
+
+    Invoke-Step 'Space on Capture: NVDA says to press a key' {
+        Send-Keys 'Space'
+        Start-Sleep -Milliseconds 500
+    } -Once $UI.CaptureStarted
+
+    Invoke-Step 'The Applications key cannot be a hotkey: NVDA says so once, focus stays on Capture, Pause works again' {
+        $before = Get-AppLogCount $HotkeyRegistered
+        Send-Keys 'Apps'
+        $null = Wait-Until 'the app registers Pause again' { (Get-AppLogCount $HotkeyRegistered) -gt $before } 3
+        $f = Get-Focus
+        Add-Check "focus stays on the '$($UI.CaptureHotkey)' button" ($f -and $f.Id -eq 'settings-hotkey-capture') "focus on $(Format-Focus $f)"
+        $saved = ([IO.File]::ReadAllText($SettingsFile) | ConvertFrom-Json).hotkey
+        Add-Check 'settings.json still has the hotkey Pause' ($saved -eq 'Pause') "hotkey is '$saved'"
+    } -Once $UI.HotkeyRefused -Forbid $UI.CaptureStarted
+
+    Invoke-Step 'Shift+Tab works again and reaches the hotkey field: NVDA reads the hotkey as Pause' {
+        Send-Keys 'Shift+Tab'
+        $null = Wait-Until 'focus on the hotkey field' { (Get-Focus).Id -eq 'settings-hotkey-display' } 3
+    } -Expect $UI.CurrentHotkey
 
     Invoke-Step "Shift+Tab into the theme group: NVDA reads the theme hint once" {
         Send-Keys 'Shift+Tab'

@@ -94,11 +94,24 @@
       }
       parts.push(key);
       const shortcut = parts.join("+");
-      localHotkey = shortcut;
-      await updateHotkey(shortcut);
-      onsave({ hotkey: shortcut });
-      capturingHotkey = false;
+      // Capture ends here, whether or not the key can be registered.
       window.removeEventListener("keydown", onKeyDown, true);
+      try {
+        await updateHotkey(shortcut);
+      } catch {
+        // The key cannot be a global hotkey (no such key for the shortcut
+        // parser, such as a Cyrillic letter) or Windows refused it (another
+        // program holds it). The old hotkey comes back, nothing is saved, and
+        // focus stays on Capture so that another key can be tried at once.
+        await cancelCapture();
+        announce(localHotkey === null
+          ? m.settings_hotkey_refused_none({ hotkey: shortcut })
+          : m.settings_hotkey_refused({ hotkey: shortcut, previous: localHotkey }));
+        return;
+      }
+      localHotkey = shortcut;
+      capturingHotkey = false;
+      onsave({ hotkey: shortcut });
       // The field's name now holds the new key, and focus reads it.
       await tick();
       focusHotkeyField();
@@ -107,12 +120,17 @@
     window.addEventListener("keydown", onKeyDown, true);
   }
 
+  // Ends the capture and registers the hotkey the field shows again.
   async function cancelCapture() {
     capturingHotkey = false;
-    if (localHotkey === null) {
-      await api.unregisterHotkey();
-    } else {
-      await api.setHotkey(localHotkey);
+    try {
+      if (localHotkey === null) {
+        await api.unregisterHotkey();
+      } else {
+        await api.setHotkey(localHotkey);
+      }
+    } catch (e) {
+      console.error("Could not restore the hotkey:", e);
     }
   }
 

@@ -79,6 +79,8 @@
   "settings_hotkey_reset_btn_aria": "Очистити гарячу клавішу",
   "settings_hotkey_none": "Не задана",
   "settings_hotkey_capturing": "Натисніть клавішу...",
+  "settings_hotkey_refused": "Не вдалося задати {hotkey} гарячою клавішею: вона не може бути глобальною гарячою клавішею, або її вже зайняла інша програма. Гаряча клавіша лишається {previous}",
+  "settings_hotkey_refused_none": "Не вдалося задати {hotkey} гарячою клавішею: вона не може бути глобальною гарячою клавішею, або її вже зайняла інша програма. Гарячої клавіші й далі немає",
   "settings_sound_label": "Звукові сповіщення",
   "settings_confirm_exit_label": "Підтвердження виходу під час запису чи конвертації",
   "settings_language_label": "Мова",

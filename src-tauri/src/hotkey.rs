@@ -21,16 +21,25 @@ static STOP_TRIGGERED: AtomicBool = AtomicBool::new(false);
 /// (from a previous press/release cycle) can detect they are outdated.
 static PRESS_EPOCH: AtomicU64 = AtomicU64::new(0);
 
+/// Parses a shortcut as the capture in the settings dialog builds it, such as
+/// `Ctrl+Shift+F9`. Fails for a key the parser has no code for: a letter of a
+/// non-Latin layout (`Ctrl+Й`), a shifted symbol (`Ctrl+Shift+!`), or a key
+/// such as `ContextMenu`.
+fn parse(shortcut_str: &str) -> Result<Shortcut, String> {
+    shortcut_str
+        .parse()
+        .map_err(|e| format!("Invalid shortcut '{shortcut_str}': {e}"))
+}
+
 /// Register the global hotkey. Safe to call multiple times (re-registration).
+/// A shortcut that does not parse leaves the current hotkey registered; one
+/// that Windows refuses (another program holds it) leaves none.
 pub fn register(app: &AppHandle, shortcut_str: &str) -> Result<(), String> {
     let manager = app.global_shortcut();
+    let shortcut = parse(shortcut_str)?;
 
     // Unregister all first (safe no-op if nothing registered)
     let _ = manager.unregister_all();
-
-    let shortcut: Shortcut = shortcut_str
-        .parse()
-        .map_err(|e| format!("Invalid shortcut '{shortcut_str}': {e}"))?;
 
     let app_handle = app.clone();
     manager
@@ -283,6 +292,37 @@ mod tests {
         // Stale timer (epoch1) checks current epoch — must not match
         assert_ne!(epoch1, PRESS_EPOCH.load(Ordering::SeqCst));
         assert_eq!(epoch2, PRESS_EPOCH.load(Ordering::SeqCst));
+    }
+
+    #[test]
+    fn parse_accepts_keys_the_capture_builds() {
+        for s in [
+            "Pause",
+            "Tab",
+            "Enter",
+            "Space",
+            "ArrowUp",
+            "A",
+            "5",
+            "F12",
+            "Ctrl+Alt+R",
+            "Ctrl+Shift+F9",
+        ] {
+            assert!(parse(s).is_ok(), "{s} should parse");
+        }
+    }
+
+    #[test]
+    fn parse_refuses_keys_without_a_code() {
+        for s in [
+            "Ctrl+Й",
+            "Ctrl+Shift+!",
+            "ContextMenu",
+            "Shift++",
+            "Unidentified",
+        ] {
+            assert!(parse(s).is_err(), "{s} should not parse");
+        }
     }
 
     #[test]

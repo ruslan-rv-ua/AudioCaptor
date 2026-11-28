@@ -1,11 +1,11 @@
 ---
 id: TASK-50
 title: Запис, довший за 6 год 12 хв, не псує WAV
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-26T13:07:05Z'
-updated_date: '2026-11-28T03:55:07Z'
+updated_date: '2026-11-28T04:16:00Z'
 labels:
   - backend
   - audio
@@ -91,6 +91,8 @@ WAV зберігає розмір даних у 32-бітному полі, то
 DoD #2 і #3 відмічено з приміткою: нового тексту інтерфейсу немає, інтерфейс, фокус і оголошення не змінювалися; `just smoke record convert mp3 flac` з NVDA однаково пройшов.
 
 2026-11-28, головна сесія: звіт звірено з дифом, з протоколами великих файлів (`task-50-check-*.txt`) і `just smoke record convert mp3 flac` (45 кроків з 45; exe зібрано після коміту), з відповідями власника в робочій сесії; `just check` на гілці повторено (152 тести). Гілку `bugfix/task-50-rf64-past-4gb` злито в `develop` і відправлено (вибір власника). Бо `hound` перейшов у `[dev-dependencies]`, задачу буде закрито після зеленого CI, запущеного вручну на `develop`. Перемикач межі RF64 для `just smoke` — чернетка DRAFT-22 в етапі «Супровід» (вибір власника).
+
+2026-11-28, головна сесія: CI, запущений вручну на `develop` (коміт 72ba9db), зелений: https://github.com/ruslan-rv-ua/AudioCaptor/actions/runs/46105115585. Задачу закрито за вибором власника.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

@@ -29,8 +29,8 @@
                dialog, Escape closes it and focus returns to where the dialog was opened. F1 in
                Settings opens About on top of Settings: UI Automation finds About in the middle
                of the window, and Settings again once About is closed. In Settings, Capture
-               keeps focus and says to press a key, Escape cancels it aloud; the Applications
-               key, which cannot be a global hotkey, ends the capture: NVDA names the key and
+               keeps focus and says to press a key, Escape cancels it aloud; Ctrl+Shift+1
+               (Ctrl+Shift+!, which cannot be a global hotkey) ends the capture: NVDA names the key and
                says why once, focus stays on Capture, the app registers Pause again and
                settings.json keeps it, Shift+Tab works again; NVDA reads the
                theme hint once on entering the group, the restart hint as the description of
@@ -215,7 +215,7 @@ $UI = @{
     CaptureStarted = 'Press a key. Escape to cancel'  # settings_hotkey_capture_started
     CaptureCancelled = 'Hotkey capture cancelled'     # settings_hotkey_capture_cancelled
     HotkeyCleared  = 'Hotkey cleared'           # settings_hotkey_cleared
-    HotkeyRefused  = 'Could not set ContextMenu as the hotkey: it cannot be a global hotkey, or another program already uses it. The hotkey stays Pause'  # settings_hotkey_refused
+    HotkeyRefused  = 'Could not set Ctrl+Shift+! as the hotkey: it cannot be a global hotkey, or another program already uses it. The hotkey stays Pause'  # settings_hotkey_refused
     ThemeDark      = 'Dark'                     # settings_theme_dark
     ThemeLight     = 'Light'                    # settings_theme_light
     ThemeHint      = 'Auto follows the Windows color setting'  # settings_theme_hint
@@ -1249,10 +1249,10 @@ function Invoke-DialogsScenario {
         Add-Check 'settings.json still has the hotkey Pause' ($saved -eq 'Pause') "hotkey is '$saved'"
     } -Once $UI.CaptureCancelled, $UI.CurrentHotkey
 
-    # A key that cannot be a global hotkey (backlog TASK-49). The Applications key reaches the
-    # capture as "ContextMenu", which the shortcut parser has no code for, under any keyboard
-    # layout. A key that another program holds with RegisterHotKey would not do: Windows gives
-    # it to that program and the focused window never sees it. So the test takes no hotkey.
+    # A key that cannot be a global hotkey (backlog TASK-49). Ctrl+Shift+1 reaches the capture
+    # as "Ctrl+Shift+!" under the English and the Ukrainian layout, and the shortcut parser has no
+    # code for "!". A key that another program holds with RegisterHotKey would not do: Windows
+    # gives it to that program and the focused window never sees it. So the test takes no hotkey.
     Invoke-Step "Tab to the '$($UI.CaptureHotkey)' button again" {
         Move-InDialog { (Get-Focus).Id -eq 'settings-hotkey-capture' } "the '$($UI.CaptureHotkey)' button"
     } -Expect $UI.CaptureHotkey
@@ -1262,9 +1262,9 @@ function Invoke-DialogsScenario {
         Start-Sleep -Milliseconds 500
     } -Once $UI.CaptureStarted
 
-    Invoke-Step 'The Applications key cannot be a hotkey: NVDA says so once, focus stays on Capture, Pause works again' {
+    Invoke-Step 'Ctrl+Shift+1 cannot be a hotkey: NVDA says so once, focus stays on Capture, Pause works again' {
         $before = Get-AppLogCount $HotkeyRegistered
-        Send-Keys 'Apps'
+        Send-Keys 'Ctrl+Shift+1'
         $null = Wait-Until 'the app registers Pause again' { (Get-AppLogCount $HotkeyRegistered) -gt $before } 3
         $f = Get-Focus
         Add-Check "focus stays on the '$($UI.CaptureHotkey)' button" ($f -and $f.Id -eq 'settings-hotkey-capture') "focus on $(Format-Focus $f)"

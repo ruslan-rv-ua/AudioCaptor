@@ -4,6 +4,7 @@ title: Випуск 0.5.0
 status: To Do
 assignee: []
 created_date: '2026-11-28T18:29:45Z'
+updated_date: '2026-11-28T18:44:06Z'
 labels:
   - release
   - model-sonnet
@@ -12,6 +13,11 @@ milestone: m-10
 dependencies:
   - TASK-43
   - TASK-54
+  - TASK-56
+  - TASK-57
+  - TASK-58
+  - TASK-59
+  - TASK-60
 references:
   - DEVELOPMENT.md
   - CHANGELOG.md
@@ -24,6 +30,8 @@ ordinal: 20500
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
 Випуск з новими можливостями: клавіші для папки записів, профілів, налаштувань і меню трея, повний шлях у полі теки й довідка (TASK-43); теги з назвою профілю й датою у файлах Opus, MP3 і FLAC (TASK-54).
+
+Також оновлено бібліотеки без змін для користувачів: TASK-56, TASK-57, TASK-58, TASK-59, TASK-60.
 
 Порядок випуску — у `DEVELOPMENT.md`, так само як для 0.4.2 (TASK-53). Push і запуск workflow потребують дозволу власника.
 <!-- SECTION:DESCRIPTION:END -->
@@ -46,3 +54,9 @@ ordinal: 20500
 - [ ] #4 Документацію оновлено там, де змінилася поведінка чи порядок роботи (README.md, README_UK.md, DEVELOPMENT.md)
 - [ ] #5 CHANGELOG.md оновлено: лише зміни, помітні користувачам (без подробиць про інструменти, тести, CI чи збірку)
 <!-- DOD:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-28: за рішенням власника в етап додано оновлення бібліотек із DRAFT-2 (TASK-56…TASK-60); випуск чекає й на них.
+<!-- SECTION:NOTES:END -->

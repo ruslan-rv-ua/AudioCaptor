@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - A WAV recording cut short because AudioCaptor crashed or was ended in Task Manager now opens with its real length and misses at most about the last second. Before, the sound was in the file, but the file said it was empty, so some players showed a length of zero or did not open it. In a profile with Opus, MP3 or FLAC, such a recording stays a WAV file, as before.
+- A WAV recording longer than about 6 h 12 min at 48 kHz (6 h 45 min at 44.1 kHz) now plays to its end. Past 4 GB, the most a WAV file can hold, AudioCaptor goes on writing the same file as RF64, the form of WAV for larger files, and the file keeps its `.wav` name. Before, the length in the file went wrong past 4 GB, and players played only part of the recording or nothing. Not every program opens RF64: see "WAV recordings over 4 GB" in the README. A shorter recording is an ordinary WAV, as before. In a profile with Opus, MP3 or FLAC the converted file already held the whole recording.
 
 ## [0.4.1] — 2026-11-28
 

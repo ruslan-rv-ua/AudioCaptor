@@ -508,7 +508,7 @@ fn decode_file(
 mod tests {
     use super::*;
     use crate::audio::types::OutputFormat;
-    use crate::convert::test_util::{free_run, test_dir, tone_wav};
+    use crate::convert::test_util::{free_run, rf64_recording, test_dir, tone_wav};
     use std::path::PathBuf;
 
     /// What a player plays of an Ogg Opus file: 48 kHz, interleaved.
@@ -849,5 +849,34 @@ mod tests {
         assert_eq!(rest.len(), 8 + comment_len);
         let comment = std::str::from_utf8(&rest[8..]).unwrap();
         assert!(comment.starts_with("ENCODER=AudioCaptor "), "{comment}");
+    }
+
+    #[test]
+    fn converts_a_recording_that_passed_the_4_gb_mark() {
+        let dir = test_dir("opus-rf64");
+        let (job, _) = rf64_recording(
+            &dir.join("mix.wav"),
+            48_000,
+            2,
+            2.0,
+            (1000.0, 400.0),
+            OutputFormat::OpusMusic,
+        );
+        let codec = OpusCodec::new(Variant::Music);
+        let (cancel, report) = free_run();
+
+        let output =
+            crate::convert::convert_file(&job, &codec, &Control::new(cancel, report)).unwrap();
+
+        assert!(!job.wav.exists(), "the WAV is deleted");
+        let played = play(&output);
+        assert_eq!(played.info.playable, job.frames);
+        // Both channels, each in its place: the samples were read from where
+        // they lie in the RF64 file.
+        let left = pitch(&played.channel(0)[24_000..72_000]);
+        let right = pitch(&played.channel(1)[24_000..72_000]);
+        assert!((left - 1000.0).abs() < 10.0, "left: {left} Hz");
+        assert!((right - 400.0).abs() < 10.0, "right: {right} Hz");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

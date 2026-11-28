@@ -619,7 +619,7 @@ fn decode_file(path: &Path, sink: &mut Sink) -> Result<StreamInfo, ConvertError>
 mod tests {
     use super::*;
     use crate::audio::types::OutputFormat;
-    use crate::convert::test_util::{free_run, test_dir, tone_wav};
+    use crate::convert::test_util::{free_run, rf64_recording, test_dir, tone_wav};
     use crate::convert::{convert_file, temp_path};
     use std::path::PathBuf;
     use std::sync::atomic::{AtomicBool, Ordering};
@@ -956,6 +956,32 @@ mod tests {
             .collect();
         assert_eq!(left, std::slice::from_ref(&output));
         assert!(play(&output).1 == recorded);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn converts_a_recording_that_passed_the_4_gb_mark() {
+        let dir = test_dir("flac-rf64");
+        let (job, stored) = rf64_recording(
+            &dir.join("mix.wav"),
+            48_000,
+            2,
+            1.0,
+            (440.0, 660.0),
+            OutputFormat::Flac,
+        );
+        let (cancel, report) = free_run();
+
+        let output = convert_file(&job, &FlacCodec, &Control::new(cancel, report)).unwrap();
+
+        assert!(!job.wav.exists(), "the WAV is deleted");
+        let (info, samples) = play(&output);
+        assert_eq!(info.frames, job.frames);
+        let expected: Vec<i32> = stored.into_iter().map(i32::from).collect();
+        assert!(
+            samples == expected,
+            "the FLAC file holds the samples of the RF64 file"
+        );
         let _ = std::fs::remove_dir_all(&dir);
     }
 

@@ -1,10 +1,12 @@
-//! Reads the samples of a WAV recording made by `audio::writer`.
+//! Reads the samples of a WAV recording made by `audio::writer`: a plain WAV,
+//! or RF64 past 4 GB (about 6 h 12 min at 48 kHz stereo).
 //!
 //! How many frames to read is given by the caller, who counted them while
-//! recording. The length in the WAV header is ignored: hound keeps it in 32
-//! bits, so past 4 GB (about 6 h 12 min at 48 kHz stereo) it has wrapped around
-//! while the samples are all in the file, and after a failed finalize it can be
-//! a second short (`audio::writer` brings it up to date every second).
+//! recording. The length in the header is ignored: after a crash or a failed
+//! finalize it can be a second short (`audio::writer` brings it up to date
+//! every second), and a WAV past 4 GB from AudioCaptor 0.4.1 or older is not
+//! RF64 but has its 32-bit length wrapped around, while the samples are all in
+//! the file. Such a WAV can still wait in the conversion queue.
 
 use std::fs::File;
 use std::io::{self, BufReader, Read};
@@ -83,11 +85,12 @@ fn invalid(reason: impl Into<String>) -> io::Error {
 }
 
 /// Reads up to the first sample of the `data` chunk and returns the channel
-/// count and the sample rate from the `fmt ` chunk.
+/// count and the sample rate from the `fmt ` chunk. Other chunks before it,
+/// such as `JUNK` and the `ds64` chunk of RF64, are skipped.
 fn read_header(reader: &mut impl Read) -> io::Result<(u16, u32)> {
     let mut riff = [0u8; 12];
     reader.read_exact(&mut riff)?;
-    if &riff[0..4] != b"RIFF" || &riff[8..12] != b"WAVE" {
+    if !matches!(&riff[0..4], b"RIFF" | b"RF64") || &riff[8..12] != b"WAVE" {
         return Err(invalid("not a WAV file"));
     }
     let mut format = None;
@@ -178,14 +181,53 @@ mod tests {
     }
 
     #[test]
+    fn reads_recordings_on_both_sides_of_the_4_gb_mark() {
+        use crate::audio::writer::{OutputWriter, WavOutputWriter};
+        let dir = test_dir("wav-rf64");
+        // The mark lowered to 100 000 bytes of samples: 25 000 stereo frames.
+        for (name, frames, magic) in [
+            ("below.wav", 20_000usize, b"RIFF"),
+            ("past.wav", 30_000, b"RF64"),
+        ] {
+            let path = dir.join(name);
+            let sound: Vec<f32> = (0..frames * 2)
+                .map(|i| ((i * 7919) % 2001) as f32 / 1000.0 - 1.0)
+                .collect();
+            let mut writer: Box<dyn OutputWriter> = Box::new(
+                WavOutputWriter::with_rf64_past(path.clone(), 48_000, 2, 100_000).unwrap(),
+            );
+            for part in sound.chunks(960) {
+                writer.write_samples(part).unwrap();
+            }
+            writer.finalize();
+            assert_eq!(&std::fs::read(&path).unwrap()[..4], magic, "{name}");
+
+            let mut wav = WavPcm::open(&path, frames as u64).unwrap();
+            assert_eq!((wav.sample_rate(), wav.channels()), (48_000, 2));
+            let mut all = Vec::new();
+            let mut part = Vec::new();
+            while wav.read(4096, &mut part).unwrap() > 0 {
+                all.extend_from_slice(&part);
+            }
+            let stored: Vec<i16> = sound
+                .iter()
+                .map(|&s| (s.clamp(-1.0, 1.0) * i16::MAX as f32) as i16)
+                .collect();
+            assert!(all == stored, "{name}: samples differ");
+        }
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn frame_count_wins_over_the_length_in_the_header() {
         let dir = test_dir("wav-header");
         let path = dir.join("a.wav");
         let samples: Vec<i16> = (0..960).map(|i| i as i16).collect();
         write_wav(&path, 48_000, 2, &samples);
         // What a WAV looks like after the app was killed while recording, and
-        // (with another wrong number) past 4 GB: the lengths in the header do
-        // not match the samples that follow.
+        // (with another wrong number) past 4 GB from AudioCaptor 0.4.1 or
+        // older: the lengths in the header do not match the samples that
+        // follow.
         let mut file = std::fs::OpenOptions::new().write(true).open(&path).unwrap();
         file.seek(SeekFrom::Start(4)).unwrap();
         file.write_all(&0u32.to_le_bytes()).unwrap();

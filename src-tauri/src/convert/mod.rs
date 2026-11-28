@@ -277,6 +277,51 @@ pub(crate) mod test_util {
         }
     }
 
+    /// Records `seconds` of tones of `left_hz` and `right_hz` (the second one
+    /// only in stereo) through the app's own writer, with its 4 GB mark
+    /// lowered to the middle of the recording: the file is RF64, as that of a
+    /// recording longer than about 6 h 12 min at 48 kHz stereo. Returns the job
+    /// and the samples as the file holds them.
+    pub fn rf64_recording(
+        path: &Path,
+        sample_rate: u32,
+        channels: u16,
+        seconds: f32,
+        (left_hz, right_hz): (f32, f32),
+        format: OutputFormat,
+    ) -> (Job, Vec<i16>) {
+        use crate::audio::writer::{OutputWriter, WavOutputWriter};
+        let frames = (seconds * sample_rate as f32).round() as usize;
+        let sound: Vec<f32> = (0..frames)
+            .flat_map(|i| {
+                let t = i as f32 / sample_rate as f32;
+                (0..channels).map(move |channel| {
+                    let hz = if channel == 0 { left_hz } else { right_hz };
+                    0.5 * (TAU * hz * t).sin()
+                })
+            })
+            .collect();
+        // Two bytes a sample: half the bytes is as many bytes as samples.
+        let half = sound.len() as u64;
+        let mut writer: Box<dyn OutputWriter> = Box::new(
+            WavOutputWriter::with_rf64_past(path.to_path_buf(), sample_rate, channels, half)
+                .unwrap(),
+        );
+        for part in sound.chunks(960) {
+            writer.write_samples(part).unwrap();
+        }
+        let recorded = writer.finalize();
+        let bytes = std::fs::read(path).unwrap();
+        assert_eq!(&bytes[..4], b"RF64");
+        let stored = bytes[80..]
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .map(|&pair| i16::from_le_bytes(pair))
+            .collect();
+        (Job::new(recorded, format), stored)
+    }
+
     /// A control that never cancels and ignores progress.
     pub fn free_run() -> (&'static AtomicBool, &'static (dyn Fn(f32) + Sync)) {
         static NEVER: AtomicBool = AtomicBool::new(false);

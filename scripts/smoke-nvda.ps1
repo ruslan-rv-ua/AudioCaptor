@@ -1657,7 +1657,8 @@ function Invoke-Mp3Scenario {
             Send-Keys 'Alt+T'
             $null = Wait-Until "the '$($UI.Start)' button" { Find-ByName $UI.Start }
             $files = Get-LoopbackFiles $queueFile
-            $wav = @($files.Keys | Where-Object { $_ -like 'loopback_*.wav' -and $files[$_] -gt 44 })
+            # A WAV with sound in it: larger than its 80-byte header (TASK-50).
+            $wav = @($files.Keys | Where-Object { $_ -like 'loopback_*.wav' -and $files[$_] -gt 80 })
             Add-Check 'the recording is kept as WAV' ($wav.Count -eq 1)
             $other = @($files.Keys | Where-Object { $_ -notlike '*.wav' })
             Add-Check 'no MP3 file and no temporary file is left' ($other.Count -eq 0) ($other -join ', ')

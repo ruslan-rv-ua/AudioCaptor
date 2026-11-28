@@ -25,7 +25,6 @@ tauri-plugin-single-instance = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 wasapi = "0.17"
-hound = "3.5"
 rubato = "0.16"
 # Opus: libopus (C, built with CMake by opusic-sys) and the Ogg container (decision-8)
 opus = "0.4"
@@ -60,6 +59,11 @@ windows-core = "0.59"
 # to turn off the browser keys and menu (webview.rs).
 webview2-com = "0.39"
 windows-core-webview2 = { package = "windows-core", version = "0.62" }
+
+[dev-dependencies]
+# WAV files in tests: written as AudioCaptor 0.4.1 and older wrote them, and read
+# back to check the app's own writer (audio/writer.rs) against another reader.
+hound = "3.5"
 
 # The C libraries are optimised in dev builds too, so clippy, tests and `just dev`
 # run libFLAC and libopus as the release does: with optimisation and NDEBUG, not

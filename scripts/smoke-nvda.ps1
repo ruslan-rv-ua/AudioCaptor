@@ -1358,7 +1358,7 @@ function Restore-KeyboardLayout {
 # From the hotkey field: Tab to Capture, Space, then the chord. The capture ends with the new
 # hotkey: the app registers it, settings.json has it, focus is on the hotkey field, NVDA reads its
 # name once, and Windows gives the key to the app alone. Mods: Alt 1, Ctrl 2, Shift 4.
-function Invoke-HotkeyCapture([string]$Chord, [string]$Title, [string]$FieldName, [uint32]$Mods, [uint32]$Vk) {
+function Invoke-HotkeyCapture([string]$Chord, [string]$Title, [string]$FieldName, [uint32]$Mods, [uint32]$VirtualKey) {
     Invoke-Step "Tab to the '$($UI.CaptureHotkey)' button, Space: NVDA says to press a key" {
         Move-InDialog { (Get-Focus).Id -eq 'settings-hotkey-capture' } "the '$($UI.CaptureHotkey)' button"
         Send-Keys 'Space'
@@ -1370,9 +1370,15 @@ function Invoke-HotkeyCapture([string]$Chord, [string]$Title, [string]$FieldName
         Send-Keys $Chord
         $null = Wait-Until "the app registers $Chord" { (Get-AppLogCount $line) -gt $before } 3
         $null = Wait-Until 'focus on the hotkey field' { (Get-Focus).Id -eq 'settings-hotkey-display' } 3
-        $saved = ([IO.File]::ReadAllText($SettingsFile) | ConvertFrom-Json).hotkey
+        # The app saves settings.json a moment after focus moves.
+        $deadline = (Get-Date).AddSeconds(3)
+        do {
+            try { $saved = ([IO.File]::ReadAllText($SettingsFile) | ConvertFrom-Json).hotkey } catch { $saved = $null }
+            if ($saved -eq $Chord) { break }
+            Start-Sleep -Milliseconds 100
+        } while ((Get-Date) -lt $deadline)
         Add-Check "settings.json has the hotkey $Chord" ($saved -eq $Chord) "hotkey is '$saved'"
-        Add-Check "Windows gives $Chord to the app: the test cannot take it" ([AcSmokeNative]::HotkeyTaken($Mods, $Vk))
+        Add-Check "Windows gives $Chord to the app: the test cannot take it" ([AcSmokeNative]::HotkeyTaken($Mods, $VirtualKey))
     } -Once $FieldName -Forbid $UI.CaptureStarted
 }
 
